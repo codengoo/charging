@@ -7,7 +7,7 @@
 | File | Action |
 |---|---|
 | `src/data/stations.ts` | MODIFY: thêm `STATUS_LABEL`, `statusOf(station, detail?)` |
-| `src/map/MapView.tsx` | MODIFY: `Filters.activeOnly`, thuộc tính `st` trên feature, `icon-opacity` |
+| `src/map/MapView.tsx` | MODIFY: `Filters.activeOnly`, thuộc tính `st` trên feature, `icon-opacity`; **bỏ nút zoom +/− và ẩn nút định vị** (yêu cầu thêm của người dùng giữa phase, GeolocateControl vẫn chạy ngầm) |
 | `src/ui/StationSheet.tsx` | MODIFY: nhãn trạng thái dùng `statusOf` (thêm Planned, AllBusy) |
 | `src/App.tsx` | MODIFY: `Filters.activeOnly` + chip "Đang hoạt động" |
 

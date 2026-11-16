@@ -1,4 +1,4 @@
-import type { DataBundle, DataManifest, PortGroup, Station, StationPower } from './types'
+import type { DataBundle, DataManifest, PortGroup, Station, StationPower, StationStatus } from './types'
 
 const CELL_SIZE = 0.1
 
@@ -193,4 +193,28 @@ export function nearestStations(
     }
   }
   return []
+}
+
+/** Trạng thái để hiển thị. `busy` chỉ có từ chi tiết live — base không giữ trạng thái này. */
+export type StatusKind = 'active' | 'busy' | 'maintaining' | 'out' | 'planned'
+
+const FROM_BASE: Record<StationStatus, StatusKind> = { 0: 'active', 1: 'maintaining', 2: 'out', 3: 'planned' }
+const FROM_DEPOT: Record<string, StatusKind> = {
+  Available: 'active',
+  AllBusy: 'busy',
+  Maintaining: 'maintaining',
+  OutOfService: 'out',
+  Planned: 'planned',
+}
+
+export const STATUS_LABEL: Record<Exclude<StatusKind, 'active'>, string> = {
+  busy: 'Đang hết cổng trống',
+  maintaining: 'Đang bảo trì',
+  out: 'Ngừng hoạt động',
+  planned: 'Sắp khai trương',
+}
+
+/** `depot_status` của chi tiết (live, khi mở trạm) đè bản build ngày. */
+export function statusOf(st: Station, depotStatus?: string | null): StatusKind {
+  return (depotStatus && Object.hasOwn(FROM_DEPOT, depotStatus) && FROM_DEPOT[depotStatus]) || FROM_BASE[st.status]
 }

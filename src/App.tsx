@@ -21,6 +21,7 @@ const DEFAULT_TITLE = document.title
 
 interface Filters {
   favoritesOnly: boolean
+  activeOnly: boolean
 }
 
 export function App() {
@@ -44,6 +45,7 @@ export function App() {
   const savedCount = allSaved(book).size
   const [filters, setFilters] = useState<Filters>({
     favoritesOnly: false,
+    activeOnly: false,
   })
 
   // Mở từ link chia sẻ /tram/<id>-<slug>: chọn trạm và bay tới ngay khi có dữ liệu (một lần).
@@ -114,6 +116,11 @@ export function App() {
             label={`Đã lưu${savedCount ? ` (${savedCount})` : ''}`}
             on={filters.favoritesOnly}
             onClick={() => setFilters((f) => ({ ...f, favoritesOnly: !f.favoritesOnly }))}
+          />
+          <FilterChip
+            label="Đang hoạt động"
+            on={filters.activeOnly}
+            onClick={() => setFilters((f) => ({ ...f, activeOnly: !f.activeOnly }))}
           />
           <Chip variant="floating" onClick={() => setShowSaved(true)}>
             <List />

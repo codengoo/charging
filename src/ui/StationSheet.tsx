@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { CalendarCheck, Clock, Heart, Navigation, Phone, PlugZap, QrCode, Wrench } from 'lucide-react'
+import { CalendarCheck, CalendarClock, Clock, Heart, Navigation, Phone, PlugZap, QrCode, Wrench } from 'lucide-react'
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -11,6 +11,7 @@ import {
 import { Chip } from '@/components/ui/chip'
 import { Button } from '@/components/ui/button'
 import { group, groupsOf, type GroupBook } from '../data/groups'
+import { STATUS_LABEL, statusOf } from '../data/stations'
 import type { Station, StationDetail, StationPower } from '../data/types'
 import { GroupGlyph } from './groupIcons'
 import { ImagePreview } from './ImagePreview'
@@ -33,6 +34,14 @@ interface Props {
   children?: ReactNode
 }
 
+/** Nền chip trạng thái: chưa mở là xám (chờ), hết cổng là vàng (tạm thời), còn lại đỏ. */
+const STATUS_BG = {
+  busy: 'bg-[#F0A500]',
+  maintaining: 'bg-[#E53935]',
+  out: 'bg-[#E53935]',
+  planned: 'bg-[#64748B]',
+} as const
+
 export function StationSheet({ open, station, book, power, powerLoading, detail, detailLoading, onOpenGroups, onShare, onClose, children }: Props) {
   const gmapsDir = `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}`
   const groups = groupsOf(book, station.entityId)
@@ -44,7 +53,7 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
     detail && detail.groups.length > 0 && detail.maxKw !== null
       ? { portCount: detail.portCount, maxKw: detail.maxKw, dcCount: detail.dcCount, groups: detail.groups }
       : power
-  const closed = detail?.depotStatus === 'Maintaining' || detail?.depotStatus === 'OutOfService'
+  const status = statusOf(station, detail?.depotStatus)
 
   return (
     <ResponsiveDialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -60,10 +69,10 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
 
         {/* Một hàng, vuốt ngang khi tràn (ẩn scrollbar) — bảng không cao lên vì chip. */}
         <div data-vaul-no-drag className="-mx-5 mt-2 flex gap-2 overflow-x-auto px-5 no-scrollbar">
-          {closed && (
-            <Chip size="sm" className="bg-[#E53935] text-white">
-              <Wrench />
-              {detail?.depotStatus === 'Maintaining' ? 'Đang bảo trì' : 'Ngừng hoạt động'}
+          {status !== 'active' && (
+            <Chip size="sm" className={`text-white ${STATUS_BG[status]}`}>
+              {status === 'planned' ? <CalendarClock /> : <Wrench />}
+              {STATUS_LABEL[status]}
             </Chip>
           )}
           <Chip size="sm" variant={station.isPublic ? 'default' : 'secondary'}>

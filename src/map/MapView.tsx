@@ -29,6 +29,7 @@ const PIN_W_BIG = 44
 
 interface Filters {
   favoritesOnly: boolean
+  activeOnly: boolean
 }
 
 function toGeoJSON(
@@ -40,12 +41,13 @@ function toGeoJSON(
   const features: GeoJSON.Feature[] = []
   for (const st of index.all) {
     if (filters.favoritesOnly && !saved.has(st.entityId)) continue
+    if (filters.activeOnly && st.status !== 0) continue
     const grp = saved.has(st.entityId) ? (pinGroupOf(book, st.entityId) ?? '') : ''
     features.push({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [st.lng, st.lat] },
-      // grp = nhóm đại diện cho ghim; chuỗi rỗng = chưa lưu ở đâu.
-      properties: { id: st.entityId, grp, rank: grp ? 1 : 0 },
+      // grp = nhóm đại diện cho ghim; chuỗi rỗng = chưa lưu ở đâu. st = trạng thái (0 hoạt động).
+      properties: { id: st.entityId, grp, rank: grp ? 1 : 0, st: st.status },
     })
   }
   return { type: 'FeatureCollection', features }
@@ -113,13 +115,16 @@ export function MapView({ index, filters, book, selected, flyTo, onSelect, onLoc
     mapRef.current = map
     if (import.meta.env.DEV) (window as unknown as { __map: maplibregl.Map }).__map = map
 
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
     const geo = new maplibregl.GeolocateControl({
       positionOptions: { enableHighAccuracy: true },
       trackUserLocation: true,
       showUserLocation: true,
     })
     map.addControl(geo, 'top-right')
+    // Không hiện nút (zoom bằng ngón tay / con lăn là đủ): control vẫn cần để vẽ chấm vị trí,
+    // tự bay về chỗ người dùng lúc mở và báo onLocate. Góc trên phải chỉ có control này.
+    const corner = map.getContainer().querySelector<HTMLElement>('.maplibregl-ctrl-top-right')
+    if (corner) corner.style.display = 'none'
     geo.on('geolocate', (e: GeolocationPosition) => {
       latest.current.onLocate?.({ lat: e.coords.latitude, lng: e.coords.longitude })
     })
@@ -177,7 +182,12 @@ export function MapView({ index, filters, book, selected, flyTo, onSelect, onLoc
           // Trạm nằm sát nhau rất nhiều; để MapLibre tự giấu bớt thì bấm trạm nào trạm đó mất.
           'icon-allow-overlap': true,
           'icon-ignore-placement': true,
-          'symbol-sort-key': ['get', 'rank'],
+          // Trạm không hoạt động vẽ dưới trạm thường; trạm đã lưu vẫn nổi nhất.
+          'symbol-sort-key': ['-', ['get', 'rank'], ['case', ['==', ['get', 'st'], 0], 0, 2]],
+        },
+        paint: {
+          // Bảo trì / ngừng / chưa khai trương: vẫn vẽ để biết có trạm, nhưng lùi ra sau.
+          'icon-opacity': ['case', ['==', ['get', 'st'], 0], 1, 0.45],
         },
       })
       // Trạm đang chọn: nguồn riêng một điểm để đổi chọn không phải dựng lại 24k feature.
