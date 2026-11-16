@@ -44,7 +44,8 @@ Cron đã đặt `0 19 * * *` (02:00 giờ VN) — chạy full pipeline mỗi ng
 ## Output
 
 - `manifest.json` — `{generation, builtAt, base, power, counts}` (cache 5 phút).
-- `base-<gen>.json.gz` — trạm: `[id, storeId, name, address, lat, lng, flags, availableDate]`
+- `base-<gen>.json.gz` — trạm (v3): `[id, storeId, name, address, lat, lng, flags, availableDate, status]`
+  — `status` 0 hoạt động / 1 bảo trì / 2 ngừng / 3 chưa khai trương, từ `charging_status`.
   (flags: bit1 công cộng, bit2 phí gửi xe, bit4 trụ LINK). Cache vĩnh viễn.
 - `power-<gen>.json.gz` — enrich căn chỉnh theo index base; mỗi hàng `null` (chưa có dữ liệu)
   hoặc `[portCount, maxKw, dcCount, "kw:count:dc|…"]`. Cache vĩnh viễn.

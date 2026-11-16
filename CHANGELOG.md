@@ -2,6 +2,15 @@
 
 Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app).
 
+## [0.6.0] — 2026-11-16 — Lọc sạc nhanh, trạng thái trạm, trạm gần bạn
+
+- Lọc trạm có sạc nhanh DC hoặc từ 120 kW; ghim trạm đổi màu theo công suất (có chú giải màu).
+- Trạm đang bảo trì, ngừng hoạt động hoặc sắp khai trương hiện mờ trên bản đồ, kèm nhãn trong chi tiết trạm.
+- Lọc "Đang hoạt động" để ẩn các trạm không sạc được.
+- "Gần tôi": 20 trạm đang hoạt động gần nhất, theo đúng bộ lọc đang bật.
+- Sao lưu trạm đã lưu và chuyển sang máy khác bằng link, mã QR hoặc file.
+- Bản đồ gọn hơn: bỏ nút phóng to / thu nhỏ và nút định vị.
+
 ## [0.5.0] — 2026-11-16 — Dữ liệu cập nhật hằng ngày & số cổng sạc
 
 - Dữ liệu trạm tải từ CDN và được làm mới hằng ngày (~25.000 trạm) — không còn gói dữ liệu cố định trong app.

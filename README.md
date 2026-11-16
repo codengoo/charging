@@ -13,9 +13,17 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
 ## Tính năng
 
 - Bản đồ toàn VN, tự gom cụm marker, bấm cụm để phóng to.
-- Mở trang tự xin vị trí hiện tại và bay về đó.
+- Mở trang tự xin vị trí hiện tại và bay về đó (không có nút zoom / định vị — GeolocateControl
+  vẫn chạy ngầm để vẽ chấm vị trí).
 - Tìm trạm theo tên/địa chỉ (không phân biệt dấu).
-- Lọc: chỉ hiện trạm đã lưu.
+- Lọc (kết hợp phép VÀ, `passesFilters` trong `src/data/stations.ts`): đã lưu, **sạc nhanh DC** /
+  **≥ 120 kW** (theo cổng DC mạnh nhất; trạm chưa có dữ liệu power bị ẩn khi lọc), **đang hoạt động**.
+- **Màu ghim theo công suất** (`TIER_COLORS` trong `src/map/pins.ts`): AC/chưa rõ xanh lá, DC < 120 kW
+  xanh dương, DC ≥ 120 kW tím; trạm đã lưu vẫn đeo ghim nhóm. Chú giải `src/ui/PowerLegend.tsx`.
+- **Trạng thái trạm**: bảo trì / ngừng / sắp khai trương vẽ mờ (`icon-opacity`), có nhãn trong chi
+  tiết. Lấy từ bản build ngày; mở trạm thì `depot_status` live (kể cả "hết cổng trống") đè lên.
+- **Gần tôi** (`src/ui/NearbySheet.tsx`): 20 trạm đang hoạt động gần nhất theo bộ lọc công suất,
+  vị trí GPS hoặc tâm bản đồ.
 - Chi tiết trạm: tên, địa chỉ, công cộng/nội bộ, trụ LINK, phí gửi xe, **số cổng + công suất
   từng mức kW (AC/DC)** — ~89% trạm có dữ liệu.
 - **Nhóm trạm đã lưu** (port từ app Android): 3 nhóm dựng sẵn + nhóm tự tạo (tên, biểu
@@ -26,6 +34,9 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
 - Nút **Chỉ đường** mở Google Maps.
 - **Chia sẻ bằng QR** (`src/ui/ShareSheet.tsx`): QR link trạm (mở app) và QR vị trí Google Maps,
   tải ảnh thẻ QR / Web Share.
+- **Sao lưu / chuyển máy** (`src/data/backup.ts`, `src/ui/BackupSheet.tsx`): sổ nhóm nén
+  `deflate-raw` + base64url trong hash `/#import=…` (không tới server), QR khi link ≤ 2.000 ký
+  tự, tải / nhập file `.json`. Nhập luôn **gộp**, hỏi xác nhận trước.
 
 ### Dữ liệu ở client (`src/data/useStationData.ts`)
 
@@ -89,7 +100,9 @@ GET https://static-cms-prod.vinfastauto.com/locators/locators-meta.json
 
 - `generation` tăng dần → so với gen đã build, khác thì rebuild.
 - `full` = tên snapshot đầy đủ → tải `{CDN}/{full}` (~6MB gz → ~72MB JSON, lọc `type=2444`).
-- `count` = tổng locator **mọi loại**. `sc` = file phụ ~180KB (nghi là status rút gọn, dùng sau).
+- `count` = tổng locator **mọi loại**. `sc` = ~1.400 showroom / xưởng dịch vụ (không có trạm sạc) — không dùng.
+- Trạng thái trạm nằm ngay trong snapshot: `charging_status` (`ACTIVE`, `BUSY`, `INACTIVE`=bảo trì,
+  `UNAVAILABLE`=chưa khai trương, `OUTOFSERVICE`), khớp `extra_data.depot_status` của `get-locator`.
 
 ### Kiến trúc hiện tại — GitHub Action → R2 → Worker
 
@@ -102,11 +115,15 @@ GitHub Action (.github/workflows/build-data.yml), cron 0 19 * * * (02:00 VN):
   node builder/run-local.mjs
     1. GET locators-meta.json → generation
     2. STREAM snapshot + 2 KML My Maps (streaming, không load nguyên khối)
-    3. Lọc type=2444, trộn enrich theo toạ độ (lệch → để trống)
+    3. Lọc type=2444, trộn enrich theo toạ độ (lệch → để trống), charging_status → cột status
     4. ghi builder/out/{base,power}-{gen}.json, seo-{gen}/*.json (preview /tram), manifest.json
   → wrangler r2 object put … (JSON THÔ)
 R2 "tramsac-data" → Worker (worker/index.ts) phục vụ /data/* → Cloudflare auto-nén (zstd/gzip)
 ```
+
+`base` v3: `[id, storeId, name, address, lat, lng, flags, availableDate, status]`, `status` 0 hoạt
+động / 1 bảo trì / 2 ngừng / 3 chưa khai trương (`BUSY` gộp vào 0 — build chỉ chạy mỗi ngày). Client
+đọc base v2 cũ (8 cột) thì coi mọi trạm là hoạt động.
 
 Client: `GET /data/manifest.json` (con trỏ latest) → `base-{gen}` (render ngay) →
 `power-{gen}` (lười, bật lọc công suất + hiện số cổng). File mang `generation` nên cache

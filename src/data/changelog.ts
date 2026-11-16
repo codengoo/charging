@@ -8,6 +8,19 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.6.0',
+    date: '2026-11-16',
+    title: 'Lọc sạc nhanh, trạng thái trạm, trạm gần bạn',
+    changes: [
+      'Lọc trạm có sạc nhanh DC hoặc từ 120 kW; ghim trạm đổi màu theo công suất (có chú giải màu).',
+      'Trạm đang bảo trì, ngừng hoạt động hoặc sắp khai trương hiện mờ trên bản đồ, kèm nhãn trong chi tiết trạm.',
+      'Lọc "Đang hoạt động" để ẩn các trạm không sạc được.',
+      '"Gần tôi": 20 trạm đang hoạt động gần nhất, theo đúng bộ lọc đang bật.',
+      'Sao lưu trạm đã lưu và chuyển sang máy khác bằng link, mã QR hoặc file.',
+      'Bản đồ gọn hơn: bỏ nút phóng to / thu nhỏ và nút định vị.',
+    ],
+  },
+  {
     version: '0.5.0',
     date: '2026-11-16',
     title: 'Dữ liệu cập nhật hằng ngày & số cổng sạc',
