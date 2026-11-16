@@ -1,0 +1,45 @@
+name: Build station data
+
+# Cron chạy build ETL (lấy version mới nhất của VinFast + enrich My Maps) rồi upload R2.
+# Chạy ở CI của GitHub (Node đầy đủ, không dính giới hạn 10ms CPU của Workers Free plan).
+on:
+  schedule:
+    - cron: '0 19 * * *' # 02:00 giờ VN mỗi ngày (UTC 19:00)
+  workflow_dispatch: {} # cho phép bấm chạy tay trong tab Actions
+
+concurrency:
+  group: build-data
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Lõi ETL chỉ dùng Node builtins (fetch/zlib/streams) → không cần npm install.
+      - name: Build dữ liệu
+        run: node builder/run-local.mjs
+
+      - name: Upload R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -e
+          GEN=$(node -e "console.log(require('./builder/out/manifest.json').generation)")
+          IMMUTABLE='public, max-age=31536000, immutable'
+          npx -y wrangler@4 r2 object put "tramsac-data/base-$GEN.json" \
+            --file="builder/out/base-$GEN.json" --remote \
+            --content-type=application/json --cache-control="$IMMUTABLE"
+          npx -y wrangler@4 r2 object put "tramsac-data/power-$GEN.json" \
+            --file="builder/out/power-$GEN.json" --remote \
+            --content-type=application/json --cache-control="$IMMUTABLE"
+          # manifest cuối cùng (con trỏ latest) — cache ngắn
+          npx -y wrangler@4 r2 object put "tramsac-data/manifest.json" \
+            --file="builder/out/manifest.json" --remote \
+            --content-type=application/json --cache-control="public, max-age=300"

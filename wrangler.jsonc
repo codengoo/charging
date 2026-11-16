@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tramsac",
+  // Cùng tài khoản giữ zone cangao.asia với chiatien.
+  "account_id": "905088b40a2385757fe35a28b31b68db",
+  "main": "worker/index.ts",
+  "compatibility_date": "2024-11-01",
+  // Build dữ liệu chạy ở GitHub Action, không ở Worker (Free plan giới hạn 10ms CPU).
+  // Frontend (Vite build) phục vụ như static assets; /data/* chạy qua Worker đọc R2.
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/data/*"]
+  },
+  // R2 chứa base/power/manifest do builder sinh ra.
+  "r2_buckets": [{ "binding": "DATA", "bucket_name": "tramsac-data" }],
+  // Domain riêng (zone cangao.asia nằm trong tài khoản này).
+  "routes": [{ "pattern": "charging.cangao.asia", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false
+}

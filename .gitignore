@@ -1,0 +1,10 @@
+node_modules
+dist
+.wrangler
+*.local
+.DS_Store
+.playwright-mcp
+builder/out
+builder/.wrangler
+.env
+.dev.vars

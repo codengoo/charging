@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#12b76a"/>
+      <stop offset="1" stop-color="#0b7a47"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#g)"/>
+  <!-- map pin -->
+  <path fill="#ffffff" d="M256 96c-70.7 0-128 57.3-128 128 0 89 128 216 128 216s128-127 128-216c0-70.7-57.3-128-128-128z"/>
+  <!-- lightning bolt -->
+  <path fill="#0b7a47" d="M272 160l-72 92h44l-16 72 76-100h-44z"/>
+</svg>
