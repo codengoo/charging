@@ -3,14 +3,15 @@
 // để test được; mặc định dùng fetch + CompressionStream chuẩn.
 
 import { streamCarStations } from './snapshot.mjs'
-import { indexKml, coordKey } from './kml.mjs'
+import { indexKml, coordKey, normName } from './kml.mjs'
 
 const CDN = 'https://static-cms-prod.vinfastauto.com/locators'
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
   '(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
 
-// 2 Google My Maps: map 1 = sạc nhanh DC, map 2 = sạc chậm AC.
+// 2 Google My Maps: map 1 = sạc nhanh DC, map 2 = sạc chậm AC. `isDc` chỉ để ghi log — cổng
+// DC/AC xét theo kW (isDcKw), vì map DC vẫn ghi kèm cổng AC của cùng trạm.
 const MYMAPS = [
   { mid: '1iIZ3L3KEKU0fg5XsIQ6hbRl7NVY8JNA', isDc: 1 },
   { mid: '1y__rpsMtCNT8qCO0ERpXJwXcom5VE2s', isDc: 0 },
@@ -74,19 +75,31 @@ function packGroups(groups) {
     .sort((a, b) => b.kw - a.kw)
 }
 
-/** Tra enrich cho một trạm: khớp ô 4-dec rồi dò 3×3 lân cận. */
-function lookupPower(index, lat, lng) {
-  let hit = index.get(coordKey(lat, lng))
-  if (!hit) {
-    const la = +lat.toFixed(4)
-    const ln = +lng.toFixed(4)
-    for (let dla = -1; dla <= 1 && !hit; dla++)
-      for (let dln = -1; dln <= 1 && !hit; dln++) {
-        if (dla === 0 && dln === 0) continue
-        hit = index.get(coordKey(la + dla * 1e-4, ln + dln * 1e-4))
+/**
+ * Tra enrich cho một trạm: gom placemark trong ô 4-dec + 3×3 lân cận (~±11–22 m), rồi chọn
+ * ĐÚNG MỘT placemark — không cộng dồn. Nhiều trạm VinFast chung một toạ độ ("Vinmec Hải
+ * Phòng", "…, hầm B", "…, tầng 1…"), mỗi trạm có placemark riêng cùng tên trong My Maps:
+ * trùng tên thắng, không ai trùng thì lấy placemark gần nhất.
+ */
+function lookupPower(index, lat, lng, name) {
+  const la = +lat.toFixed(4)
+  const ln = +lng.toFixed(4)
+  const want = normName(name)
+  let best = null
+  let bestScore = Infinity
+  for (let dla = -1; dla <= 1; dla++)
+    for (let dln = -1; dln <= 1; dln++) {
+      for (const pm of index.get(coordKey(la + dla * 1e-4, ln + dln * 1e-4)) ?? []) {
+        const d2 = (pm.lat - lat) ** 2 + (pm.lng - lng) ** 2
+        // Trùng tên: trừ hẳn một bậc để luôn thắng placemark khác tên dù gần hơn.
+        const score = (want && pm.name === want ? -1 : 0) + d2
+        if (score < bestScore) {
+          bestScore = score
+          best = pm
+        }
       }
-  }
-  return hit
+    }
+  return best
 }
 
 /**
@@ -101,7 +114,7 @@ export async function buildData(log = () => {}) {
   // 1) Index enrich từ 2 KML (giữ index nhỏ trong RAM).
   const index = new Map()
   for (const m of MYMAPS) {
-    const { count } = await indexKml(await fetchStream(kmlUrl(m.mid)), m.isDc, index)
+    const { count } = await indexKml(await fetchStream(kmlUrl(m.mid)), index)
     log(`KML ${m.isDc ? 'DC' : 'AC'}: ${count} điểm`)
   }
   log(`index toạ độ: ${index.size}`)
@@ -115,7 +128,7 @@ export async function buildData(log = () => {}) {
   for await (const r of streamCarStations(snapText)) {
     baseRows.push([r.entityId, r.storeId, r.name, r.address, r.lat, r.lng, r.flags, r.availableDate ?? 0, r.status])
     statusCount[r.status]++
-    const hit = lookupPower(index, r.lat, r.lng)
+    const hit = lookupPower(index, r.lat, r.lng, r.name)
     if (!hit) {
       powerRows.push(null) // lệch → bỏ qua, để trống
       continue
