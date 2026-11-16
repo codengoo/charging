@@ -9,7 +9,9 @@
 | `src/data/stations.ts` | MODIFY: `nearestStations` nhận `predicate` + `maxRing` |
 | `src/map/MapView.tsx` | MODIFY: prop `onMoveEnd(center)` |
 | `src/ui/NearbySheet.tsx` | CREATE |
-| `src/ui/SavedSheet.tsx` | MODIFY: export `fmtDistance` để dùng lại (hoặc chuyển sang `src/lib/format.ts`) |
+| `src/lib/format.ts` | CREATE: `fmtDistance` (từ SavedSheet) + `fmtKw` (từ StationSheet) |
+| `src/ui/SavedSheet.tsx` | MODIFY: import `fmtDistance` từ `@/lib/format` |
+| `src/ui/StationSheet.tsx` | MODIFY: import `fmtKw` từ `@/lib/format` (bảng Gần tôi cũng hiện kW) |
 | `src/App.tsx` | MODIFY: state `showNearby`, `mapCenter` ref, chip "Gần tôi" |
 
 ## 2. `src/data/stations.ts`

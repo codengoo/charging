@@ -15,6 +15,7 @@ import { STATUS_LABEL, statusOf } from '../data/stations'
 import type { Station, StationDetail, StationPower } from '../data/types'
 import { GroupGlyph } from './groupIcons'
 import { ImagePreview } from './ImagePreview'
+import { fmtKw } from '@/lib/format'
 
 interface Props {
   /** Giữ component gắn và chỉ đổi `open` — gỡ hẳn khi đóng thì mất hiệu ứng trôi xuống. */
@@ -225,8 +226,4 @@ function PowerBlock({ power, loading, standards }: { power?: StationPower; loadi
       )}
     </section>
   )
-}
-
-function fmtKw(v: number): string {
-  return Number.isInteger(v) ? String(v) : v.toFixed(1)
 }

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { List } from 'lucide-react'
+import { List, LocateFixed } from 'lucide-react'
 import { MapView } from './map/MapView'
 import { SearchBar } from './ui/SearchBar'
 import { StationSheet } from './ui/StationSheet'
@@ -8,6 +8,7 @@ import { SavedSheet } from './ui/SavedSheet'
 import { ShareSheet } from './ui/ShareSheet'
 import { ChangelogModal } from './ui/ChangelogModal'
 import { PowerLegend } from './ui/PowerLegend'
+import { NearbySheet } from './ui/NearbySheet'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { useStationData } from './data/useStationData'
@@ -20,6 +21,12 @@ import type { Station } from './data/types'
 import { parseStationId, stationPath } from './lib/stationUrl'
 
 const DEFAULT_TITLE = document.title
+
+/** Lần mở bảng "Gần tôi": điểm gốc chụp lúc bấm, kèm nguồn (GPS hay tâm bản đồ). */
+interface Nearby {
+  origin: { lat: number; lng: number }
+  fromGps: boolean
+}
 
 export function App() {
   const { index, power, error } = useStationData()
@@ -37,6 +44,11 @@ export function App() {
   const [showChangelog, setShowChangelog] = useState(false)
   const [flyTo, setFlyTo] = useState<{ lng: number; lat: number; zoom?: number } | null>(null)
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null)
+  // Tâm bản đồ hiện tại (ref: đổi liên tục khi kéo, không cần render lại). Mặc định = tâm mặc định của map.
+  const mapCenter = useRef({ lat: 16.05, lng: 108.2 })
+  const [showNearby, setShowNearby] = useState(false)
+  // Giữ lần mở cuối để bảng còn nội dung lúc trôi xuống (giống sheetStation).
+  const [nearby, setNearby] = useState<Nearby | null>(null)
   const groups = useGroupBook()
   const { book } = groups
   const savedCount = allSaved(book).size
@@ -102,6 +114,7 @@ export function App() {
         flyTo={flyTo}
         onSelect={pick}
         onLocate={setUserPos}
+        onMoveEnd={(c) => (mapCenter.current = c)}
       />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] flex flex-col gap-2 p-3">
@@ -111,6 +124,16 @@ export function App() {
         {/* Một hàng vuốt ngang: nhiều chip quá thì không xuống dòng che bản đồ. py/-my chừa chỗ
             cho bóng chip khỏi bị overflow cắt. */}
         <div className="pointer-events-auto -mx-3 -my-2 flex gap-2 overflow-x-auto px-3 py-2 no-scrollbar">
+          <Chip
+            variant="floating"
+            onClick={() => {
+              setNearby(userPos ? { origin: userPos, fromGps: true } : { origin: mapCenter.current, fromGps: false })
+              setShowNearby(true)
+            }}
+          >
+            <LocateFixed />
+            Gần tôi
+          </Chip>
           <FilterChip
             label={`Đã lưu${savedCount ? ` (${savedCount})` : ''}`}
             on={filters.favoritesOnly}
@@ -189,6 +212,22 @@ export function App() {
         onUnsave={groups.removeFromAll}
         onClose={() => setShowSaved(false)}
       />
+
+      {nearby && (
+        <NearbySheet
+          open={showNearby}
+          index={index}
+          power={power}
+          filters={filters}
+          origin={nearby.origin}
+          fromGps={nearby.fromGps}
+          onPick={(st) => {
+            setShowNearby(false)
+            pick(st)
+          }}
+          onClose={() => setShowNearby(false)}
+        />
+      )}
 
       <ChangelogModal open={showChangelog} onClose={() => setShowChangelog(false)} />
     </div>

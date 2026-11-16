@@ -93,15 +93,17 @@ interface Props {
   flyTo: { lng: number; lat: number; zoom?: number } | null
   onSelect: (st: Station) => void
   onLocate?: (pos: { lat: number; lng: number }) => void
+  /** Tâm bản đồ sau mỗi lần kéo/zoom — "Gần tôi" dùng khi chưa có GPS. */
+  onMoveEnd?: (center: { lat: number; lng: number }) => void
 }
 
-export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate }: Props) {
+export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate, onMoveEnd }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const loadedRef = useRef(false)
   // Giá trị mới nhất cho các handler đăng ký một lần trong lúc khởi tạo.
-  const latest = useRef({ index, filters, book, power, selected, onSelect, onLocate })
-  latest.current = { index, filters, book, power, selected, onSelect, onLocate }
+  const latest = useRef({ index, filters, book, power, selected, onSelect, onLocate, onMoveEnd })
+  latest.current = { index, filters, book, power, selected, onSelect, onLocate, onMoveEnd }
 
   // Khởi tạo map một lần.
   useEffect(() => {
@@ -128,6 +130,11 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
     if (corner) corner.style.display = 'none'
     geo.on('geolocate', (e: GeolocationPosition) => {
       latest.current.onLocate?.({ lat: e.coords.latitude, lng: e.coords.longitude })
+    })
+
+    map.on('moveend', () => {
+      const c = map.getCenter()
+      latest.current.onMoveEnd?.({ lat: c.lat, lng: c.lng })
     })
 
     map.on('load', () => {

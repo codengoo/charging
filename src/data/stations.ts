@@ -174,22 +174,28 @@ export function distanceKm(aLat: number, aLng: number, bLat: number, bLng: numbe
   return 2 * R * Math.asin(Math.sqrt(h))
 }
 
-/** Các trạm gần một điểm, sắp xếp theo khoảng cách tăng dần. */
+/**
+ * Các trạm gần một điểm, sắp xếp theo khoảng cách tăng dần. Quét rộng dần theo vòng ô lưới
+ * (~11 km/vòng) cho tới khi đủ `limit` trạm qua `predicate`, tối đa `maxRing` vòng.
+ */
 export function nearestStations(
   index: StationIndex,
   lat: number,
   lng: number,
   limit = 20,
+  predicate: (st: Station) => boolean = () => true,
+  maxRing = 10,
 ): Array<Station & { distanceKm: number }> {
-  // Quét rộng dần theo ô cho tới khi đủ ứng viên.
-  for (let ring = 1; ring <= 10; ring++) {
+  for (let ring = 1; ring <= maxRing; ring++) {
     const deg = ring * CELL_SIZE
-    const cand = stationsInBounds(index, lng - deg, lat - deg, lng + deg, lat + deg)
-    if (cand.length >= limit || ring === 10) {
-      return cand
-        .map((st) => ({ ...st, distanceKm: distanceKm(lat, lng, st.lat, st.lng) }))
-        .sort((a, b) => a.distanceKm - b.distanceKm)
-        .slice(0, limit)
+    const sorted = stationsInBounds(index, lng - deg, lat - deg, lng + deg, lat + deg)
+      .filter(predicate)
+      .map((st) => ({ ...st, distanceKm: distanceKm(lat, lng, st.lat, st.lng) }))
+      .sort((a, b) => a.distanceKm - b.distanceKm)
+    // Đủ số lượng CHƯA đủ: trạm ở góc hình vuông có thể xa hơn trạm ngoài vòng. Chỉ dừng khi
+    // trạm thứ `limit` nằm trong vòng tròn nội tiếp (bán kính theo vĩ độ, ~111 km/độ).
+    if ((sorted.length >= limit && sorted[limit - 1].distanceKm <= deg * 111) || ring === maxRing) {
+      return sorted.slice(0, limit)
     }
   }
   return []

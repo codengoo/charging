@@ -23,6 +23,7 @@ import { distanceKm, type StationIndex } from '../data/stations'
 import type { Station } from '../data/types'
 import { GroupGlyph, PinPreview } from './groupIcons'
 import { tintHex } from '../map/pins'
+import { fmtDistance } from '@/lib/format'
 
 interface Props {
   /** Giữ component gắn và chỉ đổi `open` — gỡ hẳn khi đóng thì mất hiệu ứng trôi xuống. */
@@ -154,8 +155,4 @@ export function SavedSheet({ open, index, book, now, userPos, onPick, onUnsave, 
       </ResponsiveDialogContent>
     </ResponsiveDialog>
   )
-}
-
-function fmtDistance(km: number): string {
-  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`
 }
