@@ -14,21 +14,57 @@ import { useIsMobile } from '@/hooks/use-media-query'
 import { googleMapsUrl, slugify, stationShareUrl } from '@/lib/stationUrl'
 import { downloadBlob, drawQr, renderQrCard } from '@/lib/qrCard'
 import type { Station } from '../data/types'
+import { pick } from '../i18n'
 
 type Mode = 'app' | 'maps'
 
+const L = pick({
+  vi: {
+    appLabel: 'Link trạm',
+    appDescription: 'Quét mã hoặc gửi link. Người nhận mở thẳng trạm này trên Bản đồ trạm sạc.',
+    appCaption: 'Quét để mở trạm trên Bản đồ trạm sạc',
+    mapsDescription: 'Quét mã hoặc gửi link để mở đúng vị trí trạm trên Google Maps và chỉ đường.',
+    mapsCaption: 'Quét để mở vị trí trên Google Maps',
+    title: 'Chia sẻ trạm',
+    modeLabel: 'Loại link chia sẻ',
+    qrAria: (caption: string) => `Mã QR: ${caption}`,
+    linkAria: 'Link chia sẻ',
+    copied: 'Đã chép',
+    copy: 'Sao chép',
+    downloadQr: 'Tải ảnh QR',
+    copiedMessage: 'Đã chép lời nhắn',
+    share: 'Chia sẻ…',
+  },
+  en: {
+    appLabel: 'Station link',
+    appDescription: 'Scan the code or send the link. The recipient opens this station directly on VinFast Charging Map.',
+    appCaption: 'Scan to open the station on VinFast Charging Map',
+    mapsDescription: 'Scan the code or send the link to open the exact station location in Google Maps and get directions.',
+    mapsCaption: 'Scan to open the location in Google Maps',
+    title: 'Share station',
+    modeLabel: 'Share link type',
+    qrAria: (caption: string) => `QR code: ${caption}`,
+    linkAria: 'Share link',
+    copied: 'Copied',
+    copy: 'Copy',
+    downloadQr: 'Download QR image',
+    copiedMessage: 'Message copied',
+    share: 'Share…',
+  },
+})
+
 const MODES: Record<Mode, { label: string; icon: typeof Link2; description: string; caption: string }> = {
   app: {
-    label: 'Link trạm',
+    label: L.appLabel,
     icon: Link2,
-    description: 'Quét mã hoặc gửi link. Người nhận mở thẳng trạm này trên Bản đồ trạm sạc.',
-    caption: 'Quét để mở trạm trên Bản đồ trạm sạc',
+    description: L.appDescription,
+    caption: L.appCaption,
   },
   maps: {
     label: 'Google Maps',
     icon: MapPinned,
-    description: 'Quét mã hoặc gửi link để mở đúng vị trí trạm trên Google Maps và chỉ đường.',
-    caption: 'Quét để mở vị trí trên Google Maps',
+    description: L.mapsDescription,
+    caption: L.mapsCaption,
   },
 }
 
@@ -112,14 +148,14 @@ export function ShareSheet({ open, station, onClose }: Props) {
     <ResponsiveDialog nested open={open} onOpenChange={(o) => !o && onClose()}>
       <ResponsiveDialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
         <ResponsiveDialogHeader className="gap-1 pr-6 text-left">
-          <ResponsiveDialogTitle className="text-base font-bold sm:text-lg">Chia sẻ trạm</ResponsiveDialogTitle>
+          <ResponsiveDialogTitle className="text-base font-bold sm:text-lg">{L.title}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="text-xs sm:text-sm">{meta.description}</ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
         {/* Một cột nhịp đều gap-3/sm:gap-4 cho cả drawer (mobile) lẫn dialog (desktop). */}
         <div className="mt-3 flex flex-col gap-3 sm:mt-0 sm:gap-4">
           <Segmented
-            label="Loại link chia sẻ"
+            label={L.modeLabel}
             value={mode}
             onChange={setMode}
             options={(Object.keys(MODES) as Mode[]).map((m) => ({ value: m, label: MODES[m].label, icon: MODES[m].icon }))}
@@ -130,7 +166,7 @@ export function ShareSheet({ open, station, onClose }: Props) {
             <canvas
               ref={setQr}
               role="img"
-              aria-label={`Mã QR: ${meta.caption}`}
+              aria-label={L.qrAria(meta.caption)}
               style={{ width: qrDisplaySize, height: qrDisplaySize }}
               className="block"
             />
@@ -142,11 +178,11 @@ export function ShareSheet({ open, station, onClose }: Props) {
               readOnly
               value={link}
               onClick={(e) => e.currentTarget.select()}
-              aria-label="Link chia sẻ"
+              aria-label={L.linkAria}
             />
             <Button onClick={copy} variant={copied ? 'secondary' : 'default'} className="shrink-0">
               {copied ? <CheckIcon /> : <CopyIcon />}
-              {copied ? 'Đã chép' : 'Sao chép'}
+              {copied ? L.copied : L.copy}
             </Button>
           </div>
 
@@ -156,11 +192,11 @@ export function ShareSheet({ open, station, onClose }: Props) {
               className="h-10 text-xs font-medium sm:text-sm"
               onClick={async () => downloadBlob(await qrImage(), fileName)}
             >
-              <DownloadIcon className="size-4" /> Tải ảnh QR
+              <DownloadIcon className="size-4" /> {L.downloadQr}
             </Button>
             <Button variant="outline" className="h-10 text-xs font-medium sm:text-sm" onClick={share}>
               {sharedHint ? <CheckIcon className="size-4" /> : <Share2Icon className="size-4" />}
-              {sharedHint ? 'Đã chép lời nhắn' : 'Chia sẻ…'}
+              {sharedHint ? L.copiedMessage : L.share}
             </Button>
           </div>
         </div>

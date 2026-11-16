@@ -13,6 +13,47 @@ import { KW_BANDS, KW_BAND_LABEL } from '../data/stations'
 import { TRIP_RADII, type TripRadius } from '../data/useTrip'
 import { CheckIcon } from 'lucide-react'
 import { cn } from 'cn'
+import { LANG, pick, type Lang } from '@/i18n'
+import { switchLang } from '@/lib/langSwitch'
+
+const L = pick({
+  vi: {
+    title: 'Cài đặt hiển thị',
+    description: 'Áp dụng mỗi lần mở app. Chip lọc trên bản đồ vẫn bật/tắt tạm thời được.',
+    language: 'Ngôn ngữ',
+    power: 'Công suất ưu tiên',
+    powerHint: 'Theo cổng mạnh nhất của trạm. Bỏ chọn bớt mức thì trạm chưa có dữ liệu công suất bị ẩn.',
+    status: 'Trạng thái trạm',
+    active: 'Đang hoạt động',
+    all: 'Tất cả',
+    corridor: 'Bề rộng hành lang dọc đường',
+    legend: 'Chú giải màu ghim',
+    show: 'Hiện',
+    hide: 'Ẩn',
+    reset: 'Khôi phục mặc định',
+  },
+  en: {
+    title: 'Display settings',
+    description: 'Applied every time you open the app. Map filter chips can still be toggled temporarily.',
+    language: 'Language',
+    power: 'Preferred power',
+    powerHint: "By the station's fastest port. Unticking a level hides stations without power data.",
+    status: 'Station status',
+    active: 'Operating',
+    all: 'All',
+    corridor: 'Distance from route',
+    legend: 'Pin colour legend',
+    show: 'Show',
+    hide: 'Hide',
+    reset: 'Reset to defaults',
+  },
+})
+
+/** Tên ngôn ngữ viết bằng chính ngôn ngữ đó — người không đọc được bản kia vẫn tìm ra. */
+const LANG_OPTIONS: { value: Lang; label: string }[] = [
+  { value: 'vi', label: 'Tiếng Việt' },
+  { value: 'en', label: 'English' },
+]
 
 interface Props {
   /** Giữ component gắn và chỉ đổi `open` — gỡ hẳn khi đóng thì mất hiệu ứng trôi xuống. */
@@ -33,18 +74,18 @@ export function SettingsSheet({ open, settings, onChange, onClose }: Props) {
     <ResponsiveDialog open={open} onOpenChange={(o) => !o && onClose()}>
       <ResponsiveDialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
         <ResponsiveDialogHeader className="gap-1 pr-6 text-left">
-          <ResponsiveDialogTitle className="text-base font-bold sm:text-lg">Cài đặt hiển thị</ResponsiveDialogTitle>
-          <ResponsiveDialogDescription className="text-xs sm:text-sm">
-            Áp dụng mỗi lần mở app. Chip lọc trên bản đồ vẫn bật/tắt tạm thời được.
-          </ResponsiveDialogDescription>
+          <ResponsiveDialogTitle className="text-base font-bold sm:text-lg">{L.title}</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription className="text-xs sm:text-sm">{L.description}</ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
         <div className="mt-3 flex flex-col gap-4 sm:mt-0">
-          <Field
-            title="Công suất ưu tiên"
-            hint="Theo cổng mạnh nhất của trạm. Bỏ chọn bớt mức thì trạm chưa có dữ liệu công suất bị ẩn."
-          >
-            <div role="group" aria-label="Công suất ưu tiên" className="flex flex-col overflow-hidden rounded-xl bg-muted">
+          {/* Đổi ngôn ngữ = chuyển sang URL kia (/ ↔ /en/) và tải lại. */}
+          <Field title={L.language}>
+            <Segmented label={L.language} value={LANG} onChange={switchLang} options={LANG_OPTIONS} />
+          </Field>
+
+          <Field title={L.power} hint={L.powerHint}>
+            <div role="group" aria-label={L.power} className="flex flex-col overflow-hidden rounded-xl bg-muted">
               {KW_BANDS.map((b) => {
                 const checked = settings.kwBands.includes(b)
                 // Luôn giữ ít nhất một mức — bỏ hết thì không còn trạm nào.
@@ -76,35 +117,35 @@ export function SettingsSheet({ open, settings, onChange, onClose }: Props) {
             </div>
           </Field>
 
-          <Field title="Trạng thái trạm">
+          <Field title={L.status}>
             <Segmented
-              label="Trạng thái trạm"
+              label={L.status}
               value={settings.activeOnly ? 'on' : 'off'}
               onChange={(v) => onChange({ activeOnly: v === 'on' })}
-              options={onOff('Đang hoạt động', 'Tất cả')}
+              options={onOff(L.active, L.all)}
             />
           </Field>
 
-          <Field title="Bề rộng hành lang dọc đường">
+          <Field title={L.corridor}>
             <Segmented
-              label="Bề rộng hành lang dọc đường"
+              label={L.corridor}
               value={String(settings.tripRadiusKm)}
               onChange={(v) => onChange({ tripRadiusKm: Number(v) as TripRadius })}
               options={TRIP_RADII.map((r) => ({ value: String(r), label: `${r} km` }))}
             />
           </Field>
 
-          <Field title="Chú giải màu ghim">
+          <Field title={L.legend}>
             <Segmented
-              label="Chú giải màu ghim"
+              label={L.legend}
               value={settings.showLegend ? 'on' : 'off'}
               onChange={(v) => onChange({ showLegend: v === 'on' })}
-              options={onOff('Hiện', 'Ẩn')}
+              options={onOff(L.show, L.hide)}
             />
           </Field>
 
           <Button variant="ghost" size="sm" className="self-start text-muted-foreground" onClick={() => onChange(DEFAULT_SETTINGS)}>
-            Khôi phục mặc định
+            {L.reset}
           </Button>
         </div>
       </ResponsiveDialogContent>

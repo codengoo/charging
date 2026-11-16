@@ -26,6 +26,58 @@ import {
 } from '../data/groups'
 import { PinPreview, groupIcon } from './groupIcons'
 import { darkenHex, tintHex } from '../map/pins'
+import { pick } from '../i18n'
+
+const L = pick({
+  vi: {
+    title: 'Lưu vào nhóm',
+    multi: 'Một trạm có thể nằm trong nhiều nhóm.',
+    newGroup: 'Tạo nhóm mới',
+    empty: 'Chưa có trạm nào',
+    count: (n: number) => `${n} trạm`,
+    left: (s: string) => ` · còn ${s}`,
+    autoRemove: (s: string) => ` · tự gỡ sau ${s}`,
+    inGroup: 'Đang ở trong nhóm',
+    setTtl: (g: string) => `Đặt thời hạn tự gỡ cho nhóm ${g}`,
+    deleteGroup: (g: string) => `Xoá nhóm ${g}`,
+    confirmDelete: 'Xoá?',
+    ttlFor: (g: string) => `Tự gỡ trạm khỏi “${g}” sau`,
+    back: 'Quay lại',
+    newTitle: 'Nhóm mới',
+    newDesc: 'Đặt tên, chọn biểu tượng, màu và thời hạn tự gỡ cho nhóm.',
+    name: 'Tên nhóm',
+    icon: 'Biểu tượng',
+    color: 'Màu',
+    colorAria: (hex: string) => `Màu ${hex}`,
+    ttl: 'Tự gỡ trạm khỏi nhóm sau',
+    cancel: 'Huỷ',
+    create: 'Tạo nhóm',
+  },
+  en: {
+    title: 'Save to group',
+    multi: 'A station can be in several groups.',
+    newGroup: 'New group',
+    empty: 'No stations yet',
+    count: (n: number) => `${n} ${n === 1 ? 'station' : 'stations'}`,
+    left: (s: string) => ` · ${s} left`,
+    autoRemove: (s: string) => ` · auto-remove after ${s}`,
+    inGroup: 'In this group',
+    setTtl: (g: string) => `Set auto-remove time for group ${g}`,
+    deleteGroup: (g: string) => `Delete group ${g}`,
+    confirmDelete: 'Delete?',
+    ttlFor: (g: string) => `Remove stations from “${g}” after`,
+    back: 'Back',
+    newTitle: 'New group',
+    newDesc: 'Name the group and choose its icon, color and auto-remove time.',
+    name: 'Group name',
+    icon: 'Icon',
+    color: 'Color',
+    colorAria: (hex: string) => `Color ${hex}`,
+    ttl: 'Remove stations from group after',
+    cancel: 'Cancel',
+    create: 'Create group',
+  },
+})
 
 interface Props {
   /** Giữ component gắn và chỉ đổi `open` — gỡ hẳn khi đóng thì mất hiệu ứng trôi xuống. */
@@ -71,10 +123,10 @@ export function GroupsSheet(props: Props) {
         ) : (
           <>
             <ResponsiveDialogHeader>
-              <ResponsiveDialogTitle className="text-lg">Lưu vào nhóm</ResponsiveDialogTitle>
+              <ResponsiveDialogTitle className="text-lg">{L.title}</ResponsiveDialogTitle>
               <ResponsiveDialogDescription className="text-sm">
                 <span className="line-clamp-1">{stationName}</span>
-                Một trạm có thể nằm trong nhiều nhóm.
+                {L.multi}
               </ResponsiveDialogDescription>
             </ResponsiveDialogHeader>
 
@@ -96,7 +148,7 @@ export function GroupsSheet(props: Props) {
 
             <Button variant="ghost" className="mt-2 self-start text-brand" onClick={() => setCreating(true)}>
               <Plus />
-              Tạo nhóm mới
+              {L.newGroup}
             </Button>
           </>
         )}
@@ -129,9 +181,9 @@ function GroupRow({
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   // Trạm đang trong nhóm và có hạn thì nói còn bao lâu; không thì nói luật chung của nhóm.
-  let sub = count === 0 ? 'Chưa có trạm nào' : `${count} trạm`
-  if (expiresAt !== null) sub += ` · còn ${remaining(expiresAt, now)}`
-  else if (group.ttlHours > 0) sub += ` · tự gỡ sau ${ttlLabel(group.ttlHours)}`
+  let sub = count === 0 ? L.empty : L.count(count)
+  if (expiresAt !== null) sub += L.left(remaining(expiresAt, now))
+  else if (group.ttlHours > 0) sub += L.autoRemove(ttlLabel(group.ttlHours))
 
   return (
     <div className="border-b border-border/60 last:border-b-0">
@@ -149,7 +201,7 @@ function GroupRow({
             <span className="truncate text-xs text-muted-foreground">{sub}</span>
           </span>
           {checked && (
-            <Check className="ml-auto size-5 shrink-0" color={darkenHex(group.colorHex, 0.8)} aria-label="Đang ở trong nhóm" />
+            <Check className="ml-auto size-5 shrink-0" color={darkenHex(group.colorHex, 0.8)} aria-label={L.inGroup} />
           )}
         </button>
 
@@ -158,7 +210,7 @@ function GroupRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={`Đặt thời hạn tự gỡ cho nhóm ${group.label}`}
+            aria-label={L.setTtl(group.label)}
             aria-expanded={pickTtl}
             onClick={() => setPickTtl((v) => !v)}
           >
@@ -169,19 +221,19 @@ function GroupRow({
           <Button
             variant={confirmDelete ? 'destructive' : 'ghost'}
             size={confirmDelete ? 'sm' : 'icon-sm'}
-            aria-label={`Xoá nhóm ${group.label}`}
+            aria-label={L.deleteGroup(group.label)}
             onClick={() => (confirmDelete ? onDelete() : setConfirmDelete(true))}
             onBlur={() => setConfirmDelete(false)}
           >
             <Trash2 />
-            {confirmDelete && 'Xoá?'}
+            {confirmDelete && L.confirmDelete}
           </Button>
         )}
       </div>
 
       {pickTtl && (
         <div className="pb-3 pl-11">
-          <p className="mb-1.5 text-xs text-muted-foreground">Tự gỡ trạm khỏi “{group.label}” sau</p>
+          <p className="mb-1.5 text-xs text-muted-foreground">{L.ttlFor(group.label)}</p>
           <TtlChips
             selected={group.ttlHours}
             onSelect={(h) => {
@@ -233,13 +285,13 @@ function NewGroupForm({
     >
       <ResponsiveDialogHeader>
         <div className="flex items-center gap-1">
-          <Button type="button" variant="ghost" size="icon-sm" aria-label="Quay lại" onClick={onCancel}>
+          <Button type="button" variant="ghost" size="icon-sm" aria-label={L.back} onClick={onCancel}>
             <ArrowLeft />
           </Button>
-          <ResponsiveDialogTitle className="text-lg">Nhóm mới</ResponsiveDialogTitle>
+          <ResponsiveDialogTitle className="text-lg">{L.newTitle}</ResponsiveDialogTitle>
         </div>
         <ResponsiveDialogDescription className="sr-only">
-          Đặt tên, chọn biểu tượng, màu và thời hạn tự gỡ cho nhóm.
+          {L.newDesc}
         </ResponsiveDialogDescription>
       </ResponsiveDialogHeader>
 
@@ -249,13 +301,13 @@ function NewGroupForm({
           autoFocus
           value={label}
           onChange={(e) => setLabel(e.target.value)}
-          placeholder="Tên nhóm"
+          placeholder={L.name}
           maxLength={40}
-          aria-label="Tên nhóm"
+          aria-label={L.name}
         />
       </div>
 
-      <p className="mt-4 mb-1.5 text-xs font-medium">Biểu tượng</p>
+      <p className="mt-4 mb-1.5 text-xs font-medium">{L.icon}</p>
       <div className="flex flex-wrap gap-2">
         {ICON_KEYS.map((key) => {
           const Icon = groupIcon(key)
@@ -276,13 +328,13 @@ function NewGroupForm({
         })}
       </div>
 
-      <p className="mt-4 mb-1.5 text-xs font-medium">Màu</p>
+      <p className="mt-4 mb-1.5 text-xs font-medium">{L.color}</p>
       <div className="flex flex-wrap gap-2">
         {COLORS.map((hex) => (
           <button
             key={hex}
             type="button"
-            aria-label={`Màu ${hex}`}
+            aria-label={L.colorAria(hex)}
             aria-pressed={hex === colorHex}
             onClick={() => setColorHex(hex)}
             className="size-8 rounded-full transition-transform active:scale-95"
@@ -295,15 +347,15 @@ function NewGroupForm({
         ))}
       </div>
 
-      <p className="mt-4 mb-1.5 text-xs font-medium">Tự gỡ trạm khỏi nhóm sau</p>
+      <p className="mt-4 mb-1.5 text-xs font-medium">{L.ttl}</p>
       <TtlChips selected={ttlHours} onSelect={setTtlHours} />
 
       <div className="mt-5 flex justify-end gap-2">
         <Button type="button" variant="ghost" onClick={onCancel}>
-          Huỷ
+          {L.cancel}
         </Button>
         <Button type="submit" variant="brand" disabled={!valid}>
-          Tạo nhóm
+          {L.create}
         </Button>
       </div>
     </form>

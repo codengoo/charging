@@ -5,6 +5,7 @@
  * cổng hỏng / đặt trước, đúng con số app VinFast hiện), `chargingKw`, `maintPorts`.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { pick } from '../i18n'
 
 export interface LivePorts {
   kw: number
@@ -81,17 +82,25 @@ export function parseLive(j: ChargingBody, at = Date.now()): LiveStatus {
   }
 }
 
+const MSG = pick({
+  vi: { network: 'Không có mạng', tooFast: 'Gọi quá nhanh', timeout: 'Quá hạn chờ', busy: 'Nguồn dữ liệu đang bận', failed: 'Không lấy được số liệu' },
+  en: { network: 'No connection', tooFast: 'Too many requests', timeout: 'Timed out', busy: 'Data source busy', failed: "Couldn't get data" },
+})
+
+/** Mã lỗi "trạm không có số liệu" (404) — UI so khớp mã này, không so chữ. */
+export const UNAVAILABLE = 'unavailable'
+
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   let res: Response
   try {
     res = await fetch(path, { signal })
   } catch (e) {
     if (signal?.aborted) throw e
-    throw new LiveError('Không có mạng')
+    throw new LiveError(MSG.network)
   }
-  if (res.status === 429) throw new LiveError('Gọi quá nhanh')
-  if (res.status === 404) throw new LiveError('Trạm không có số liệu')
-  if (!res.ok) throw new LiveError(res.status === 504 ? 'Quá hạn chờ' : 'Nguồn dữ liệu đang bận')
+  if (res.status === 429) throw new LiveError(MSG.tooFast)
+  if (res.status === 404) throw new LiveError(UNAVAILABLE)
+  if (!res.ok) throw new LiveError(res.status === 504 ? MSG.timeout : MSG.busy)
   return (await res.json()) as T
 }
 
@@ -290,7 +299,7 @@ export function useLiveStatus(storeId: string | null, enabled: boolean): LiveSta
       shownFor.current = storeId
     }
     const ctrl = new AbortController()
-    const msg = (e: unknown) => (e instanceof LiveError ? e.message : 'Không lấy được số liệu')
+    const msg = (e: unknown) => (e instanceof LiveError ? e.message : MSG.failed)
     setLiveLoading(true)
     setLiveError(null)
     fetchLive(storeId, ctrl.signal)

@@ -14,6 +14,40 @@ import { downloadBlob, drawQr } from '@/lib/qrCard'
 import { shareOrigin } from '@/lib/stationUrl'
 import { allSaved, type GroupBook } from '../data/groups'
 import { QR_MAX, backupUrl, readBackupFile, toBackup } from '../data/backup'
+import { pick } from '../i18n'
+
+const L = pick({
+  vi: {
+    shareTitle: 'Trạm sạc đã lưu',
+    shareText: 'Mở link để chép các trạm đã lưu sang máy này',
+    title: 'Sao lưu / chuyển máy',
+    summary: (stations: number, groups: number) =>
+      `${stations} trạm${groups ? `, ${groups} nhóm tự tạo` : ''}. Mở link hoặc quét mã trên máy kia để gộp vào — trạm đã lưu sẵn ở máy đó giữ nguyên.`,
+    qrAria: 'Mã QR sao lưu trạm đã lưu',
+    tooMany: 'Nhiều trạm quá nên mã QR sẽ khó quét — gửi link hoặc file thay vào đó.',
+    linkAria: 'Link sao lưu',
+    copied: 'Đã chép',
+    copy: 'Sao chép',
+    share: 'Chia sẻ…',
+    download: 'Tải file',
+    importFile: 'Nhập từ file…',
+  },
+  en: {
+    shareTitle: 'Saved charging stations',
+    shareText: 'Open the link to copy the saved stations to this device',
+    title: 'Backup / move to another device',
+    summary: (stations: number, groups: number) =>
+      `${stations} ${stations === 1 ? 'station' : 'stations'}${groups ? `, ${groups} custom ${groups === 1 ? 'group' : 'groups'}` : ''}. Open the link or scan the code on the other device to merge — stations already saved there are kept.`,
+    qrAria: 'Backup QR code for saved stations',
+    tooMany: 'Too many stations for an easily scannable QR code — send the link or file instead.',
+    linkAria: 'Backup link',
+    copied: 'Copied',
+    copy: 'Copy',
+    share: 'Share…',
+    download: 'Download file',
+    importFile: 'Import from file…',
+  },
+})
 
 interface Props {
   /** Giữ component gắn và chỉ đổi `open` — gỡ hẳn khi đóng thì mất hiệu ứng trôi xuống. */
@@ -69,7 +103,7 @@ export function BackupSheet({ open, book, onImportFile, onClose }: Props) {
   async function share() {
     if (!link) return
     try {
-      await navigator.share({ title: 'Trạm sạc đã lưu', text: 'Mở link để chép các trạm đã lưu sang máy này', url: link })
+      await navigator.share({ title: L.shareTitle, text: L.shareText, url: link })
     } catch {
       // Người dùng huỷ — không phải lỗi.
     }
@@ -92,10 +126,9 @@ export function BackupSheet({ open, book, onImportFile, onClose }: Props) {
     <ResponsiveDialog nested open={open} onOpenChange={(o) => !o && onClose()}>
       <ResponsiveDialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
         <ResponsiveDialogHeader className="gap-1 pr-6 text-left">
-          <ResponsiveDialogTitle className="text-base font-bold sm:text-lg">Sao lưu / chuyển máy</ResponsiveDialogTitle>
+          <ResponsiveDialogTitle className="text-base font-bold sm:text-lg">{L.title}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="text-xs sm:text-sm">
-            {stations} trạm{customGroups ? `, ${customGroups} nhóm tự tạo` : ''}. Mở link hoặc quét mã trên máy kia để
-            gộp vào — trạm đã lưu sẵn ở máy đó giữ nguyên.
+            {L.summary(stations, customGroups)}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
@@ -106,7 +139,7 @@ export function BackupSheet({ open, book, onImportFile, onClose }: Props) {
               <canvas
                 ref={setQr}
                 role="img"
-                aria-label="Mã QR sao lưu trạm đã lưu"
+                aria-label={L.qrAria}
                 style={{ width: qrDisplaySize, height: qrDisplaySize }}
                 className="block"
               />
@@ -114,7 +147,7 @@ export function BackupSheet({ open, book, onImportFile, onClose }: Props) {
           ) : (
             link && (
               <p className="rounded-xl bg-muted px-3 py-2.5 text-xs text-muted-foreground">
-                Nhiều trạm quá nên mã QR sẽ khó quét — gửi link hoặc file thay vào đó.
+                {L.tooMany}
               </p>
             )
           )}
@@ -125,25 +158,25 @@ export function BackupSheet({ open, book, onImportFile, onClose }: Props) {
               readOnly
               value={link ?? ''}
               onClick={(e) => e.currentTarget.select()}
-              aria-label="Link sao lưu"
+              aria-label={L.linkAria}
             />
             <Button onClick={copy} disabled={!link} variant={copied ? 'secondary' : 'default'} className="shrink-0">
               {copied ? <CheckIcon /> : <CopyIcon />}
-              {copied ? 'Đã chép' : 'Sao chép'}
+              {copied ? L.copied : L.copy}
             </Button>
           </div>
 
           <div className="flex gap-2 pt-1 *:flex-1">
             {typeof navigator.share === 'function' && (
               <Button variant="outline" className="h-10 text-xs font-medium sm:text-sm" disabled={!link} onClick={share}>
-                <Share2Icon className="size-4" /> Chia sẻ…
+                <Share2Icon className="size-4" /> {L.share}
               </Button>
             )}
             <Button variant="outline" className="h-10 text-xs font-medium sm:text-sm" onClick={downloadFile}>
-              <DownloadIcon className="size-4" /> Tải file
+              <DownloadIcon className="size-4" /> {L.download}
             </Button>
             <Button variant="outline" className="h-10 text-xs font-medium sm:text-sm" onClick={() => fileRef.current?.click()}>
-              <Upload className="size-4" /> Nhập từ file…
+              <Upload className="size-4" /> {L.importFile}
             </Button>
           </div>
           <input ref={fileRef} type="file" accept=".json,application/json" className="hidden" onChange={pickFile} />

@@ -5,6 +5,8 @@
  * lấy id sinh từ đồng hồ — đổi tên hiển thị sau này không làm mất dữ liệu cũ.
  */
 
+import { pick } from '../i18n'
+
 /** Mã hình — tầng dữ liệu không phụ thuộc React, UI tự tra mã ra icon. */
 export type GroupIconKey =
   | 'heart'
@@ -32,14 +34,37 @@ export interface StationGroup {
   ttlHours: number
 }
 
+const L = pick({
+  vi: {
+    favorite: 'Yêu thích',
+    star: 'Sao',
+    planned: 'Đánh dấu sẽ đến',
+    ttl: ['Không tự gỡ', '6 giờ', '1 ngày', '3 ngày', '1 tuần', '30 ngày'],
+    underMinute: 'dưới 1 phút',
+    days: (n: number) => `${n} ngày`,
+    hours: (n: number) => `${n} giờ`,
+    minutes: (n: number) => `${n} phút`,
+  },
+  en: {
+    favorite: 'Favorites',
+    star: 'Starred',
+    planned: 'Planned',
+    ttl: ['Never', '6 hours', '1 day', '3 days', '1 week', '30 days'],
+    underMinute: 'under 1 minute',
+    days: (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`,
+    hours: (n: number) => `${n} ${n === 1 ? 'hour' : 'hours'}`,
+    minutes: (n: number) => `${n} ${n === 1 ? 'minute' : 'minutes'}`,
+  },
+})
+
 export const FAVORITE = 'favorite'
 export const STAR = 'star'
 export const PLANNED = 'planned'
 
 export const BUILT_IN: StationGroup[] = [
-  { id: FAVORITE, label: 'Yêu thích', builtIn: true, iconKey: 'heart', colorHex: '#E53935', ttlHours: 0 },
-  { id: STAR, label: 'Sao', builtIn: true, iconKey: 'star', colorHex: '#F0A500', ttlHours: 0 },
-  { id: PLANNED, label: 'Đánh dấu sẽ đến', builtIn: true, iconKey: 'flag', colorHex: '#2563EB', ttlHours: 0 },
+  { id: FAVORITE, label: L.favorite, builtIn: true, iconKey: 'heart', colorHex: '#E53935', ttlHours: 0 },
+  { id: STAR, label: L.star, builtIn: true, iconKey: 'star', colorHex: '#F0A500', ttlHours: 0 },
+  { id: PLANNED, label: L.planned, builtIn: true, iconKey: 'flag', colorHex: '#2563EB', ttlHours: 0 },
 ]
 
 /**
@@ -58,12 +83,12 @@ export const COLORS = [
 
 /** Các mức thời hạn cho sẵn. Người dùng chọn chứ không gõ số. */
 export const TTL_OPTIONS = [
-  { hours: 0, label: 'Không tự gỡ' },
-  { hours: 6, label: '6 giờ' },
-  { hours: 24, label: '1 ngày' },
-  { hours: 72, label: '3 ngày' },
-  { hours: 168, label: '1 tuần' },
-  { hours: 720, label: '30 ngày' },
+  { hours: 0, label: L.ttl[0] },
+  { hours: 6, label: L.ttl[1] },
+  { hours: 24, label: L.ttl[2] },
+  { hours: 72, label: L.ttl[3] },
+  { hours: 168, label: L.ttl[4] },
+  { hours: 720, label: L.ttl[5] },
 ] as const
 
 export function ttlLabel(hours: number): string {
@@ -355,9 +380,9 @@ export function saveBook(book: GroupBook): void {
  */
 export function remaining(untilMs: number, now: number): string {
   const left = untilMs - now
-  if (left <= 0) return 'dưới 1 phút'
+  if (left <= 0) return L.underMinute
   const minutes = Math.floor(left / 60_000)
-  if (minutes >= 1440) return `${Math.ceil(minutes / 1440)} ngày`
-  if (minutes >= 60) return `${Math.ceil(minutes / 60)} giờ`
-  return `${Math.max(1, minutes)} phút`
+  if (minutes >= 1440) return L.days(Math.ceil(minutes / 1440))
+  if (minutes >= 60) return L.hours(Math.ceil(minutes / 60))
+  return L.minutes(Math.max(1, minutes))
 }

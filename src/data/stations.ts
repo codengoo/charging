@@ -1,4 +1,5 @@
 import type { DataBundle, DataManifest, PortGroup, Station, StationPower, StationStatus } from './types'
+import { pick } from '../i18n'
 
 const CELL_SIZE = 0.1
 
@@ -60,9 +61,14 @@ export interface StationIndex {
 /** Gốc dữ liệu: Worker đọc R2 tại `/data/*` (ở dev, vite phục vụ từ builder/out — xem vite.config.ts). */
 const DATA_BASE = '/data'
 
+const LOAD_FAILED = pick({
+  vi: (path: string, status: number) => `Tải ${path} thất bại: ${status}`,
+  en: (path: string, status: number) => `Failed to load ${path}: ${status}`,
+})
+
 async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${DATA_BASE}/${path}`, init)
-  if (!res.ok) throw new Error(`Tải ${path} thất bại: ${res.status}`)
+  if (!res.ok) throw new Error(LOAD_FAILED(path, res.status))
   return (await res.json()) as T
 }
 
@@ -213,12 +219,20 @@ const FROM_DEPOT: Record<string, StatusKind> = {
   Planned: 'planned',
 }
 
-export const STATUS_LABEL: Record<Exclude<StatusKind, 'active'>, string> = {
-  busy: 'Đang hết cổng trống',
-  maintaining: 'Đang bảo trì',
-  out: 'Ngừng hoạt động',
-  planned: 'Sắp khai trương',
-}
+export const STATUS_LABEL: Record<Exclude<StatusKind, 'active'>, string> = pick({
+  vi: {
+    busy: 'Đang hết cổng trống',
+    maintaining: 'Đang bảo trì',
+    out: 'Ngừng hoạt động',
+    planned: 'Sắp khai trương',
+  },
+  en: {
+    busy: 'All ports busy',
+    maintaining: 'Under maintenance',
+    out: 'Out of service',
+    planned: 'Opening soon',
+  },
+})
 
 /** `depot_status` của chi tiết (live, khi mở trạm) đè bản build ngày. */
 export function statusOf(st: Station, depotStatus?: string | null): StatusKind {
@@ -246,7 +260,7 @@ export const MID_KW = 60
 export const KW_BAND_LABEL: Record<KwBand, string> = {
   hi: `≥ ${FAST_KW} kW`,
   mid: `${MID_KW}–${FAST_KW - 1} kW`,
-  low: `Dưới ${MID_KW} kW`,
+  low: pick({ vi: `Dưới ${MID_KW} kW`, en: `Under ${MID_KW} kW` }),
 }
 
 export function bandOf(p: StationPower | undefined): KwBand | null {
@@ -261,7 +275,7 @@ export const kwActive = (bands: KwBand[]) => bands.length > 0 && bands.length < 
 /** Nhãn gọn cho chip / mô tả: các mức liền nhau gộp thành một khoảng. */
 export function kwLabel(bands: KwBand[]): string {
   const has = (b: KwBand) => bands.includes(b)
-  if (!kwActive(bands)) return 'Công suất'
+  if (!kwActive(bands)) return pick({ vi: 'Công suất', en: 'Power' })
   if (has('hi') && has('mid')) return `≥ ${MID_KW} kW`
   if (has('mid') && has('low')) return `< ${FAST_KW} kW`
   if (has('hi') && has('low')) return `≥ ${FAST_KW} · < ${MID_KW} kW`

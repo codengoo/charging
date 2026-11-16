@@ -7,6 +7,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { distanceKm } from './stations'
+import { pick } from '../i18n'
 import type { Station } from './types'
 
 export interface DriveInfo {
@@ -98,9 +99,22 @@ export function useDriveDistance(origin: LatLng | null, station: Station | null,
 }
 
 /** "khoảng 18 phút", "khoảng 1 giờ 5 phút". */
+const T = pick({
+  vi: {
+    min: (m: number) => `${m} phút`,
+    hr: (h: number) => `${h} giờ`,
+    hrMin: (h: number, m: number) => `${h} giờ ${m} phút`,
+  },
+  en: {
+    min: (m: number) => `${m} min`,
+    hr: (h: number) => `${h} h`,
+    hrMin: (h: number, m: number) => `${h} h ${m} min`,
+  },
+})
+
 export function fmtMinutes(seconds: number): string {
   const m = Math.max(1, Math.round(seconds / 60))
-  if (m < 60) return `${m} phút`
+  if (m < 60) return T.min(m)
   const h = Math.floor(m / 60)
-  return m % 60 ? `${h} giờ ${m % 60} phút` : `${h} giờ`
+  return m % 60 ? T.hrMin(h, m % 60) : T.hr(h)
 }

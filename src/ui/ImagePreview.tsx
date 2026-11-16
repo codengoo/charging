@@ -8,6 +8,30 @@ import 'yet-another-react-lightbox/styles.css'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { useIsMobile } from '@/hooks/use-media-query'
+import { pick } from '@/i18n'
+
+const L = pick({
+  vi: {
+    zoomHint: 'Ảnh trạm sạc. Chụm hai ngón hoặc chạm đúp để phóng to, kéo để di chuyển.',
+    photos: 'Ảnh trạm sạc',
+    prev: 'Ảnh trước',
+    next: 'Ảnh sau',
+    zoomIn: 'Phóng to',
+    zoomOut: 'Thu nhỏ',
+    close: 'Đóng',
+    alt: (i: number, n: number) => `Ảnh ${i} / ${n}`,
+  },
+  en: {
+    zoomHint: 'Charging station photos. Pinch or double-tap to zoom, drag to pan.',
+    photos: 'Charging station photos',
+    prev: 'Previous photo',
+    next: 'Next photo',
+    zoomIn: 'Zoom in',
+    zoomOut: 'Zoom out',
+    close: 'Close',
+    alt: (i: number, n: number) => `Photo ${i} of ${n}`,
+  },
+})
 
 interface Props {
   images: string[]
@@ -70,7 +94,7 @@ function ZoomViewer({ images, index, title, onClose }: Props) {
         >
           <DialogPrimitive.Title className="sr-only">{title}</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
-            Ảnh trạm sạc. Chụm hai ngón hoặc chạm đúp để phóng to, kéo để di chuyển.
+            {L.zoomHint}
           </DialogPrimitive.Description>
 
           {index !== null && (
@@ -95,7 +119,7 @@ function ZoomViewer({ images, index, title, onClose }: Props) {
                 ...(coarse || !many ? { buttonPrev: () => null, buttonNext: () => null } : {}),
                 ...(coarse ? { buttonZoom: () => null } : {}),
               }}
-              labels={{ Previous: 'Ảnh trước', Next: 'Ảnh sau', 'Zoom in': 'Phóng to', 'Zoom out': 'Thu nhỏ' }}
+              labels={{ Previous: L.prev, Next: L.next, 'Zoom in': L.zoomIn, 'Zoom out': L.zoomOut }}
               // Toolbar (nút +− trên máy tính) xuống đáy: góc trên phải là nút đóng của ta.
               styles={{ container: { backgroundColor: '#000' }, toolbar: { top: 'auto', bottom: 0 } }}
             />
@@ -113,7 +137,7 @@ function ZoomViewer({ images, index, title, onClose }: Props) {
             </div>
             <DialogPrimitive.Close
               className="pointer-events-auto -mt-1 -mr-1 grid size-10 shrink-0 cursor-pointer place-items-center rounded-full bg-white/15 backdrop-blur transition-colors hover:bg-white/25"
-              aria-label="Đóng"
+              aria-label={L.close}
             >
               <X className="size-5" />
             </DialogPrimitive.Close>
@@ -171,7 +195,7 @@ function ModalViewer({ images, index, title, onClose }: Props) {
         className="gap-3 p-4 sm:max-w-2xl"
       >
         <DialogTitle className="pr-8 text-base font-semibold">{title}</DialogTitle>
-        <DialogDescription className="sr-only">Ảnh trạm sạc</DialogDescription>
+        <DialogDescription className="sr-only">{L.photos}</DialogDescription>
 
         <div className="relative overflow-hidden rounded-xl bg-black/5 dark:bg-white/5">
           <div
@@ -186,7 +210,7 @@ function ModalViewer({ images, index, title, onClose }: Props) {
               <div key={url} className="grid w-full shrink-0 snap-center place-items-center p-1">
                 <img
                   src={url}
-                  alt={`Ảnh ${i + 1} / ${images.length}`}
+                  alt={L.alt(i + 1, images.length)}
                   decoding="async"
                   className="max-h-[70dvh] w-full rounded-lg object-contain"
                 />
@@ -202,7 +226,7 @@ function ModalViewer({ images, index, title, onClose }: Props) {
                 className="absolute top-1/2 left-2 hidden -translate-y-1/2 rounded-full bg-card/85 shadow-md backdrop-blur sm:inline-flex"
                 disabled={current === 0}
                 onClick={() => go(current - 1)}
-                aria-label="Ảnh trước"
+                aria-label={L.prev}
               >
                 <ChevronLeft />
               </Button>
@@ -212,7 +236,7 @@ function ModalViewer({ images, index, title, onClose }: Props) {
                 className="absolute top-1/2 right-2 hidden -translate-y-1/2 rounded-full bg-card/85 shadow-md backdrop-blur sm:inline-flex"
                 disabled={current === images.length - 1}
                 onClick={() => go(current + 1)}
-                aria-label="Ảnh sau"
+                aria-label={L.next}
               >
                 <ChevronRight />
               </Button>

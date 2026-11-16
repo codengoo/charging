@@ -7,12 +7,13 @@
   "compatibility_date": "2024-11-01",
   // Build dữ liệu chạy ở GitHub Action, không ở Worker (Free plan giới hạn 10ms CPU).
   // Frontend (Vite build) phục vụ như static assets; /data/* (R2), /station/* (preview link
-  // chia sẻ, thay meta theo trạm; /tram/* cũ 301 sang) và /api/* chạy qua Worker.
+  // chia sẻ, thay meta theo trạm; /tram/* cũ 301 sang), /en/* (bản tiếng Anh: meta + hreflang)
+  // và /api/* chạy qua Worker.
   "assets": {
     "binding": "ASSETS",
     "directory": "./dist",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/data/*", "/station/*", "/tram", "/tram/*", "/api/*"]
+    "run_worker_first": ["/data/*", "/station/*", "/tram", "/tram/*", "/api/*", "/en", "/en/*"]
   },
   // Giới hạn /api/{route,geocode,revgeocode,maps-link} theo IP — chặn người ngoài dùng ké quota
   // HERE. period chỉ nhận 10 hoặc 60. Key HERE: `npx wrangler secret put HERE_API_KEY`.

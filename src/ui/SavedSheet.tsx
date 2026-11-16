@@ -24,6 +24,30 @@ import type { Station } from '../data/types'
 import { GroupGlyph, PinPreview } from './groupIcons'
 import { tintHex } from '../map/pins'
 import { fmtDistance } from '@/lib/format'
+import { LOCALE, pick } from '../i18n'
+
+const L = pick({
+  vi: {
+    title: 'Trạm sạc đã lưu',
+    empty: 'Chưa có trạm nào. Mở một trạm rồi bấm “Lưu” để thêm vào nhóm.',
+    filtered: (shown: number, total: number) => `${shown}/${total} trạm`,
+    count: (n: number) => `${n} trạm đã lưu`,
+    backup: 'Sao lưu / chuyển máy',
+    all: 'Tất cả',
+    left: (t: string) => `còn ${t}`,
+    unsave: (name: string) => `Bỏ ${name} khỏi mọi nhóm`,
+  },
+  en: {
+    title: 'Saved charging stations',
+    empty: 'No stations yet. Open a station and tap “Save” to add it to a group.',
+    filtered: (shown: number, total: number) => `${shown}/${total} ${total === 1 ? 'station' : 'stations'}`,
+    count: (n: number) => `${n} saved ${n === 1 ? 'station' : 'stations'}`,
+    backup: 'Back up / transfer',
+    all: 'All',
+    left: (t: string) => `${t} left`,
+    unsave: (name: string) => `Remove ${name} from all groups`,
+  },
+})
 
 interface Props {
   /** Giữ component gắn và chỉ đổi `open` — gỡ hẳn khi đóng thì mất hiệu ứng trôi xuống. */
@@ -57,7 +81,7 @@ export function SavedSheet({ open, index, book, now, userPos, onPick, onUnsave, 
         km: userPos ? distanceKm(userPos.lat, userPos.lng, st.lat, st.lng) : NaN,
       }))
     // Có vị trí thì gần nhất lên trước; không có thì theo tên.
-    rows.sort((a, b) => (userPos ? a.km - b.km : a.st.name.localeCompare(b.st.name, 'vi')))
+    rows.sort((a, b) => (userPos ? a.km - b.km : a.st.name.localeCompare(b.st.name, LOCALE)))
     return rows
   }, [index, book, userPos])
 
@@ -72,26 +96,26 @@ export function SavedSheet({ open, index, book, now, userPos, onPick, onUnsave, 
     <ResponsiveDialog open={open} onOpenChange={(o) => !o && onClose()}>
       <ResponsiveDialogContent className="sm:max-w-md">
         <ResponsiveDialogHeader>
-          <ResponsiveDialogTitle className="text-lg">Trạm sạc đã lưu</ResponsiveDialogTitle>
+          <ResponsiveDialogTitle className="text-lg">{L.title}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="text-sm">
             {items.length === 0
-              ? 'Chưa có trạm nào. Mở một trạm rồi bấm “Lưu” để thêm vào nhóm.'
+              ? L.empty
               : filter.size > 0
-                ? `${shown.length}/${items.length} trạm`
-                : `${items.length} trạm đã lưu`}
+                ? L.filtered(shown.length, items.length)
+                : L.count(items.length)}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
         {/* Luôn hiện, kể cả khi chưa lưu gì: máy mới cần chỗ "Nhập từ file". */}
         <Button variant="outline" size="sm" className="mt-2 self-start rounded-full" onClick={onBackup}>
           <ArrowLeftRight />
-          Sao lưu / chuyển máy
+          {L.backup}
         </Button>
 
         {items.length > 0 && (
           <div className="mt-2 -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 no-scrollbar">
             <Chip selected={filter.size === 0} onClick={() => setFilter(new Set())}>
-              Tất cả
+              {L.all}
             </Chip>
             {usedGroups.map((g) => {
               const on = filter.has(g.id)
@@ -145,14 +169,14 @@ export function SavedSheet({ open, index, book, now, userPos, onPick, onUnsave, 
                       })}
                     </span>
                     {exp !== null && (
-                      <span className="text-[11px] text-muted-foreground">còn {remaining(exp, now)}</span>
+                      <span className="text-[11px] text-muted-foreground">{L.left(remaining(exp, now))}</span>
                     )}
                   </span>
                 </button>
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`Bỏ ${st.name} khỏi mọi nhóm`}
+                  aria-label={L.unsave(st.name)}
                   onClick={() => onUnsave(st.entityId)}
                 >
                   <X />

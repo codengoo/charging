@@ -12,6 +12,8 @@ Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app
 - Trạm dọc đường lọc theo mức công suất đã chọn, chỉnh được ngay trong bảng hành trình.
 - Số cổng sạc chính xác hơn: đọc đủ mọi mức công suất của trạm, tách đúng cổng AC/DC.
 - Icon trạm sạc mới (phích cắm), chú giải màu và icon trong danh sách to hơn.
+- Thêm giao diện tiếng Anh (đổi trong Cài đặt hiển thị, hoặc mở /en/).
+- Số cổng và số cổng đang cắm gộp chung một khối: mỗi mức kW một màu, chip tô dần theo số cổng đang dùng.
 
 ## [0.7.0] — 2026-11-16 — Trạm sạc dọc đường
 

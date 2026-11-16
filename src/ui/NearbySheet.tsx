@@ -12,6 +12,33 @@ import { TIER_COLORS } from '../map/pins'
 import { PinPreview } from './groupIcons'
 import { fmtDistance, fmtKw } from '@/lib/format'
 import { cachedDrive, type DriveInfo, type LatLng } from '../data/drive'
+import { pick } from '../i18n'
+
+const L = pick({
+  vi: {
+    driving: 'Quãng đường lái xe',
+    straight: 'Đường chim bay',
+    nearYou: 'Trạm gần bạn',
+    nearCenter: 'Trạm gần tâm bản đồ',
+    power: (label: string) => `công suất ${label}`,
+    none: (f: string) => `Không có trạm đang hoạt động${f ? ` ${f}` : ''} trong khoảng 110 km.`,
+    count: (n: number, f: string) => `${n} trạm đang hoạt động${f ? ` ${f}` : ''} gần nhất`,
+    gpsHint: ' · ~ là đường chim bay, mở trạm để xem quãng đường lái xe.',
+    noGpsHint: ' · Bật định vị để xếp theo chỗ bạn đứng.',
+  },
+  en: {
+    driving: 'Driving distance',
+    straight: 'Straight-line distance',
+    nearYou: 'Stations near you',
+    nearCenter: 'Stations near map center',
+    power: (label: string) => `at ${label}`,
+    none: (f: string) => `No operating stations${f ? ` ${f}` : ''} within about 110 km.`,
+    count: (n: number, f: string) =>
+      `${n} nearest operating ${n === 1 ? 'station' : 'stations'}${f ? ` ${f}` : ''}`,
+    gpsHint: ' · ~ is straight-line; open a station to see driving distance.',
+    noGpsHint: ' · Turn on location to sort by where you are.',
+  },
+})
 
 /**
  * Trạm đã mở (có quãng đường lái trong cache) hiện km đường thật; còn lại là đường chim bay,
@@ -20,13 +47,13 @@ import { cachedDrive, type DriveInfo, type LatLng } from '../data/drive'
 function Distance({ drive, straightKm }: { drive: DriveInfo | null | undefined; straightKm: number }) {
   if (drive) {
     return (
-      <span className="text-sm font-semibold" title="Quãng đường lái xe">
+      <span className="text-sm font-semibold" title={L.driving}>
         {fmtDistance(drive.meters / 1000)}
       </span>
     )
   }
   return (
-    <span className="text-sm font-semibold" title="Đường chim bay">
+    <span className="text-sm font-semibold" title={L.straight}>
       ~{fmtDistance(straightKm)}
     </span>
   )
@@ -59,20 +86,18 @@ export function NearbySheet({ open, index, power, filters, origin, fromGps, driv
     return nearestStations(index, origin.lat, origin.lng, LIMIT, (st) => passesFilters(st, f, power), MAX_RING)
   }, [index, power, filters, origin])
 
-  const filterLabel = kwActive(filters.kw) ? `công suất ${kwLabel(filters.kw)}` : ''
+  const filterLabel = kwActive(filters.kw) ? L.power(kwLabel(filters.kw)) : ''
 
   return (
     <ResponsiveDialog open={open} onOpenChange={(o) => !o && onClose()}>
       <ResponsiveDialogContent className="sm:max-w-md">
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle className="text-lg">
-            {fromGps ? 'Trạm gần bạn' : 'Trạm gần tâm bản đồ'}
+            {fromGps ? L.nearYou : L.nearCenter}
           </ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="text-sm">
-            {items.length === 0
-              ? `Không có trạm đang hoạt động${filterLabel ? ` ${filterLabel}` : ''} trong khoảng 110 km.`
-              : `${items.length} trạm đang hoạt động${filterLabel ? ` ${filterLabel}` : ''} gần nhất`}
-            {fromGps ? ' · ~ là đường chim bay, mở trạm để xem quãng đường lái xe.' : ' · Bật định vị để xếp theo chỗ bạn đứng.'}
+            {items.length === 0 ? L.none(filterLabel) : L.count(items.length, filterLabel)}
+            {fromGps ? L.gpsHint : L.noGpsHint}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 

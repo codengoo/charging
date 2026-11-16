@@ -31,6 +31,34 @@ import { useGroupBook } from './data/useGroupBook'
 import { APP_VERSION } from './data/changelog'
 import type { Station } from './data/types'
 import { parseStationId, readTripLink, stationPath, tripPath } from './lib/stationUrl'
+import { LANG, pick as tr, stripLang, withLang } from './i18n'
+
+const T = tr({
+  vi: {
+    stationTitle: (name: string) => `${name} — Trạm sạc VinFast`,
+    loadError: 'Không tải được dữ liệu trạm.',
+    loading: 'Đang tải bản đồ trạm sạc…',
+    nearMe: 'Gần tôi',
+    alongRoute: 'Dọc đường',
+    saved: (n: number) => `Đã lưu${n ? ` (${n})` : ''}`,
+    active: 'Đang hoạt động',
+    list: 'Danh sách',
+    settings: 'Cài đặt hiển thị',
+    whatsNew: 'Có gì mới',
+  },
+  en: {
+    stationTitle: (name: string) => `${name} — VinFast charging station`,
+    loadError: 'Could not load station data.',
+    loading: 'Loading charging station map…',
+    nearMe: 'Near me',
+    alongRoute: 'Along route',
+    saved: (n: number) => `Saved${n ? ` (${n})` : ''}`,
+    active: 'Operating',
+    list: 'List',
+    settings: 'Display settings',
+    whatsNew: "What's new",
+  },
+})
 
 const DEFAULT_TITLE = document.title
 
@@ -182,12 +210,12 @@ export function App() {
       const url = tripPath(trip.link ? (firstUrl(trip.link) ?? trip.link) : null)
       if (location.pathname + location.search !== url) history.replaceState(null, '', url)
     } else {
-      const path = selected ? stationPath(selected) : '/'
+      const path = selected ? stationPath(selected) : withLang('/', LANG)
       // Rời /trip thì bỏ luôn ?link=…; còn lại giữ query (vd. utm_*).
-      const search = location.pathname.startsWith('/trip') ? '' : location.search
+      const search = stripLang(location.pathname).startsWith('/trip') ? '' : location.search
       if (location.pathname !== path || search !== location.search) history.replaceState(null, '', path + search)
     }
-    document.title = selected ? `${selected.name} — Trạm sạc VinFast` : DEFAULT_TITLE
+    document.title = selected ? T.stationTitle(selected.name) : DEFAULT_TITLE
   }, [index, selected, tripOpen, trip.link, tripLink])
 
   function pick(st: Station) {
@@ -198,7 +226,7 @@ export function App() {
   if (error) {
     return (
       <div className="flex h-dvh flex-col items-center justify-center gap-3 p-6 text-center text-muted-foreground">
-        <p>Không tải được dữ liệu trạm.</p>
+        <p>{T.loadError}</p>
         <code className="text-xs">{error}</code>
       </div>
     )
@@ -207,7 +235,7 @@ export function App() {
     return (
       <div className="flex h-dvh flex-col items-center justify-center gap-4 p-6 text-center text-muted-foreground">
         <div className="size-9 animate-spin rounded-full border-[3px] border-muted border-t-brand" />
-        <p>Đang tải bản đồ trạm sạc…</p>
+        <p>{T.loading}</p>
       </div>
     )
   }
@@ -246,28 +274,28 @@ export function App() {
             }}
           >
             <LocateFixed />
-            Gần tôi
+            {T.nearMe}
           </Chip>
           <Chip variant="floating" selected={tripOpen} onClick={() => (tripOpen ? tripCtl.close() : tripCtl.show())}>
             <Route />
-            Dọc đường
+            {T.alongRoute}
           </Chip>
           <FilterChip
-            label={`Đã lưu${savedCount ? ` (${savedCount})` : ''}`}
+            label={T.saved(savedCount)}
             on={filters.favoritesOnly}
             onClick={() => setFilters((f) => ({ ...f, favoritesOnly: !f.favoritesOnly }))}
           />
           <FilterChip label={kwLabel(settings.kwBands)} on={kwActive(filters.kw)} onClick={toggleKw} />
           <FilterChip
-            label="Đang hoạt động"
+            label={T.active}
             on={filters.activeOnly}
             onClick={() => setFilters((f) => ({ ...f, activeOnly: !f.activeOnly }))}
           />
           <Chip variant="floating" onClick={() => setShowSaved(true)}>
             <List />
-            Danh sách
+            {T.list}
           </Chip>
-          <Chip variant="floating" aria-label="Cài đặt hiển thị" title="Cài đặt hiển thị" onClick={() => setShowSettings(true)}>
+          <Chip variant="floating" aria-label={T.settings} title={T.settings} onClick={() => setShowSettings(true)}>
             <Settings2 />
           </Chip>
         </div>
@@ -296,7 +324,7 @@ export function App() {
         className="absolute bottom-3 left-3 z-[5] rounded-full bg-card/90 shadow-lg shadow-black/10 backdrop-blur"
         onClick={() => setShowChangelog(true)}
       >
-        v{APP_VERSION} · Có gì mới
+        v{APP_VERSION} · {T.whatsNew}
       </Button>
 
       {/* Các bảng luôn GẮN sẵn, chỉ đổi `open`: gỡ hẳn khi đóng thì vaul/Radix không kịp chạy

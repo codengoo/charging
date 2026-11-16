@@ -3,6 +3,12 @@ import { Search, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import type { Station } from '../data/types'
 import { searchStations, type StationIndex } from '../data/stations'
+import { pick } from '../i18n'
+
+const L = pick({
+  vi: { placeholder: 'Tìm trạm theo tên hoặc địa chỉ…', clear: 'Xoá' },
+  en: { placeholder: 'Search stations by name or address…', clear: 'Clear' },
+})
 
 interface Props {
   index: StationIndex
@@ -23,7 +29,7 @@ export function SearchBar({ index, onPick }: Props) {
       <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         value={q}
-        placeholder="Tìm trạm theo tên hoặc địa chỉ…"
+        placeholder={L.placeholder}
         className="h-12 bg-card pr-10 pl-9 text-[15px] shadow-lg shadow-black/5 ring-1 ring-black/5"
         onChange={(e) => {
           setQ(e.target.value)
@@ -34,7 +40,7 @@ export function SearchBar({ index, onPick }: Props) {
       {q && (
         <button
           className="absolute top-1/2 right-2 flex size-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground hover:bg-muted"
-          aria-label="Xoá"
+          aria-label={L.clear}
           onClick={() => {
             setQ('')
             setOpen(false)

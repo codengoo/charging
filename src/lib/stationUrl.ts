@@ -7,6 +7,8 @@
  * cho SEO — sai slug (trạm đổi tên) thì server chuyển 301 về slug đúng.
  */
 
+import { LANG, stripLang, withLang, type Lang } from '../i18n'
+
 /** Domain chính thức — dùng khi đang chạy local (QR trỏ về localhost thì điện thoại không mở được). */
 export const SITE_URL = 'https://charging.cangao.asia'
 
@@ -26,14 +28,15 @@ export function slugify(s: string): string {
 /** Tiền tố path trạm. `/tram/*` cũ (QR đã in, link đã gửi) được Worker 301 về đây. */
 export const STATION_PREFIX = '/station/'
 
-export function stationPath(st: { entityId: string; name: string }): string {
+/** Đường dẫn trạm; `lang` 'en' thêm tiền tố `/en`. Mặc định theo ngôn ngữ trang (Worker: vi). */
+export function stationPath(st: { entityId: string; name: string }, lang: Lang = LANG): string {
   const slug = slugify(st.name)
-  return `${STATION_PREFIX}${st.entityId}${slug ? `-${slug}` : ''}`
+  return withLang(`${STATION_PREFIX}${st.entityId}${slug ? `-${slug}` : ''}`, lang)
 }
 
-/** Lấy entityId từ pathname `/station/<id>-<slug>`. Không khớp thì null. */
+/** Lấy entityId từ pathname `[/en]/station/<id>-<slug>`. Không khớp thì null. */
 export function parseStationId(pathname: string): string | null {
-  const m = /^\/station\/(\d+)(?:-[^/]*)?\/?$/.exec(pathname)
+  const m = /^\/station\/(\d+)(?:-[^/]*)?\/?$/.exec(stripLang(pathname))
   return m ? m[1] : null
 }
 
@@ -61,8 +64,9 @@ export function googleMapsUrl(st: { lat: number; lng: number }): string {
 /** Trang hành trình "trạm dọc đường": `/trip?link=<link Google Maps>`. Không cần Worker (SPA). */
 export const TRIP_PATH = '/trip'
 
-export function tripPath(link: string | null): string {
-  return link ? `${TRIP_PATH}?link=${encodeURIComponent(link)}` : TRIP_PATH
+export function tripPath(link: string | null, lang: Lang = LANG): string {
+  const path = withLang(TRIP_PATH, lang)
+  return link ? `${path}?link=${encodeURIComponent(link)}` : path
 }
 
 /**
@@ -72,7 +76,8 @@ export function tripPath(link: string | null): string {
  * hành trình chưa có link.
  */
 export function readTripLink(loc: { pathname: string; search: string }): string | null | undefined {
-  if (loc.pathname !== TRIP_PATH && loc.pathname !== `${TRIP_PATH}/`) return undefined
+  const path = stripLang(loc.pathname)
+  if (path !== TRIP_PATH && path !== `${TRIP_PATH}/`) return undefined
   const q = new URLSearchParams(loc.search)
   return q.get('link') || q.get('url') || q.get('text') || null
 }

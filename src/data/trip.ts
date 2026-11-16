@@ -6,6 +6,7 @@
 import { decodeFlexiblePolyline, type GeoPoint } from '../lib/flexiblePolyline'
 import { firstUrl, hasFix, isShortLink, parseMapsUrl, type TripStop } from '../lib/mapsLink'
 import type { RoutePath } from './routeCorridor'
+import { pick } from '../i18n'
 
 /** Một chặng đã có toạ độ, kèm tên để hiện. */
 export interface TripPoint {
@@ -17,14 +18,26 @@ export interface TripPoint {
 /** Lỗi có câu tiếng Việt hiện thẳng cho người dùng. */
 export class TripError extends Error {}
 
-export const MSG = {
-  badLink: 'Không đọc được liên kết Google Maps này.',
-  badStop: 'Không xác định được một trong các điểm của hành trình.',
-  noGps: 'Chưa lấy được vị trí của bạn — bật định vị rồi thử lại.',
-  noRoute: 'Không tìm được đường giữa các điểm này. Kiểm tra mạng rồi thử lại.',
-  tooFast: 'Gọi quá nhanh, thử lại sau ít phút.',
-  noKey: 'Máy chủ chưa cấu hình dịch vụ tìm đường.',
-}
+export const MSG = pick({
+  vi: {
+    badLink: 'Không đọc được liên kết Google Maps này.',
+    badStop: 'Không xác định được một trong các điểm của hành trình.',
+    noGps: 'Chưa lấy được vị trí của bạn — bật định vị rồi thử lại.',
+    noRoute: 'Không tìm được đường giữa các điểm này. Kiểm tra mạng rồi thử lại.',
+    tooFast: 'Gọi quá nhanh, thử lại sau ít phút.',
+    noKey: 'Máy chủ chưa cấu hình dịch vụ tìm đường.',
+    myLocation: 'Vị trí của tôi',
+  },
+  en: {
+    badLink: "Couldn't read this Google Maps link.",
+    badStop: "Couldn't locate one of the stops on this trip.",
+    noGps: "Couldn't get your location — turn on location services and try again.",
+    noRoute: "Couldn't find a route between these points. Check your connection and try again.",
+    tooFast: 'Too many requests, try again in a few minutes.',
+    noKey: 'The server has no routing service configured.',
+    myLocation: 'My location',
+  },
+})
 
 /** functionalClass 1 = hạng cao nhất (cao tốc / đường có kiểm soát lối ra). */
 const LIMITED_ACCESS_CLASS = 1
@@ -163,7 +176,7 @@ export async function resolveTrip(
 
   if (needGps) {
     if (!me) throw new TripError(MSG.noGps)
-    points.unshift({ label: 'Vị trí của tôi', lat: me.lat, lng: me.lng })
+    points.unshift({ label: MSG.myLocation, lat: me.lat, lng: me.lng })
   }
   return points
 }

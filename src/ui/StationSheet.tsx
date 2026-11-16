@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { CalendarCheck, CalendarClock, Clock, Heart, Navigation, Phone, PlugZap, QrCode, Wrench } from 'lucide-react'
+import { CalendarCheck, CalendarClock, Clock, Heart, Navigation, Phone, QrCode, Wrench } from 'lucide-react'
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -15,10 +15,50 @@ import { STATUS_LABEL, statusOf } from '../data/stations'
 import type { Station, StationDetail, StationPower } from '../data/types'
 import { GroupGlyph } from './groupIcons'
 import { ImagePreview } from './ImagePreview'
-import { fmtDistance, fmtKw } from '@/lib/format'
+import { fmtDistance } from '@/lib/format'
 import { fmtMinutes, type DriveState } from '../data/drive'
 import type { LiveState } from '../data/live'
-import { LiveSection } from './LiveSection'
+import { HistoryBox, PortsBox } from './LiveSection'
+import { pick } from '@/i18n'
+
+const L = pick({
+  vi: {
+    changeGroups: 'Đổi nhóm đã lưu',
+    saveToGroup: 'Lưu vào nhóm',
+    saved: 'Đã lưu',
+    save: 'Lưu',
+    share: 'Chia sẻ trạm, mã QR',
+    directions: 'Chỉ đường',
+    public: 'Công cộng',
+    private: 'Nội bộ',
+    link: 'Trụ LINK',
+    parking: 'Có thể mất phí gửi xe',
+    reservable: 'Đặt trước được',
+    photo: (i: number, name: string) => `Xem ảnh ${i} của ${name}`,
+    computing: 'Đang tính quãng đường…',
+    driving: (d: string) => `${d} lái xe`,
+    about: ' · khoảng ',
+    straight: (d: string) => `~${d} đường chim bay`,
+  },
+  en: {
+    changeGroups: 'Change saved groups',
+    saveToGroup: 'Save to group',
+    saved: 'Saved',
+    save: 'Save',
+    share: 'Share station, QR code',
+    directions: 'Directions',
+    public: 'Public',
+    private: 'Private',
+    link: 'LINK charger',
+    parking: 'Parking fee may apply',
+    reservable: 'Reservable',
+    photo: (i: number, name: string) => `View photo ${i} of ${name}`,
+    computing: 'Calculating distance…',
+    driving: (d: string) => `${d} driving`,
+    about: ' · about ',
+    straight: (d: string) => `~${d} straight-line`,
+  },
+})
 
 interface Props {
   /** Giữ component gắn và chỉ đổi `open` — gỡ hẳn khi đóng thì mất hiệu ứng trôi xuống. */
@@ -85,10 +125,10 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
             </Chip>
           )}
           <Chip size="sm" variant={station.isPublic ? 'default' : 'secondary'}>
-            {station.isPublic ? 'Công cộng' : 'Nội bộ'}
+            {station.isPublic ? L.public : L.private}
           </Chip>
-          {station.hasLink && <Chip size="sm">Trụ LINK</Chip>}
-          {station.parkingFee && <Chip size="sm" variant="outline">Có thể mất phí gửi xe</Chip>}
+          {station.hasLink && <Chip size="sm">{L.link}</Chip>}
+          {station.parkingFee && <Chip size="sm" variant="outline">{L.parking}</Chip>}
           {detail?.open247 && (
             <Chip size="sm" variant="outline">
               <Clock />
@@ -104,7 +144,7 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
           {detail?.reservable && (
             <Chip size="sm" variant="outline">
               <CalendarCheck />
-              Đặt trước được
+              {L.reservable}
             </Chip>
           )}
         </div>
@@ -114,7 +154,7 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
             type="button"
             onClick={onOpenGroups}
             className="mt-3 flex flex-wrap gap-1.5 text-left"
-            aria-label="Đổi nhóm đã lưu"
+            aria-label={L.changeGroups}
           >
             {groups.map((g) => (
               <Chip key={g.id} size="sm" variant="outline">
@@ -125,9 +165,9 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
           </button>
         )}
 
-        <PowerBlock power={ports} loading={powerLoading || (!ports && detailLoading)} standards={detail?.standards} />
+        <PortsBox power={ports} powerLoading={powerLoading || (!ports && detailLoading)} standards={detail?.standards} live={live} />
 
-        {live && <LiveSection live={live} power={ports} />}
+        {live && <HistoryBox live={live} power={ports} />}
 
         {detail?.hotline && (
           <a
@@ -144,18 +184,18 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
             variant="outline"
             className="flex-1 sm:flex-none"
             onClick={onOpenGroups}
-            aria-label={saved ? 'Đổi nhóm đã lưu' : 'Lưu vào nhóm'}
+            aria-label={saved ? L.changeGroups : L.saveToGroup}
           >
             <Heart className={saved ? 'fill-[#E53935] text-[#E53935]' : ''} />
-            {saved ? 'Đã lưu' : 'Lưu'}
+            {saved ? L.saved : L.save}
           </Button>
-          <Button variant="outline" size="icon" className="shrink-0" aria-label="Chia sẻ trạm, mã QR" onClick={onShare}>
+          <Button variant="outline" size="icon" className="shrink-0" aria-label={L.share} onClick={onShare}>
             <QrCode />
           </Button>
           <Button asChild variant="brand" className="flex-1 sm:flex-none">
             <a href={gmapsDir} target="_blank" rel="noreferrer">
               <Navigation />
-              Chỉ đường
+              {L.directions}
             </a>
           </Button>
         </ResponsiveDialogFooter>
@@ -183,7 +223,7 @@ function Gallery({ images, loading, name }: { images?: string[]; loading?: boole
           key={url}
           type="button"
           onClick={() => setViewing(i)}
-          aria-label={`Xem ảnh ${i + 1} của ${name}`}
+          aria-label={L.photo(i + 1, name)}
           className={`h-36 shrink-0 cursor-zoom-in snap-start overflow-hidden rounded-xl bg-muted outline-none focus-visible:ring-3 focus-visible:ring-ring/40 ${one ? 'w-full' : 'w-52'}`}
         >
           <img
@@ -200,60 +240,21 @@ function Gallery({ images, loading, name }: { images?: string[]; loading?: boole
   )
 }
 
-/**
- * Khối "Cổng sạc": tổng số cổng + công suất tối đa, rồi từng mức kW. Ưu tiên connector từ
- * VinFast (lúc mở trạm); chưa có thì dùng bản ghép Google My Maps theo toạ độ (~89% trạm) —
- * không khớp nguồn nào thì nói rõ là chưa có, không đoán.
- */
-function PowerBlock({ power, loading, standards }: { power?: StationPower; loading?: boolean; standards?: string[] }) {
-  return (
-    <section className="mt-3 rounded-xl bg-muted px-3 py-2.5" aria-label="Cổng sạc">
-      <div className="flex items-center gap-2 text-sm">
-        <PlugZap className="size-4 shrink-0 text-brand" aria-hidden />
-        {power ? (
-          <span>
-            <span className="font-semibold">{power.portCount} cổng</span>
-            <span className="text-muted-foreground"> · tối đa {fmtKw(power.maxKw)} kW</span>
-            {standards && standards.length > 0 && (
-              <span className="text-muted-foreground"> · {standards.join(', ')}</span>
-            )}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">
-            {loading ? 'Đang tải số cổng…' : 'Chưa có thông tin cổng sạc cho trạm này.'}
-          </span>
-        )}
-      </div>
-      {power && power.groups.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {power.groups.map((g) => (
-            <Chip key={`${g.kw}-${g.dc}`} size="sm" variant="outline">
-              <span className="font-semibold">{fmtKw(g.kw)} kW</span>
-              <span className="text-muted-foreground">× {g.count} · {g.dc ? 'DC' : 'AC'}</span>
-            </Chip>
-          ))}
-        </div>
-      )}
-    </section>
-  )
-}
-
-
 /** "12.4 km lái xe · khoảng 18 phút" — như ngăn kéo trạm bên Android. */
 function DriveLine({ drive }: { drive?: DriveState }) {
   if (!drive || drive.kind === 'none') return null
   return (
     <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
       <Navigation className="size-3.5 shrink-0" aria-hidden />
-      {drive.kind === 'loading' && 'Đang tính quãng đường…'}
+      {drive.kind === 'loading' && L.computing}
       {drive.kind === 'ok' && (
         <span>
-          <span className="font-semibold text-foreground">{fmtDistance(drive.info.meters / 1000)} lái xe</span>
-          {' · khoảng '}
+          <span className="font-semibold text-foreground">{L.driving(fmtDistance(drive.info.meters / 1000))}</span>
+          {L.about}
           {fmtMinutes(drive.info.seconds)}
         </span>
       )}
-      {drive.kind === 'fallback' && `~${fmtDistance(drive.straightKm)} đường chim bay`}
+      {drive.kind === 'fallback' && L.straight(fmtDistance(drive.straightKm))}
     </p>
   )
 }

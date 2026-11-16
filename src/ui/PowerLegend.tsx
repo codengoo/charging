@@ -2,11 +2,27 @@ import { useState } from 'react'
 import { PinPreview } from './groupIcons'
 import { TIER_COLORS } from '../map/pins'
 import { FAST_KW } from '../data/stations'
+import { pick } from '../i18n'
 
 const KEY = 'tramsac.legend'
 
+const L = pick({
+  vi: {
+    ac: 'AC / chưa rõ',
+    collapse: 'Thu chú giải màu ghim',
+    expand: 'Mở chú giải màu ghim',
+    inactive: 'Bảo trì / sắp mở',
+  },
+  en: {
+    ac: 'AC / unknown',
+    collapse: 'Collapse pin color legend',
+    expand: 'Expand pin color legend',
+    inactive: 'Maintenance / opening soon',
+  },
+})
+
 const ROWS = [
-  { color: TIER_COLORS[0], label: 'AC / chưa rõ' },
+  { color: TIER_COLORS[0], label: L.ac },
   { color: TIER_COLORS[1], label: `DC < ${FAST_KW} kW` },
   { color: TIER_COLORS[2], label: `DC ≥ ${FAST_KW} kW` },
 ]
@@ -41,7 +57,7 @@ export function PowerLegend() {
       type="button"
       onClick={toggle}
       aria-expanded={open}
-      aria-label={open ? 'Thu chú giải màu ghim' : 'Mở chú giải màu ghim'}
+      aria-label={open ? L.collapse : L.expand}
       className="absolute right-3 bottom-14 z-[5] rounded-xl bg-card/90 text-left shadow-lg shadow-black/10 backdrop-blur outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
     >
       {open ? (
@@ -54,7 +70,7 @@ export function PowerLegend() {
           ))}
           <span className="flex items-center gap-2 text-muted-foreground">
             <PinPreview group={{ iconKey: 'charger', colorHex: TIER_COLORS[0] }} width={22} className="opacity-45" />
-            Bảo trì / sắp mở
+            {L.inactive}
           </span>
         </span>
       ) : (
