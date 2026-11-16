@@ -120,3 +120,9 @@ Pure TS ports of FlexiblePolyline, MapsLink parsing and RouteCorridor
 (thin/cells/pick/opposite-carriageway rule, 400-station cap by offset),
 plus trip.ts (client for /api/*) and the useTrip state hook. No UI yet.
 ```
+
+## 10. Kết quả thực hiện (2026-11-16)
+
+- Nguồn port: `codengoo/charge-map-android` (private, lấy qua `gh api`): `FlexiblePolyline.kt`, `MapsLink.kt`, `RouteCorridor.kt`, `HereRouting.kt`, `HerePlaces.kt`, `MapViewModel.handleSharedText/resolvePoint`, `StationRepository.alongRoute`.
+- Lệch: chuỗi mẫu HERE `BFoz5xJ67i1B1B7PzIhaxL7Y` giải ra **4** điểm (đúng README HERE; plan ghi 3 là sai). `alongRoute` bỏ trạm `status ≠ 0` như Android (`includeUnusable = false`). `useTrip` thêm `show()` + trạng thái `idle` (bảng mở, chưa có link). `trip.ts` thêm câu lỗi cho 429 / 503 (chưa có key). `parseHereRoute` tách khỏi `fetchRoute` để test không cần mạng.
+- Đã kiểm bằng script scratchpad (bundle esbuild): polyline (cả mẫu có chiều thứ 3, chuỗi hỏng), 4 dạng link + link thật `maps.app.goo.gl/Wa4BHQY94CRPMfuA7` mở qua `/api/maps-link` → 2 chặng đúng toạ độ (dạng `!1d!2d`), pick (1 km giữ, 3 km bỏ, trái-cao tốc 50 m bỏ, phải giữ, trái-đường thường giữ, `atKm` ±0,05), trần 400/500 theo offset, bỏ trạm không hoạt động, thin ≤ 1.502 điểm giữ đầu/cuối + cờ cùng nhịp, nối section HERE.
