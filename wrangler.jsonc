@@ -23,6 +23,9 @@
   "r2_buckets": [{ "binding": "DATA", "bucket_name": "tramsac-data" }],
   // Domain riêng (zone cangao.asia nằm trong tài khoản này).
   "routes": [{ "pattern": "charging.cangao.asia", "custom_domain": true }],
+  // Workers Logs: worker/locator.ts ghi một dòng JSON mỗi request /api/station để đo VinFast
+  // chặn ra sao trên lưu lượng thật.
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
   "workers_dev": false,
   "preview_urls": false
 }

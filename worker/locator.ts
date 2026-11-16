@@ -32,35 +32,85 @@ const STANDARD: Record<string, string> = {
   GBT_AC: 'GB/T AC',
 }
 
-export async function serveStationDetail(url: URL, data: R2Bucket, ctx: ExecutionContext): Promise<Response> {
+/**
+ * Một dòng log cho mỗi request (Workers Logs, `observability` trong wrangler.jsonc) để đo VinFast
+ * chặn ra sao trên lưu lượng thật. 16/11 đo tay không thấy dấu rate-limit: gọi dồn 8 luồng vẫn
+ * qua; chỗ bị chặn thì chặn ngay từ request đầu (4–17 ms, trang `IM_UNDER_ATTACK_BOX`) — nhưng
+ * 80 mẫu chưa đủ để biết tỉ lệ thật và lần thử lại cứu được bao nhiêu.
+ *
+ * Truy vấn trên dashboard: message chứa `"evt":"detail"`, lọc theo `outcome`, `colo`, `calls`.
+ */
+interface Trace {
+  evt: 'detail'
+  id: string
+  colo?: string
+  /** hit: edge cache · ok · not_found · stale: VinFast lỗi, trả bản R2 · fail: lỗi, không có bản cũ. */
+  outcome?: 'hit' | 'ok' | 'not_found' | 'stale' | 'fail'
+  ms?: number
+  reason?: string
+  /** Từng lần gọi VinFast: lượt thử (1 | 2), bước, status, có phải trang chặn HTML không. */
+  calls: TraceCall[]
+}
+
+interface TraceCall {
+  try: number
+  /** main: get-locator · warm: trang tìm trạm lấy cookie · cookie: get-locator kèm cookie. */
+  step: 'main' | 'warm' | 'cookie'
+  status: number
+  html?: boolean
+  ms: number
+}
+
+export async function serveStationDetail(
+  url: URL,
+  data: R2Bucket,
+  ctx: ExecutionContext,
+  colo?: string,
+): Promise<Response> {
   const id = url.pathname.slice('/api/station/'.length)
   // entityId là số; chặn mọi thứ khác để Worker không thành proxy mở tới VinFast.
   if (!/^\d{1,9}$/.test(id)) return json({ error: 'bad id' }, 400, 0)
 
+  const t0 = Date.now()
+  const trace: Trace = { evt: 'detail', id, colo, calls: [] }
+  const done = (outcome: NonNullable<Trace['outcome']>) => {
+    trace.outcome = outcome
+    trace.ms = Date.now() - t0
+    console.log(JSON.stringify(trace))
+  }
+
   const cache = caches.default
   const key = new Request(new URL(`/api/station/${id}`, url.origin).toString())
   const hit = await cache.match(key)
-  if (hit) return hit
+  if (hit) {
+    done('hit')
+    return hit
+  }
 
   let res: Response
   try {
-    const raw = await fetchLocatorRetry(id)
+    const raw = await fetchLocatorRetry(id, trace)
     const detail = raw && parseDetail(raw)
     if (detail) {
       res = json(detail, 200, TTL_OK)
       const body = JSON.stringify(detail)
       ctx.waitUntil(data.put(stashKey(id), body, { httpMetadata: { contentType: 'application/json' } }))
+      done('ok')
     } else {
       res = json({ error: 'not found' }, 404, TTL_FAIL)
+      done('not_found')
     }
   } catch (e) {
+    trace.reason = e instanceof Error ? e.message : String(e)
     const stale = await data.get(stashKey(id))
     if (stale) {
       // Bản cũ: cache edge ngắn để lần sau thử lấy bản mới; báo qua header để còn soi.
       res = new Response(stale.body, { headers: headers(TTL_FAIL) })
       res.headers.set('X-Detail-Stale', stale.uploaded.toISOString())
+      done('stale')
     } else {
-      res = json({ error: 'upstream', reason: e instanceof Error ? e.message : String(e) }, 502, TTL_FAIL)
+      res = json({ error: 'upstream', reason: trace.reason }, 502, TTL_FAIL)
+      done('fail')
     }
   }
   ctx.waitUntil(cache.put(key, res.clone()))
@@ -77,12 +127,12 @@ export async function serveStationDetail(url: URL, data: R2Bucket, ctx: Executio
  * Chặn lác đác nên thử lại hầu như là qua: một lần nữa sau ~400 ms (chậm hơn chút khi gặp
  * chặn còn hơn hiện trạm thiếu ảnh). 404 = trạm không có, không thử lại.
  */
-async function fetchLocatorRetry(id: string): Promise<Record<string, unknown> | null> {
+async function fetchLocatorRetry(id: string, trace: Trace): Promise<Record<string, unknown> | null> {
   try {
-    return await fetchLocator(id)
+    return await fetchLocator(id, trace, 1)
   } catch {
     await new Promise((r) => setTimeout(r, 400))
-    return fetchLocator(id)
+    return fetchLocator(id, trace, 2)
   }
 }
 
@@ -91,26 +141,41 @@ async function fetchLocatorRetry(id: string): Promise<Record<string, unknown> | 
  * 403 thì ghé trang tìm trạm lấy cookie rồi thử lại MỘT lần (một lượt tối đa 3 subrequest; kèm thử lại ở
  * [fetchLocatorRetry] là 6 — xa giới hạn 50 của Free plan).
  */
-async function fetchLocator(id: string): Promise<Record<string, unknown> | null> {
-  let res = await call(id)
+async function fetchLocator(id: string, trace: Trace, attempt: number): Promise<Record<string, unknown> | null> {
+  const timed = async (step: TraceCall['step'], run: () => Promise<Response>) => {
+    const t = Date.now()
+    const r = await run()
+    const entry: TraceCall = { try: attempt, step, status: r.status, ms: Date.now() - t }
+    trace.calls.push(entry)
+    return { r, entry }
+  }
+
+  let { r: res, entry } = await timed('main', () => call(id))
   if (res.status === 403) {
-    const warm = await fetch(PAGE, { headers: { 'User-Agent': UA, Accept: 'text/html' } })
+    entry.html = isHtml(await res.text())
+    const { r: warm } = await timed('warm', () => fetch(PAGE, { headers: { 'User-Agent': UA, Accept: 'text/html' } }))
     await warm.body?.cancel()
     const cookie = (warm.headers.getSetCookie?.() ?? [])
       .map((c) => c.split(';')[0])
       .join('; ')
-    if (cookie) res = await call(id, cookie)
+    if (cookie) ({ r: res, entry } = await timed('cookie', () => call(id, cookie)))
   }
   if (!res.ok) {
-    await res.body?.cancel()
+    if (!res.bodyUsed) entry.html = isHtml(await res.text())
     if (res.status === 404) return null
     throw new Error(`get-locator ${res.status}`)
   }
   const text = await res.text()
   // HTML thay vì JSON = trang chặn của Cloudflare, không phải "trạm không tồn tại".
-  if (!text.startsWith('{')) throw new Error('blocked')
+  if (!text.startsWith('{')) {
+    entry.html = true
+    throw new Error('blocked')
+  }
   return JSON.parse(text) as Record<string, unknown>
 }
+
+/** Trang chặn của Cloudflare (`IM_UNDER_ATTACK_BOX`, "Just a moment") là HTML, không phải JSON. */
+const isHtml = (body: string) => body.trimStart().startsWith('<')
 
 function call(id: string, cookie?: string): Promise<Response> {
   const headers: Record<string, string> = {

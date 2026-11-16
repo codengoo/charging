@@ -31,7 +31,7 @@ const NOINDEX = 'noindex, nofollow, noarchive'
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url)
-    if (url.pathname.startsWith('/api/station/')) return serveStationDetail(url, env.DATA, ctx)
+    if (url.pathname.startsWith('/api/station/')) return serveStationDetail(url, env.DATA, ctx, req.cf?.colo as string | undefined)
     if (url.pathname.startsWith('/api/')) return serveApi(req, url, env)
     if (url.pathname.startsWith('/data/')) return serveData(url, env)
     // Path cũ (QR đã in, link đã gửi) -> path tiếng Anh. 301 để trình duyệt/bot nhớ luôn.
