@@ -8,3 +8,6 @@ builder/out
 builder/.wrangler
 .env
 .dev.vars
+
+# tsc -b tự sinh
+*.tsbuildinfo
