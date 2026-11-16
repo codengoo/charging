@@ -225,12 +225,19 @@ export function routeBounds(points: GeoPoint[]): [[number, number], [number, num
  * Vượt trần thì bỏ theo ĐỘ LỆCH KHỎI TUYẾN, không cắt đuôi: cắt đuôi giữ trạm đầu chuyến và vứt
  * hết phần cuối — đúng đoạn người ta lo hết pin nhất.
  */
-export function alongRoute(index: StationIndex, route: RoutePath, radiusKm: number, limit = ALONG_ROUTE_LIMIT): RouteHits {
+export function alongRoute(
+  index: StationIndex,
+  route: RoutePath,
+  radiusKm: number,
+  /** Bộ lọc thêm (vd. mức công suất) — áp TRƯỚC trần `limit` để trần không ăn mất trạm hợp lệ. */
+  keep: (st: Station) => boolean = () => true,
+  limit = ALONG_ROUTE_LIMIT,
+): RouteHits {
   const thin = thinRoute(route.points, route.limited)
   if (thin.points.length < 2) return { items: [], total: 0 }
   const candidates: Station[] = []
   for (const cell of corridorCells(thin.points, radiusKm)) {
-    for (const st of index.byCell.get(cell) ?? []) if (st.status === 0) candidates.push(st)
+    for (const st of index.byCell.get(cell) ?? []) if (st.status === 0 && keep(st)) candidates.push(st)
   }
   const all = pickAlongRoute(thin, candidates, radiusKm)
   if (all.length <= limit) return { items: all, total: all.length }

@@ -45,22 +45,22 @@ export function PowerLegend() {
       className="absolute right-3 bottom-14 z-[5] rounded-xl bg-card/90 text-left shadow-lg shadow-black/10 backdrop-blur outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
     >
       {open ? (
-        <span className="flex flex-col gap-1 px-2.5 py-2 text-[11px] leading-none">
+        <span className="flex flex-col gap-1.5 px-3 py-2.5 text-[13px] leading-none">
           {ROWS.map((r) => (
-            <span key={r.label} className="flex items-center gap-1.5">
-              <PinPreview group={{ iconKey: 'charger', colorHex: r.color }} width={16} />
+            <span key={r.label} className="flex items-center gap-2">
+              <PinPreview group={{ iconKey: 'charger', colorHex: r.color }} width={22} />
               {r.label}
             </span>
           ))}
-          <span className="flex items-center gap-1.5 text-muted-foreground">
-            <PinPreview group={{ iconKey: 'charger', colorHex: TIER_COLORS[0] }} width={16} className="opacity-45" />
+          <span className="flex items-center gap-2 text-muted-foreground">
+            <PinPreview group={{ iconKey: 'charger', colorHex: TIER_COLORS[0] }} width={22} className="opacity-45" />
             Bảo trì / sắp mở
           </span>
         </span>
       ) : (
-        <span className="flex gap-0.5 p-2" aria-hidden>
+        <span className="flex gap-1 p-2.5" aria-hidden>
           {TIER_COLORS.map((c) => (
-            <span key={c} className="size-2.5 rounded-full" style={{ background: c }} />
+            <span key={c} className="size-3.5 rounded-full" style={{ background: c }} />
           ))}
         </span>
       )}

@@ -7,7 +7,7 @@ import { fmtDistance, fmtKw } from '@/lib/format'
 import type { RouteHits } from '../data/routeCorridor'
 import { TRIP_RADII, type TripRadius, type TripState } from '../data/useTrip'
 import type { Station, StationPower } from '../data/types'
-import { tierOf } from '../data/stations'
+import { KW_BANDS, KW_BAND_LABEL, kwActive, tierOf, type KwBand } from '../data/stations'
 import { TIER_COLORS } from '../map/pins'
 
 interface Props {
@@ -18,6 +18,9 @@ interface Props {
   stationOpen: boolean
   onOpen: (text: string) => void
   onRadius: (km: TripRadius) => void
+  /** Mức công suất đang lọc (rỗng = tất cả). Đổi ở đây là đổi luôn Cài đặt hiển thị. */
+  kwBands: KwBand[]
+  onKwBands: (bands: KwBand[]) => void
   onPick: (st: Station) => void
   onClose: () => void
 }
@@ -27,7 +30,7 @@ interface Props {
  * tuyến, và bảng chi tiết trạm mở đè lên được. Điện thoại: dải dưới đáy, bấm tay cầm để thu/mở.
  * Màn rộng: thẻ nổi góc trái.
  */
-export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, onPick, onClose }: Props) {
+export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, kwBands, onKwBands, onPick, onClose }: Props) {
   const [text, setText] = useState(trip.link ?? '')
   const [expanded, setExpanded] = useState(true)
   // Link đổi từ ngoài (mở /trip?link=…, share target) → ô nhập theo.
@@ -35,6 +38,13 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, on
   useEffect(() => {
     if (stationOpen) setExpanded(false)
   }, [stationOpen])
+
+  const shownBands = kwActive(kwBands) ? kwBands : KW_BANDS
+  function toggleBand(b: KwBand) {
+    const on = shownBands.includes(b)
+    if (on && shownBands.length === 1) return // giữ ít nhất một mức
+    onKwBands(KW_BANDS.filter((x) => (x === b ? !on : shownBands.includes(x))))
+  }
 
   const busy = trip.status === 'resolving' || trip.status === 'routing'
 
@@ -117,6 +127,15 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, on
             {TRIP_RADII.map((km) => (
               <Chip key={km} size="sm" selected={trip.radiusKm === km} onClick={() => onRadius(km)}>
                 {km} km
+              </Chip>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Công suất">
+            <span className="text-xs text-muted-foreground">Công suất</span>
+            {KW_BANDS.map((b) => (
+              <Chip key={b} size="sm" selected={shownBands.includes(b)} onClick={() => toggleBand(b)}>
+                {KW_BAND_LABEL[b]}
               </Chip>
             ))}
           </div>

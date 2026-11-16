@@ -1,7 +1,9 @@
-// /api/route, /api/geocode, /api/revgeocode, /api/maps-link: proxy HERE (giấu key) + mở link
+// /api/route, /api/drive, /api/geocode, /api/revgeocode, /api/maps-link: proxy HERE (giấu key) + mở link
 // rút gọn Google Maps. Worker CHỈ làm I/O: body HERE trả nguyên (stream), không parse — Workers
 // Free plan giới hạn 10 ms CPU. Client lo giải mã polyline, đọc link, lọc hành lang.
 // (/api/station/* là proxy chi tiết VinFast, ở worker/locator.ts, không đi qua đây.)
+
+import { serveLive } from './evcs'
 
 export interface ApiEnv {
   /** Secret: `npx wrangler secret put HERE_API_KEY`; local: `.dev.vars`. */
@@ -30,9 +32,12 @@ export async function serveApi(req: Request, url: URL, env: ApiEnv): Promise<Res
   if (!success) return fail(429, 'Gọi quá nhanh, thử lại sau ít phút')
 
   try {
+    if (url.pathname.startsWith('/api/live')) return await serveLive(url)
     switch (url.pathname) {
       case '/api/route':
         return await route(url, env)
+      case '/api/drive':
+        return await drive(url, env)
       case '/api/geocode':
         return await geocode(url, env)
       case '/api/revgeocode':
@@ -103,6 +108,25 @@ async function route(url: URL, env: ApiEnv): Promise<Response> {
   target.searchParams.set('spans', 'length,functionalClass')
   target.searchParams.set('apiKey', key)
   return passHere(target, 300)
+}
+
+/**
+ * `from=lat,lng&to=lat,lng` → quãng đường lái xe thật (chỉ `summary`, vài trăm byte). Dùng khi
+ * mở một trạm — giống HereRouting.route() bên Android. 1 lượt Routing Car mỗi cặp điểm.
+ */
+async function drive(url: URL, env: ApiEnv): Promise<Response> {
+  const from = url.searchParams.get('from') ?? ''
+  const to = url.searchParams.get('to') ?? ''
+  if (!COORD.test(from) || !COORD.test(to)) return fail(400, 'from/to không hợp lệ')
+  const key = hereKey(env)
+  if (!key) return fail(503, 'Chưa cấu hình HERE_API_KEY')
+  const target = new URL('https://router.hereapi.com/v8/routes')
+  target.searchParams.set('transportMode', 'car')
+  target.searchParams.set('origin', from)
+  target.searchParams.set('destination', to)
+  target.searchParams.set('return', 'summary')
+  target.searchParams.set('apiKey', key)
+  return passHere(target, 600)
 }
 
 /** `q` (≤ 200 ký tự), `at` tuỳ chọn để ưu tiên kết quả gần đó. */

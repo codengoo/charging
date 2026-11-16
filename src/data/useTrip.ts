@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { GeoPoint } from '../lib/flexiblePolyline'
 import { alongRoute, type RouteHits, type RoutePath } from './routeCorridor'
 import type { StationIndex } from './stations'
+import type { Station } from './types'
 import { MSG, TripError, fetchRoute, resolveTrip, type TripPoint } from './trip'
 
 export type TripRadius = 2 | 5 | 10
@@ -36,16 +37,22 @@ function askPosition(): Promise<GeoPoint | null> {
 }
 
 /** Hành trình "trạm dọc đường". Port tripJob / handleSharedText / setTripRadius của MapViewModel. */
-export function useTrip(index: StationIndex | null, userPos: GeoPoint | null) {
-  const [trip, setTrip] = useState<TripState>(CLOSED)
+export function useTrip(
+  index: StationIndex | null,
+  userPos: GeoPoint | null,
+  initialRadiusKm: TripRadius = 2,
+  /** Lọc trạm dọc tuyến (mức công suất). Truyền hàm ổn định (useCallback) — đổi là lọc lại. */
+  keep?: (st: Station) => boolean,
+) {
+  const [trip, setTrip] = useState<TripState>(() => ({ ...CLOSED, radiusKm: initialRadiusKm }))
   const job = useRef<AbortController | null>(null)
   const pos = useRef(userPos)
   pos.current = userPos
 
   // Lọc lại khi đổi bán kính / có generation mới — đồng bộ, vài ms cho ≤ 1.500 điểm.
   const hits = useMemo(
-    () => (index && trip.route ? alongRoute(index, trip.route, trip.radiusKm) : EMPTY_HITS),
-    [index, trip.route, trip.radiusKm],
+    () => (index && trip.route ? alongRoute(index, trip.route, trip.radiusKm, keep) : EMPTY_HITS),
+    [index, trip.route, trip.radiusKm, keep],
   )
 
   /** Mở bảng trống (chưa có link). */

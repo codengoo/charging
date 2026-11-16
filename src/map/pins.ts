@@ -33,10 +33,11 @@ interface GlyphDef {
 }
 
 const GLYPHS: Record<PinGlyph, GlyphDef> = {
-  // Trụ sạc — hình mặc định của ghim trạm. evenOdd để ô màn hình là LỖ.
+  // Phích cắm điện có tia sét khoét rỗng — hình mặc định của ghim trạm. Hình trụ bơm cũ trông
+  // như cây xăng. evenOdd để tia sét là LỖ, lộ màu đĩa nhạt phía dưới.
   charger: {
-    d: 'M7,3 h7 a1.8,1.8 0 0 1 1.8,1.8 v14.4 a1.8,1.8 0 0 1 -1.8,1.8 h-7 a1.8,1.8 0 0 1 -1.8,-1.8 v-14.4 a1.8,1.8 0 0 1 1.8,-1.8 Z M7.4,5.6 h6.2 v4.6 h-6.2 Z M17.4,8.4 c1.9,0 3.2,1.3 3.2,3.1 v4.6 a1.5,1.5 0 0 1 -3,0 v-4.3 c0,-0.5 -0.3,-0.8 -0.8,-0.8 h-0.6 v-2.6 Z',
-    transform: 'translate(26.46 28.52) scale(2.29)',
+    d: 'M16.01,7 L16,3 h-2 v4 h-4 V3 H8 v4 h-0.01 C7,6.99 6,7.99 6,8.99 v5.49 L9.5,18 v3 h5 v-3 l3.5,-3.51 v-5.5 c0,-1 -1,-2 -1.99,-1.99 Z M12.9,8.4 L9.9,12.6 h1.9 L11.1,16 L14.1,11.8 h-1.9 Z',
+    transform: GRP_TRANSFORM,
     evenOdd: true,
   },
   heart: {

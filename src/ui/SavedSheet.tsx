@@ -131,7 +131,7 @@ export function SavedSheet({ open, index, book, now, userPos, onPick, onUnsave, 
                   className="flex min-w-0 flex-1 items-center gap-3 py-2.5 text-left"
                   onClick={() => onPick(st)}
                 >
-                  <PinPreview group={pin ?? DEFAULT_PIN} width={24} className="shrink-0" />
+                  <PinPreview group={pin ?? DEFAULT_PIN} width={32} className="shrink-0" />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="line-clamp-2 text-[15px] leading-snug">{st.name}</span>
                     <span className="truncate text-xs text-muted-foreground">{st.address}</span>

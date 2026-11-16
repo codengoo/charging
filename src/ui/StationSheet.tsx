@@ -15,7 +15,10 @@ import { STATUS_LABEL, statusOf } from '../data/stations'
 import type { Station, StationDetail, StationPower } from '../data/types'
 import { GroupGlyph } from './groupIcons'
 import { ImagePreview } from './ImagePreview'
-import { fmtKw } from '@/lib/format'
+import { fmtDistance, fmtKw } from '@/lib/format'
+import { fmtMinutes, type DriveState } from '../data/drive'
+import type { LiveState } from '../data/live'
+import { LiveSection } from './LiveSection'
 
 interface Props {
   /** Giữ component gắn và chỉ đổi `open` — gỡ hẳn khi đóng thì mất hiệu ứng trôi xuống. */
@@ -28,6 +31,10 @@ interface Props {
   /** Chi tiết từ VinFast (ảnh, connector, giờ, hotline) — chỉ tải khi mở trạm. */
   detail?: StationDetail
   detailLoading?: boolean
+  /** Quãng đường lái xe từ vị trí người dùng (HERE); kind 'none' = chưa có GPS. */
+  drive?: DriveState
+  /** Số cổng trống + lịch sử 24h từ EVCS (chỉ khi bảng mở). */
+  live?: LiveState
   onOpenGroups: () => void
   onShare: () => void
   onClose: () => void
@@ -43,7 +50,7 @@ const STATUS_BG = {
   planned: 'bg-[#64748B]',
 } as const
 
-export function StationSheet({ open, station, book, power, powerLoading, detail, detailLoading, onOpenGroups, onShare, onClose, children }: Props) {
+export function StationSheet({ open, station, book, power, powerLoading, detail, detailLoading, drive, live, onOpenGroups, onShare, onClose, children }: Props) {
   const gmapsDir = `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}`
   const groups = groupsOf(book, station.entityId)
     .map((id) => group(book, id))
@@ -64,6 +71,7 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
           <ResponsiveDialogDescription className="text-sm">
             {station.address}
           </ResponsiveDialogDescription>
+          <DriveLine drive={drive} />
         </ResponsiveDialogHeader>
 
         <Gallery images={detail?.images} loading={detailLoading} name={station.name} />
@@ -118,6 +126,8 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
         )}
 
         <PowerBlock power={ports} loading={powerLoading || (!ports && detailLoading)} standards={detail?.standards} />
+
+        {live && <LiveSection live={live} power={ports} />}
 
         {detail?.hotline && (
           <a
@@ -225,5 +235,25 @@ function PowerBlock({ power, loading, standards }: { power?: StationPower; loadi
         </div>
       )}
     </section>
+  )
+}
+
+
+/** "12.4 km lái xe · khoảng 18 phút" — như ngăn kéo trạm bên Android. */
+function DriveLine({ drive }: { drive?: DriveState }) {
+  if (!drive || drive.kind === 'none') return null
+  return (
+    <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+      <Navigation className="size-3.5 shrink-0" aria-hidden />
+      {drive.kind === 'loading' && 'Đang tính quãng đường…'}
+      {drive.kind === 'ok' && (
+        <span>
+          <span className="font-semibold text-foreground">{fmtDistance(drive.info.meters / 1000)} lái xe</span>
+          {' · khoảng '}
+          {fmtMinutes(drive.info.seconds)}
+        </span>
+      )}
+      {drive.kind === 'fallback' && `~${fmtDistance(drive.straightKm)} đường chim bay`}
+    </p>
   )
 }

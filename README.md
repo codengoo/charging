@@ -95,6 +95,25 @@ Trạm dọc đường cần tính tuyến (HERE Routing v8) và đoán toạ đ
 | `GET /api/geocode?q=…[&at=lat,lng]` | HERE discover (có `at`) / geocode trong VN |
 | `GET /api/revgeocode?at=lat,lng` | Tên điểm từ toạ độ |
 | `GET /api/maps-link?url=<maps.app.goo.gl/…>` | Mở link rút gọn, trả `{ url }` thuộc `google.*/maps` |
+| `GET /api/drive?from=lat,lng&to=lat,lng` | Quãng đường lái xe thật tới trạm đang mở (`return=summary`), 1 lượt Routing Car |
+
+## Số cổng trống thời gian thực (`worker/evcs.ts`)
+
+Port `EvcsApi` / `EvcsHistory` của app Android. `charging_status` của VinFast trễ 1–2 giờ; EVCS.VN
+trả số cổng trống theo từng mức kW gần như tức thời. `storeId` VinFast (`C.HNO1129`) = locationId
+của EVCS. Khách vãng lai, không cần đăng nhập.
+
+| Endpoint | Việc | Cache (Cache API, dùng chung) |
+|---|---|---|
+| `GET /api/live/<storeId>` | Token (POST trang trạm, `X-Partial: user`) → POST `/charging`: `ports` ("60kW trống 7/10 cổng"), `chargingKw`, `maintPorts`, `depotMaint`, `ticker` | 60 s |
+| `GET /api/live-history/<storeId>` | socket.io qua WebSocket `www2.evcs.vn`: `history_data` + `history_kw_data` 24h, ghép bằng cắt chuỗi | 5 phút |
+| `GET /api/live-nearby?at=lat,lng` | POST `/search`: ~20–50 trạm quanh đó kèm cổng trống theo kW → huy hiệu trên ghim (zoom ≥ 13) | 5 phút |
+
+- Chỉ gọi `/live` + `/live-history` khi người dùng MỞ một trạm; huy hiệu gọi lại khi tâm bản đồ
+  dịch > 1 km hoặc số cũ quá 2 phút. EVCS tự cache ~5 phút và chặn nhịp — gọi dày hơn vô ích.
+- Lỗi tạm (503, trả HTML) thử lại 2 lần (700 ms, 1,8 s); token hết hạn trên socket (`44`) xin lại một lần.
+- Dự báo "xe sắp sạc xong" (`ticker`) hiện bị khoá cho khách vãng lai (cần EVCS Go) — client vẫn
+  đọc nếu có.
 
 - Body HERE trả **nguyên** (stream, không parse) để dưới hạn 10 ms CPU; client tự giải mã.
 - Chỉ nhận request cùng origin (`Sec-Fetch-Site` / `Origin` / `Referer`) + rate limit 30 request /

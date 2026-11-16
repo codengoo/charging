@@ -8,6 +8,21 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.8.0',
+    date: '2026-11-17',
+    title: 'Cổng trống thời gian thực & cài đặt hiển thị',
+    changes: [
+      'Mở trạm thấy ngay số cổng đang trống theo từng mức kW, số xe đang sạc và cổng bảo trì (nguồn EVCS, gần như tức thời).',
+      'Biểu đồ "24 giờ qua": số xe sạc theo giờ, giờ đông / vắng nhất, tỉ lệ lấp đầy — xem riêng từng mức kW.',
+      'Phóng to bản đồ (zoom 13+) để thấy số cổng trống ngay trên ghim, ví dụ "120kW×3 · 60kW×2".',
+      'Quãng đường lái xe thật và thời gian tới trạm đang mở (thay cho đường chim bay).',
+      'Nút ⚙ Cài đặt hiển thị: chọn mức công suất ưu tiên (≥ 120 / 60–119 / dưới 60 kW), chỉ trạm đang hoạt động, bề rộng hành lang dọc đường, ẩn/hiện chú giải màu.',
+      'Trạm dọc đường lọc theo mức công suất đã chọn, chỉnh được ngay trong bảng hành trình.',
+      'Số cổng sạc chính xác hơn: đọc đủ mọi mức công suất của trạm, tách đúng cổng AC/DC.',
+      'Icon trạm sạc mới (phích cắm), chú giải màu và icon trong danh sách to hơn.',
+    ],
+  },
+  {
     version: '0.7.0',
     date: '2026-11-16',
     title: 'Trạm sạc dọc đường',

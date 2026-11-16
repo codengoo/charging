@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { List, LocateFixed, Route } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { List, LocateFixed, Route, Settings2 } from 'lucide-react'
 import { MapView, type TripLayer } from './map/MapView'
 import { SearchBar } from './ui/SearchBar'
 import { StationSheet } from './ui/StationSheet'
@@ -10,6 +10,10 @@ import { ChangelogModal } from './ui/ChangelogModal'
 import { PowerLegend } from './ui/PowerLegend'
 import { NearbySheet } from './ui/NearbySheet'
 import { BackupSheet } from './ui/BackupSheet'
+import { SettingsSheet } from './ui/SettingsSheet'
+import { useDriveDistance, useStableOrigin } from './data/drive'
+import { useLiveStatus, useNearbyLive } from './data/live'
+import { filtersFrom, useSettings, type Settings } from './data/settings'
 import { ImportDialog, pendingImport, type PendingImport } from './ui/ImportDialog'
 import { IMPORT_HASH, decodeBackup } from './data/backup'
 import { TripPanel } from './ui/TripPanel'
@@ -21,7 +25,7 @@ import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { useStationData } from './data/useStationData'
 import { useStationDetail } from './data/useStationDetail'
-import { DEFAULT_FILTERS, FAST_KW, type Filters } from './data/stations'
+import { DEFAULT_FILTERS, kwActive, kwLabel, passesFilters, type Filters } from './data/stations'
 import { allSaved } from './data/groups'
 import { useGroupBook } from './data/useGroupBook'
 import { APP_VERSION } from './data/changelog'
@@ -48,6 +52,10 @@ export function App() {
   if (selected && selected !== sheetStation) setSheetStation(selected)
   // Chi tiết VinFast chỉ gọi khi có trạm được chọn; giữ theo sheetStation để còn ảnh lúc trôi xuống.
   const detail = useStationDetail(sheetStation?.entityId ?? null)
+  // Số cổng trống + lịch sử 24h (EVCS) — chỉ khi bảng trạm đang mở.
+  const live = useLiveStatus(sheetStation?.storeId ?? null, selected !== null)
+  // Huy hiệu số cổng trống trên ghim quanh tâm bản đồ (từ zoom 13).
+  const nearbyLive = useNearbyLive()
   const [grouping, setGrouping] = useState(false)
   const [sharing, setSharing] = useState(false)
   // Đọc NGAY lúc khởi tạo: effect đồng bộ URL bên dưới sẽ ghi đè pathname.
@@ -58,6 +66,9 @@ export function App() {
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null)
   // Tâm bản đồ hiện tại (ref: đổi liên tục khi kéo, không cần render lại). Mặc định = tâm mặc định của map.
   const mapCenter = useRef({ lat: 16.05, lng: 108.2 })
+  // Quãng đường lái xe (HERE) tới trạm đang mở, từ vị trí GPS — chỉ gọi khi bảng trạm mở.
+  const driveOrigin = useStableOrigin(userPos)
+  const drive = useDriveDistance(driveOrigin, sheetStation, selected !== null)
   const [showNearby, setShowNearby] = useState(false)
   // Giữ lần mở cuối để bảng còn nội dung lúc trôi xuống (giống sheetStation).
   const [nearby, setNearby] = useState<Nearby | null>(null)
@@ -66,7 +77,16 @@ export function App() {
   const isMobile = useIsMobile()
   // Trang hành trình /trip?link=… (hoặc ?text=/?url= từ Web Share Target): đọc NGAY lúc khởi tạo.
   const [tripLink] = useState(() => readTripLink(location))
-  const tripCtl = useTrip(index, userPos)
+  const { settings, update: updateSettings } = useSettings()
+  const [showSettings, setShowSettings] = useState(false)
+  // Mở app với bộ lọc theo cài đặt; chip đổi tạm trong phiên, không ghi ngược vào cài đặt.
+  const [filters, setFilters] = useState<Filters>(() => filtersFrom(settings))
+  // Trạm dọc đường theo cùng bộ lọc công suất với bản đồ.
+  const tripKeep = useCallback(
+    (st: Station) => passesFilters(st, { ...DEFAULT_FILTERS, kw: filters.kw }, power),
+    [filters.kw, power],
+  )
+  const tripCtl = useTrip(index, userPos, settings.tripRadiusKm, tripKeep)
   const { trip, hits } = tripCtl
   const [showBackup, setShowBackup] = useState(false)
   // Link sao lưu `/#import=<payload>`: đọc NGAY lúc khởi tạo, effect đồng bộ URL sẽ xoá hash.
@@ -79,9 +99,20 @@ export function App() {
     setShowImport(true)
   }
   const savedCount = allSaved(book).size
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
-  // Hai mức công suất loại trừ nhau; bấm lại chip đang bật thì về tất cả.
-  const setPower = (p: Filters['power']) => setFilters((f) => ({ ...f, power: f.power === p ? 'all' : p }))
+  // Chip kW: bật/tắt tạm trong phiên các mức đã chọn trong cài đặt. Cài đặt chưa chọn mức nào
+  // (đủ cả 3) thì chip không có gì để lọc → mở cài đặt.
+  const kwPref = kwActive(settings.kwBands)
+  function toggleKw() {
+    if (!kwPref) return setShowSettings(true)
+    setFilters((f) => ({ ...f, kw: kwActive(f.kw) ? [] : settings.kwBands }))
+  }
+  // Đổi cài đặt thì áp dụng ngay cho phiên hiện tại — chỉ trường vừa đổi, giữ nguyên chip khác.
+  function changeSettings(patch: Partial<Settings>) {
+    updateSettings(patch)
+    if (patch.kwBands !== undefined) setFilters((f) => ({ ...f, kw: patch.kwBands! }))
+    if (patch.activeOnly !== undefined) setFilters((f) => ({ ...f, activeOnly: patch.activeOnly! }))
+    if (patch.tripRadiusKm !== undefined) tripCtl.setRadius(patch.tripRadiusKm)
+  }
 
   // Mở từ link chia sẻ /station/<id>-<slug>: chọn trạm và bay tới ngay khi có dữ liệu (một lần).
   const linkHandled = useRef(false)
@@ -192,7 +223,11 @@ export function App() {
         flyTo={flyTo}
         onSelect={pick}
         onLocate={setUserPos}
-        onMoveEnd={(c) => (mapCenter.current = c)}
+        onMoveEnd={(v) => {
+          mapCenter.current = { lat: v.lat, lng: v.lng }
+          nearbyLive.refresh(v.lat, v.lng, v.zoom)
+        }}
+        live={nearbyLive.byStore}
         trip={tripLayer}
       />
 
@@ -222,8 +257,7 @@ export function App() {
             on={filters.favoritesOnly}
             onClick={() => setFilters((f) => ({ ...f, favoritesOnly: !f.favoritesOnly }))}
           />
-          <FilterChip label="Sạc nhanh DC" on={filters.power === 'dc'} onClick={() => setPower('dc')} />
-          <FilterChip label={`≥ ${FAST_KW} kW`} on={filters.power === 'dc120'} onClick={() => setPower('dc120')} />
+          <FilterChip label={kwLabel(settings.kwBands)} on={kwActive(filters.kw)} onClick={toggleKw} />
           <FilterChip
             label="Đang hoạt động"
             on={filters.activeOnly}
@@ -233,10 +267,13 @@ export function App() {
             <List />
             Danh sách
           </Chip>
+          <Chip variant="floating" aria-label="Cài đặt hiển thị" title="Cài đặt hiển thị" onClick={() => setShowSettings(true)}>
+            <Settings2 />
+          </Chip>
         </div>
       </div>
 
-      <PowerLegend />
+      {settings.showLegend && <PowerLegend />}
 
       {tripOpen && (
         <TripPanel
@@ -246,6 +283,8 @@ export function App() {
           stationOpen={selected !== null}
           onOpen={tripCtl.open}
           onRadius={tripCtl.setRadius}
+          kwBands={filters.kw}
+          onKwBands={(kwBands) => changeSettings({ kwBands })}
           onPick={pick}
           onClose={tripCtl.close}
         />
@@ -271,6 +310,8 @@ export function App() {
           powerLoading={power === null}
           detail={detail.detail}
           detailLoading={detail.loading}
+          drive={drive}
+          live={live}
           onOpenGroups={() => setGrouping(true)}
           onShare={() => setSharing(true)}
           onClose={() => {
@@ -343,6 +384,7 @@ export function App() {
           filters={filters}
           origin={nearby.origin}
           fromGps={nearby.fromGps}
+          driveOrigin={driveOrigin}
           onPick={(st) => {
             setShowNearby(false)
             pick(st)
@@ -350,6 +392,13 @@ export function App() {
           onClose={() => setShowNearby(false)}
         />
       )}
+
+      <SettingsSheet
+        open={showSettings}
+        settings={settings}
+        onChange={changeSettings}
+        onClose={() => setShowSettings(false)}
+      />
 
       <ChangelogModal open={showChangelog} onClose={() => setShowChangelog(false)} />
     </div>

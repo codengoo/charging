@@ -2,6 +2,17 @@
 
 Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app).
 
+## [0.8.0] — 2026-11-17 — Cổng trống thời gian thực & cài đặt hiển thị
+
+- Mở trạm thấy ngay số cổng đang trống theo từng mức kW, số xe đang sạc và cổng bảo trì (nguồn EVCS, gần như tức thời).
+- Biểu đồ "24 giờ qua": số xe sạc theo giờ, giờ đông / vắng nhất, tỉ lệ lấp đầy — xem riêng từng mức kW.
+- Phóng to bản đồ (zoom 13+) để thấy số cổng trống ngay trên ghim, ví dụ "120kW×3 · 60kW×2".
+- Quãng đường lái xe thật và thời gian tới trạm đang mở (thay cho đường chim bay).
+- Nút ⚙ Cài đặt hiển thị: chọn mức công suất ưu tiên (≥ 120 / 60–119 / dưới 60 kW), chỉ trạm đang hoạt động, bề rộng hành lang dọc đường, ẩn/hiện chú giải màu.
+- Trạm dọc đường lọc theo mức công suất đã chọn, chỉnh được ngay trong bảng hành trình.
+- Số cổng sạc chính xác hơn: đọc đủ mọi mức công suất của trạm, tách đúng cổng AC/DC.
+- Icon trạm sạc mới (phích cắm), chú giải màu và icon trong danh sách to hơn.
+
 ## [0.7.0] — 2026-11-16 — Trạm sạc dọc đường
 
 - Trạm sạc dọc đường: chia sẻ chỉ đường từ Google Maps (Android, khi đã cài app lên màn hình chính) hoặc dán link vào app — app vẽ tuyến và liệt kê trạm theo thứ tự gặp trên đường.

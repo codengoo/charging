@@ -238,14 +238,46 @@ export function tierOf(p: StationPower | undefined): PowerTier {
   return dcMax >= FAST_KW ? 2 : 1
 }
 
+/** Mức lọc công suất theo cổng mạnh nhất (AC lẫn DC): ≥ 120 / 60–119 / dưới 60 kW. */
+export type KwBand = 'hi' | 'mid' | 'low'
+export const KW_BANDS: KwBand[] = ['hi', 'mid', 'low']
+export const MID_KW = 60
+
+export const KW_BAND_LABEL: Record<KwBand, string> = {
+  hi: `≥ ${FAST_KW} kW`,
+  mid: `${MID_KW}–${FAST_KW - 1} kW`,
+  low: `Dưới ${MID_KW} kW`,
+}
+
+export function bandOf(p: StationPower | undefined): KwBand | null {
+  const max = p ? p.groups.reduce((m, g) => Math.max(m, g.kw), p.maxKw || 0) : 0
+  if (max <= 0) return null
+  return max >= FAST_KW ? 'hi' : max >= MID_KW ? 'mid' : 'low'
+}
+
+/** Rỗng hoặc đủ cả 3 mức = không lọc công suất. */
+export const kwActive = (bands: KwBand[]) => bands.length > 0 && bands.length < KW_BANDS.length
+
+/** Nhãn gọn cho chip / mô tả: các mức liền nhau gộp thành một khoảng. */
+export function kwLabel(bands: KwBand[]): string {
+  const has = (b: KwBand) => bands.includes(b)
+  if (!kwActive(bands)) return 'Công suất'
+  if (has('hi') && has('mid')) return `≥ ${MID_KW} kW`
+  if (has('mid') && has('low')) return `< ${FAST_KW} kW`
+  if (has('hi') && has('low')) return `≥ ${FAST_KW} · < ${MID_KW} kW`
+  if (has('hi')) return `≥ ${FAST_KW} kW`
+  if (has('mid')) return `${MID_KW}–${FAST_KW - 1} kW`
+  return `< ${MID_KW} kW`
+}
+
 export interface Filters {
   favoritesOnly: boolean
   activeOnly: boolean
-  /** 'dc' = có cổng DC; 'dc120' = có cổng DC ≥ 120 kW. Trạm chưa có dữ liệu power bị ẩn. */
-  power: 'all' | 'dc' | 'dc120'
+  /** Mức công suất được hiện; xem kwActive. Đang lọc thì trạm chưa có dữ liệu power bị ẩn. */
+  kw: KwBand[]
 }
 
-export const DEFAULT_FILTERS: Filters = { favoritesOnly: false, activeOnly: false, power: 'all' }
+export const DEFAULT_FILTERS: Filters = { favoritesOnly: false, activeOnly: false, kw: [] }
 
 /** Lọc chung cho bản đồ và bảng "Gần tôi". `saved` chỉ cần khi favoritesOnly. */
 export function passesFilters(
@@ -256,9 +288,9 @@ export function passesFilters(
 ): boolean {
   if (f.favoritesOnly && !saved?.has(st.entityId)) return false
   if (f.activeOnly && st.status !== 0) return false
-  if (f.power !== 'all') {
-    const t = tierOf(power?.get(st.entityId))
-    if (f.power === 'dc' ? t < 1 : t < 2) return false
+  if (kwActive(f.kw)) {
+    const b = bandOf(power?.get(st.entityId))
+    if (!b || !f.kw.includes(b)) return false
   }
   return true
 }
