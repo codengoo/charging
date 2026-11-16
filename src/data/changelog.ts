@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.5.0',
+    date: '2026-11-16',
+    title: 'Dữ liệu cập nhật hằng ngày & số cổng sạc',
+    changes: [
+      'Dữ liệu trạm tải từ CDN và được làm mới hằng ngày (~25.000 trạm) — không còn gói dữ liệu cố định trong app.',
+      'Chi tiết trạm hiện số cổng, công suất tối đa và từng mức kW (AC/DC).',
+      'Để app mở lâu: quay lại tab sẽ tự nhận bản dữ liệu mới, không tải lại trang.',
+      'Chuyển sang domain charging.cangao.asia; link chia sẻ và mã QR trỏ về domain mới.',
+    ],
+  },
+  {
     version: '0.4.0',
     date: '2026-11-16',
     title: 'Chia sẻ trạm bằng mã QR',

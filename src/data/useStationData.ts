@@ -52,9 +52,10 @@ export function useStationData() {
       if (document.visibilityState !== 'visible') return
       if (Date.now() - lastCheck.current < RECHECK_MS) return
       lastCheck.current = Date.now()
+      if (loadingGen.current !== null) return
       try {
         const m = await loadManifest()
-        if (m.generation === shownGen.current || loadingGen.current === m.generation) return
+        if (m.generation === shownGen.current) return
         loadingGen.current = m.generation
         await apply(await loadStations(m))
       } catch {

@@ -9,6 +9,27 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Radix gắn `data-state="open|closed"`, KHÔNG gắn `data-open`/`data-closed`. Thiếu các variant
+ * này thì `data-closed:animate-out`… biên dịch thành `[data-closed]` — không bao giờ khớp, hộp
+ * thoại mở/đóng không có hiệu ứng (Radix Presence thấy không có animation nên gỡ ngay).
+ * Chép từ `shadcn/tailwind.css` mà chiatien import.
+ */
+@custom-variant data-open {
+  &:where([data-state="open"]),
+  &:where([data-open]:not([data-open="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-closed {
+  &:where([data-state="closed"]),
+  &:where([data-closed]:not([data-closed="false"])) {
+    @slot;
+  }
+}
+@custom-variant data-state-open (&:where([data-state="open"]));
+@custom-variant data-state-closed (&:where([data-state="closed"]));
+
 @theme inline {
     --font-heading: 'Bricolage Grotesque Variable', 'Be Vietnam Pro', system-ui, sans-serif;
     --font-sans: 'Be Vietnam Pro', system-ui, sans-serif;

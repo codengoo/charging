@@ -1,20 +1,23 @@
 # Bản đồ trạm sạc ô tô VinFast — Web
 
-Webapp bản đồ 23.942 trạm sạc ô tô VinFast. Port Phase 1 từ app Android `charge-map-android`.
+Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới hằng ngày. Port từ app Android
+`charge-map-android`. Chạy tại **https://charging.cangao.asia**.
 
-- **Bản đồ:** MapLibre GL JS + tile **OpenFreeMap** (miễn phí, không cần key, không backend).
-- **Dữ liệu:** 23.942 trạm nhúng sẵn (`public/stations.json`) — mở trang là có ngay, không gọi API.
-- **Deploy:** Cloudflare Pages (tĩnh hoàn toàn).
+- **Bản đồ:** MapLibre GL JS + tile **OpenFreeMap** (miễn phí, không cần key).
+- **Dữ liệu:** GitHub Action build mỗi ngày → R2 → Worker phục vụ `/data/*` (xem
+  "Pipeline dữ liệu" bên dưới). Client tải `manifest` → `base` (vẽ bản đồ) → `power` (số cổng, kW).
+- **Deploy:** Cloudflare **Worker + Static Assets** (`wrangler.jsonc`, `worker/index.ts`).
 
 > Quy ước giao diện (màu, chữ, component, pattern bảng/QR) ở [`design.md`](design.md) — dùng chung hệ với chiatien.
 
-## Tính năng Phase 1
+## Tính năng
 
 - Bản đồ toàn VN, tự gom cụm marker, bấm cụm để phóng to.
 - Mở trang tự xin vị trí hiện tại và bay về đó.
 - Tìm trạm theo tên/địa chỉ (không phân biệt dấu).
 - Lọc: chỉ hiện trạm đã lưu.
-- Chi tiết trạm: tên, địa chỉ, công cộng/nội bộ, trụ LINK, phí gửi xe.
+- Chi tiết trạm: tên, địa chỉ, công cộng/nội bộ, trụ LINK, phí gửi xe, **số cổng + công suất
+  từng mức kW (AC/DC)** — ~89% trạm có dữ liệu.
 - **Nhóm trạm đã lưu** (port từ app Android): 3 nhóm dựng sẵn + nhóm tự tạo (tên, biểu
   tượng, màu, thời hạn tự gỡ), danh sách đã lưu lọc theo nhóm. Lưu trong localStorage
   khoá `tramsac.groups`; khoá cũ `tramsac.favorites` tự chuyển sang nhóm "Yêu thích".
@@ -24,70 +27,52 @@ Webapp bản đồ 23.942 trạm sạc ô tô VinFast. Port Phase 1 từ app And
 - **Chia sẻ bằng QR** (`src/ui/ShareSheet.tsx`): QR link trạm (mở app) và QR vị trí Google Maps,
   tải ảnh thẻ QR / Web Share.
 
+### Dữ liệu ở client (`src/data/useStationData.ts`)
+
+- `GET /data/manifest.json` với `cache: 'no-cache'` (luôn hỏi lại, thường chỉ 304) →
+  `base-<gen>.json` (vẽ bản đồ) → `power-<gen>.json` tải ngầm, căn theo thứ tự hàng của base.
+- Tab để mở lâu: quay lại tab (sau ≥ 30 phút) thì hỏi manifest; generation mới → tải lại và
+  thay chỉ mục **không dựng lại bản đồ**. Trạm đang mở và nhóm đã lưu giữ nguyên (cùng `entityId`).
+
 ## Link trạm & chia sẻ
 
 - Mỗi trạm có URL `/tram/<entityId>-<slug>` (`src/lib/stationUrl.ts`). App đọc URL lúc mở để
   chọn trạm, và đổi URL theo trạm đang mở.
-- `functions/tram/[[path]].ts` (Cloudflare Pages Function) thay meta title / description /
-  Open Graph theo trạm trong `index.html` để link gửi qua Zalo, Messenger có preview đúng;
-  slug sai → 301 về slug đúng, id không tồn tại → 404. HTML không cache (asset có hash đổi
-  mỗi lần deploy).
+- `worker/index.ts` (route `/tram/*`, khai trong `run_worker_first`) thay meta title /
+  description / Open Graph theo trạm trong `index.html` để link gửi qua Zalo, Messenger có
+  preview đúng; slug sai → 301 về slug đúng, id không tồn tại → 404. HTML không cache.
+- Tra trạm từ shard `seo-<gen>/<id % 32>.json` (~100 KB) do builder ghi lên R2 — parse cả base
+  4 MB vượt hạn 10 ms CPU Free plan. Manifest chưa có `seo` (bản build cũ) thì vẫn mở app,
+  chỉ thiếu preview.
 - **Dữ liệu trạm là nội bộ:** trang `/tram/*` gắn `noindex` (header `X-Robots-Tag` + thẻ meta),
-  không JSON-LD. `stations.json` và `seo/*` cũng `noindex` + `Disallow` trong robots.txt.
-  `public/sitemap.xml` chỉ có trang chủ.
-- `seo.plugin.ts` (plugin Vite, chỉ chạy lúc build) sinh `dist/seo/<id % 128>.json` — Function
-  chỉ đọc một shard ~25 KB thay vì `stations.json` 4 MB (giới hạn CPU Functions gói free).
-- Thử Function local: `npm run build && npx wrangler pages dev dist`.
-
-> Số cổng, công suất và trạng thái còn/hết chỗ **chưa có** ở Phase 1 — dữ liệu tĩnh của
-> VinFast không kèm các trường này; cần backend proxy (Phase 2).
+  không JSON-LD; `/data/*` cũng `noindex` + `Disallow` trong robots.txt. `public/sitemap.xml`
+  chỉ có trang chủ.
 
 ## Chạy local
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+npm run dev        # http://localhost:5173 — /data/* proxy sang https://charging.cangao.asia
 npm run build      # ra thư mục dist/
-npm run preview    # xem thử bản build
 ```
 
-## Deploy lên Cloudflare Pages
-
-### Cách A — một lệnh (Wrangler CLI)
+Thử cả Worker (`/data/*` từ R2 giả lập + preview `/tram/*`):
 
 ```bash
-npm run deploy
-# = npm run build && wrangler pages deploy dist --project-name tramsac
+node builder/run-local.mjs                       # sinh builder/out/
+# nạp builder/out vào R2 local: npx wrangler r2 object put tramsac-data/<file> --file=builder/out/<file> --local
+npm run build && npx wrangler dev --local        # http://127.0.0.1:8787
+# hoặc: DATA_ORIGIN=http://127.0.0.1:8787 npm run dev
 ```
 
-Lần đầu Wrangler sẽ mở trình duyệt để đăng nhập Cloudflare. Nếu project `tramsac`
-chưa tồn tại, nó hỏi tạo mới — chọn **Create new project**.
+## Deploy
 
-### Cách B — nối Git (CI tự build)
+```bash
+npm run deploy     # = npm run build && wrangler deploy
+```
 
-Trên dashboard Cloudflare → **Workers & Pages → Create → Pages → Connect to Git**, trỏ
-tới repo này và đặt:
-
-| Mục | Giá trị |
-|---|---|
-| Framework preset | None (hoặc Vite) |
-| Build command | `npm run build` |
-| Build output directory | `dist` |
-| Node version | 18 trở lên (biến môi trường `NODE_VERSION=20`) |
-
-Mỗi lần push là Cloudflare tự build và deploy.
-
-### Cấu hình kèm theo
-
-- `public/_headers` — cache `stations.json` 1 ngày, asset có hash cache vĩnh viễn.
-- `public/_redirects` — SPA fallback về `index.html`.
-- `wrangler.toml` — tên project + thư mục output cho `wrangler pages deploy`.
-
-## Cập nhật dữ liệu trạm
-
-Chạy lại `partition.js` bên repo `vinfast-charging`, rồi copy gói tĩnh (đã giải nén) đè
-lên `public/stations.json`. Format: `{"v","cell","generation","fields":[id,storeId,name,address,lat,lng,flags,availableDate],"rows":[...]}`.
-`flags`: bit 1 = công cộng, 2 = phí gửi xe, 4 = trụ LINK.
+`wrangler.jsonc`: Worker `tramsac`, static assets từ `dist/` (SPA fallback), R2 `tramsac-data`,
+custom domain `charging.cangao.asia`. `public/_headers`: asset có hash cache vĩnh viễn.
 
 ## Pipeline dữ liệu (precompute trên Cloudflare)
 
@@ -118,7 +103,7 @@ GitHub Action (.github/workflows/build-data.yml), cron 0 19 * * * (02:00 VN):
     1. GET locators-meta.json → generation
     2. STREAM snapshot + 2 KML My Maps (streaming, không load nguyên khối)
     3. Lọc type=2444, trộn enrich theo toạ độ (lệch → để trống)
-    4. ghi builder/out/{base,power}-{gen}.json, manifest.json
+    4. ghi builder/out/{base,power}-{gen}.json, seo-{gen}/*.json (preview /tram), manifest.json
   → wrangler r2 object put … (JSON THÔ)
 R2 "tramsac-data" → Worker (worker/index.ts) phục vụ /data/* → Cloudflare auto-nén (zstd/gzip)
 ```
@@ -135,9 +120,11 @@ toạ độ (làm tròn ~11m), phủ ~89%. Streaming parser ở `builder/lib/`.
 `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` (token quyền R2 Edit). Chạy tay: tab
 Actions → "Build station data" → Run workflow.
 
-> **TODO (chưa làm):** nguồn `get-locator/{entityId}` của VinFast (sau Cloudflare, cần
-> warm-up cookie `__cf_bm` + rate-limit) cho **ảnh thật của trạm** + connector chính xác —
-> những thứ My Maps không có. Crawl trước trong Action rồi nhồi URL ảnh vào `power-{gen}`.
+**Chi tiết trạm lúc mở** — `GET /api/station/<entityId>` (`worker/locator.ts`): Worker proxy
+`get-locator/{entityId}` của VinFast (cần UA trình duyệt; 403 thì lấy cookie `__cf_bm` rồi thử
+lại một lần), rút gọn còn ảnh thật, connector (kW, AC/DC, chuẩn đầu sạc), 24/7 / giờ mở cửa,
+đặt trước, hotline, `depot_status`; cache edge 6h (lỗi 60s). Client (`useStationDetail`) CHỈ gọi
+khi người dùng chọn một trạm — không crawl hàng loạt. Connector VinFast được ưu tiên hơn My Maps.
 
 ### Phương án dự phòng tương lai — Cloudflare Workflows (nếu lên Workers Paid)
 
@@ -157,6 +144,6 @@ nên **client không phải đổi gì**. Kích hoạt khi một Worker streamin
 
 ## Lộ trình tiếp theo
 
-- **Phase 2:** chi tiết trạm từ `get-locator` (ảnh + connector) qua Worker proxy; status
-  refresh + EVCS real-time.
+- **Phase 2:** ~~chi tiết trạm từ `get-locator` qua Worker proxy~~ (xong); status refresh +
+  EVCS real-time.
 - **Phase 3:** chỉ đường, PWA offline, chia sẻ URL `?station=`.

@@ -97,8 +97,8 @@ export function MapView({ index, filters, book, selected, flyTo, onSelect, onLoc
   const mapRef = useRef<maplibregl.Map | null>(null)
   const loadedRef = useRef(false)
   // Giá trị mới nhất cho các handler đăng ký một lần trong lúc khởi tạo.
-  const latest = useRef({ filters, book, selected, onSelect, onLocate })
-  latest.current = { filters, book, selected, onSelect, onLocate }
+  const latest = useRef({ index, filters, book, selected, onSelect, onLocate })
+  latest.current = { index, filters, book, selected, onSelect, onLocate }
 
   // Khởi tạo map một lần.
   useEffect(() => {
@@ -125,10 +125,10 @@ export function MapView({ index, filters, book, selected, flyTo, onSelect, onLoc
     })
 
     map.on('load', () => {
-      const { filters: f, book: b, selected: sel } = latest.current
+      const { index: idx, filters: f, book: b, selected: sel } = latest.current
       map.addSource(SRC, {
         type: 'geojson',
-        data: toGeoJSON(index, f, b),
+        data: toGeoJSON(idx, f, b),
         cluster: true,
         clusterRadius: 50,
         clusterMaxZoom: 12,
@@ -206,7 +206,7 @@ export function MapView({ index, filters, book, selected, flyTo, onSelect, onLoc
       map.on('click', 'point', (e) => {
         const feat = e.features?.[0]
         if (!feat) return
-        const st = index.byId.get(feat.properties?.id as string)
+        const st = latest.current.index.byId.get(feat.properties?.id as string)
         if (st) latest.current.onSelect(st)
       })
       for (const layer of ['clusters', 'point']) {
@@ -225,7 +225,9 @@ export function MapView({ index, filters, book, selected, flyTo, onSelect, onLoc
       mapRef.current = null
       loadedRef.current = false
     }
-  }, [index])
+    // Khởi tạo MỘT lần. Dữ liệu đổi (generation mới, lọc, nhóm) chỉ setData ở effect dưới —
+    // dựng lại map sẽ chớp màn hình và mất vị trí đang xem.
+  }, [])
 
   // Cập nhật dữ liệu khi filter / sổ nhóm đổi.
   useEffect(() => {

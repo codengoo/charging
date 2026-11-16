@@ -25,6 +25,8 @@ import { GroupGlyph, PinPreview } from './groupIcons'
 import { tintHex } from '../map/pins'
 
 interface Props {
+  /** Giữ component gắn và chỉ đổi `open` — gỡ hẳn khi đóng thì mất hiệu ứng trôi xuống. */
+  open: boolean
   index: StationIndex
   book: GroupBook
   now: number
@@ -37,7 +39,7 @@ interface Props {
 const DEFAULT_PIN = { iconKey: 'charger', colorHex: '#12B76A' } as const
 
 /** Danh sách mọi trạm đã lưu, lọc theo nhóm. Port FavoritesTab (PlacesSheet.kt). */
-export function SavedSheet({ index, book, now, userPos, onPick, onUnsave, onClose }: Props) {
+export function SavedSheet({ open, index, book, now, userPos, onPick, onUnsave, onClose }: Props) {
   // Rỗng = xem tất cả. Chọn NHIỀU nhóm là phép HOẶC: chọn "Sao" và "Sẽ đến" là muốn
   // thấy cả hai, không phải trạm nằm trong cả hai.
   const [filter, setFilter] = useState<Set<string>>(new Set())
@@ -63,7 +65,7 @@ export function SavedSheet({ index, book, now, userPos, onPick, onUnsave, onClos
   const usedGroups = book.groups.filter((g) => idsIn(book, g.id).length > 0)
 
   return (
-    <ResponsiveDialog open onOpenChange={(o) => !o && onClose()}>
+    <ResponsiveDialog open={open} onOpenChange={(o) => !o && onClose()}>
       <ResponsiveDialogContent className="sm:max-w-md">
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle className="text-lg">Trạm sạc đã lưu</ResponsiveDialogTitle>

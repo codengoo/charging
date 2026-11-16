@@ -8,12 +8,14 @@ import { Badge } from '@/components/ui/badge'
 import { CHANGELOG } from '../data/changelog'
 
 interface Props {
+  /** Giữ component gắn và chỉ đổi `open` — gỡ hẳn khi đóng thì mất hiệu ứng trôi xuống. */
+  open: boolean
   onClose: () => void
 }
 
-export function ChangelogModal({ onClose }: Props) {
+export function ChangelogModal({ open, onClose }: Props) {
   return (
-    <ResponsiveDialog open onOpenChange={(o) => !o && onClose()}>
+    <ResponsiveDialog open={open} onOpenChange={(o) => !o && onClose()}>
       <ResponsiveDialogContent className="sm:max-w-md">
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle className="text-lg">Lịch sử cập nhật</ResponsiveDialogTitle>

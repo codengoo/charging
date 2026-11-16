@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { ArrowLeft, Check, Clock, Plus, Trash2 } from 'lucide-react'
 import {
   ResponsiveDialog,
@@ -28,6 +28,8 @@ import { PinPreview, groupIcon } from './groupIcons'
 import { darkenHex, tintHex } from '../map/pins'
 
 interface Props {
+  /** Giữ component gắn và chỉ đổi `open` — gỡ hẳn khi đóng thì mất hiệu ứng trôi xuống. */
+  open: boolean
   book: GroupBook
   now: number
   entityId: string
@@ -46,12 +48,17 @@ interface Props {
  * Tạo nhóm mới đổi NỘI DUNG bảng này thay vì mở thêm một tầng hộp thoại thứ ba.
  */
 export function GroupsSheet(props: Props) {
-  const { book, now, entityId, stationName, onClose } = props
+  const { open, book, now, entityId, stationName, onClose } = props
   const [creating, setCreating] = useState(false)
+  // Mở lại thì về danh sách nhóm. Reset lúc MỞ (trước khi vẽ) chứ không lúc đóng — đổi nội
+  // dung giữa hiệu ứng trôi xuống trông như giật.
+  useLayoutEffect(() => {
+    if (open) setCreating(false)
+  }, [open])
   const inGroups = new Set(groupsOf(book, entityId))
 
   return (
-    <ResponsiveDialog nested open onOpenChange={(o) => !o && onClose()}>
+    <ResponsiveDialog nested open={open} onOpenChange={(o) => !o && onClose()}>
       <ResponsiveDialogContent className="sm:max-w-md">
         {creating ? (
           <NewGroupForm

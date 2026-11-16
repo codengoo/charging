@@ -2,6 +2,13 @@
 
 Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app).
 
+## [0.5.0] — 2026-11-16 — Dữ liệu cập nhật hằng ngày & số cổng sạc
+
+- Dữ liệu trạm tải từ CDN và được làm mới hằng ngày (~25.000 trạm) — không còn gói dữ liệu cố định trong app.
+- Chi tiết trạm hiện số cổng, công suất tối đa và từng mức kW (AC/DC).
+- Để app mở lâu: quay lại tab sẽ tự nhận bản dữ liệu mới, không tải lại trang.
+- Chuyển sang domain charging.cangao.asia; link chia sẻ và mã QR trỏ về domain mới.
+
 ## [0.4.0] — 2026-11-16 — Chia sẻ trạm bằng mã QR
 
 - Chia sẻ trạm bằng mã QR: nút QR trong chi tiết trạm.

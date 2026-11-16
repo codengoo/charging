@@ -39,6 +39,14 @@ jobs:
           npx -y wrangler@4 r2 object put "tramsac-data/power-$GEN.json" \
             --file="builder/out/power-$GEN.json" --remote \
             --content-type=application/json --cache-control="$IMMUTABLE"
+          # Shard tra cứu cho preview link /tram/<id> (worker/index.ts) — trước manifest để
+          # manifest mới không bao giờ trỏ tới shard chưa có.
+          SEO_DIR="seo-$GEN"
+          for f in builder/out/$SEO_DIR/*.json; do
+            npx -y wrangler@4 r2 object put "tramsac-data/$SEO_DIR/$(basename "$f")" \
+              --file="$f" --remote \
+              --content-type=application/json --cache-control="$IMMUTABLE"
+          done
           # manifest cuối cùng (con trỏ latest) — cache ngắn
           npx -y wrangler@4 r2 object put "tramsac-data/manifest.json" \
             --file="builder/out/manifest.json" --remote \

@@ -6,12 +6,13 @@
   "main": "worker/index.ts",
   "compatibility_date": "2024-11-01",
   // Build dữ liệu chạy ở GitHub Action, không ở Worker (Free plan giới hạn 10ms CPU).
-  // Frontend (Vite build) phục vụ như static assets; /data/* chạy qua Worker đọc R2.
+  // Frontend (Vite build) phục vụ như static assets; /data/* (R2), /tram/* (preview link
+  // chia sẻ, thay meta theo trạm) và /api/* (chi tiết trạm từ VinFast) chạy qua Worker.
   "assets": {
     "binding": "ASSETS",
     "directory": "./dist",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/data/*"]
+    "run_worker_first": ["/data/*", "/tram/*", "/api/*"]
   },
   // R2 chứa base/power/manifest do builder sinh ra.
   "r2_buckets": [{ "binding": "DATA", "bucket_name": "tramsac-data" }],

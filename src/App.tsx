@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { List } from 'lucide-react'
 import { MapView } from './map/MapView'
 import { SearchBar } from './ui/SearchBar'
@@ -9,7 +9,8 @@ import { ShareSheet } from './ui/ShareSheet'
 import { ChangelogModal } from './ui/ChangelogModal'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
-import { loadStations, type StationIndex } from './data/stations'
+import { useStationData } from './data/useStationData'
+import { useStationDetail } from './data/useStationDetail'
 import { allSaved } from './data/groups'
 import { useGroupBook } from './data/useGroupBook'
 import { APP_VERSION } from './data/changelog'
@@ -23,9 +24,13 @@ interface Filters {
 }
 
 export function App() {
-  const [index, setIndex] = useState<StationIndex | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const { index, power, error } = useStationData()
   const [selected, setSelected] = useState<Station | null>(null)
+  // Trạm cuối cùng từng mở — bảng trạm vẫn có nội dung trong lúc trôi xuống sau khi đóng.
+  const [sheetStation, setSheetStation] = useState<Station | null>(null)
+  if (selected && selected !== sheetStation) setSheetStation(selected)
+  // Chi tiết VinFast chỉ gọi khi có trạm được chọn; giữ theo sheetStation để còn ảnh lúc trôi xuống.
+  const detail = useStationDetail(sheetStation?.entityId ?? null)
   const [grouping, setGrouping] = useState(false)
   const [sharing, setSharing] = useState(false)
   // Đọc NGAY lúc khởi tạo: effect đồng bộ URL bên dưới sẽ ghi đè pathname.
@@ -41,16 +46,20 @@ export function App() {
     favoritesOnly: false,
   })
 
+  // Mở từ link chia sẻ /tram/<id>-<slug>: chọn trạm và bay tới ngay khi có dữ liệu (một lần).
+  const linkHandled = useRef(false)
   useEffect(() => {
-    loadStations()
-      .then((idx) => {
-        setIndex(idx)
-        // Mở từ link chia sẻ /tram/<id>-<slug>: chọn trạm và bay tới ngay.
-        const st = linkedId ? idx.byId.get(linkedId) : undefined
-        if (st) pick(st)
-      })
-      .catch((e) => setError(String(e)))
-  }, [])
+    if (!index || linkHandled.current) return
+    linkHandled.current = true
+    const st = linkedId ? index.byId.get(linkedId) : undefined
+    if (st) pick(st)
+  }, [index, linkedId])
+
+  // Generation mới (dữ liệu làm mới hằng ngày): trạm đang mở trỏ sang bản ghi mới cùng id.
+  useEffect(() => {
+    if (!index) return
+    setSelected((s) => (s ? (index.byId.get(s.entityId) ?? s) : s))
+  }, [index])
 
   // URL theo trạm đang mở: copy thanh địa chỉ là ra đúng link chia sẻ. replaceState chứ không
   // pushState — bấm qua lại nhiều trạm không làm đầy lịch sử nút Back.
@@ -122,10 +131,17 @@ export function App() {
         v{APP_VERSION} · Có gì mới
       </Button>
 
-      {selected && (
+      {/* Các bảng luôn GẮN sẵn, chỉ đổi `open`: gỡ hẳn khi đóng thì vaul/Radix không kịp chạy
+          hiệu ứng trôi xuống. Bảng trạm giữ trạm cuối cùng để còn nội dung lúc đang trôi. */}
+      {sheetStation && (
         <StationSheet
-          station={selected}
+          open={selected !== null}
+          station={sheetStation}
           book={book}
+          power={power?.get(sheetStation.entityId)}
+          powerLoading={power === null}
+          detail={detail.detail}
+          detailLoading={detail.loading}
           onOpenGroups={() => setGrouping(true)}
           onShare={() => setSharing(true)}
           onClose={() => {
@@ -134,39 +150,37 @@ export function App() {
             setSharing(false)
           }}
         >
-          {sharing && <ShareSheet station={selected} onClose={() => setSharing(false)} />}
-          {grouping && (
-            <GroupsSheet
-              book={book}
-              now={groups.now}
-              entityId={selected.entityId}
-              stationName={selected.name}
-              onToggle={(g) => groups.toggle(g, selected.entityId)}
-              onCreate={(g) => groups.create(g, selected.entityId)}
-              onDelete={groups.remove}
-              onTtlChange={groups.setTtl}
-              onClose={() => setGrouping(false)}
-            />
-          )}
+          <ShareSheet open={sharing} station={sheetStation} onClose={() => setSharing(false)} />
+          <GroupsSheet
+            open={grouping}
+            book={book}
+            now={groups.now}
+            entityId={sheetStation.entityId}
+            stationName={sheetStation.name}
+            onToggle={(g) => groups.toggle(g, sheetStation.entityId)}
+            onCreate={(g) => groups.create(g, sheetStation.entityId)}
+            onDelete={groups.remove}
+            onTtlChange={groups.setTtl}
+            onClose={() => setGrouping(false)}
+          />
         </StationSheet>
       )}
 
-      {showSaved && (
-        <SavedSheet
-          index={index}
-          book={book}
-          now={groups.now}
-          userPos={userPos}
-          onPick={(st) => {
-            setShowSaved(false)
-            pick(st)
-          }}
-          onUnsave={groups.removeFromAll}
-          onClose={() => setShowSaved(false)}
-        />
-      )}
+      <SavedSheet
+        open={showSaved}
+        index={index}
+        book={book}
+        now={groups.now}
+        userPos={userPos}
+        onPick={(st) => {
+          setShowSaved(false)
+          pick(st)
+        }}
+        onUnsave={groups.removeFromAll}
+        onClose={() => setShowSaved(false)}
+      />
 
-      {showChangelog && <ChangelogModal onClose={() => setShowChangelog(false)} />}
+      <ChangelogModal open={showChangelog} onClose={() => setShowChangelog(false)} />
     </div>
   )
 }

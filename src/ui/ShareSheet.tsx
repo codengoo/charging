@@ -36,6 +36,8 @@ const MODES: Record<Mode, { label: string; icon: typeof Link2; description: stri
 const BRAND_HEX = '#009966'
 
 interface Props {
+  /** Giữ component gắn và chỉ đổi `open` — gỡ hẳn khi đóng thì mất hiệu ứng trôi xuống. */
+  open: boolean
   station: Station
   onClose: () => void
 }
@@ -44,7 +46,7 @@ interface Props {
  * Chia sẻ một trạm: link app (có preview khi gửi qua Zalo/Messenger) hoặc vị trí Google Maps.
  * Bố cục theo hộp "Mời bạn" của chiatien — xem design.md, mục "Chia sẻ / QR".
  */
-export function ShareSheet({ station, onClose }: Props) {
+export function ShareSheet({ open, station, onClose }: Props) {
   const isMobile = useIsMobile()
   const qrDisplaySize = isMobile ? 168 : 208
   const [mode, setMode] = useState<Mode>('app')
@@ -107,7 +109,7 @@ export function ShareSheet({ station, onClose }: Props) {
   }
 
   return (
-    <ResponsiveDialog nested open onOpenChange={(o) => !o && onClose()}>
+    <ResponsiveDialog nested open={open} onOpenChange={(o) => !o && onClose()}>
       <ResponsiveDialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
         <ResponsiveDialogHeader className="gap-1 pr-6 text-left">
           <ResponsiveDialogTitle className="text-base font-bold sm:text-lg">Chia sẻ trạm</ResponsiveDialogTitle>

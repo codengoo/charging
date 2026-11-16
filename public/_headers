@@ -1,14 +1,4 @@
-# Cloudflare Pages headers
-# Dữ liệu trạm đổi theo generation; cache 1 ngày, cho CDN nén.
-# Dữ liệu trạm là nội bộ — không lập chỉ mục file dữ liệu.
-/stations.json
-  Cache-Control: public, max-age=86400
-  Content-Type: application/json; charset=utf-8
-  X-Robots-Tag: noindex, nofollow
-
-/seo/*
-  X-Robots-Tag: noindex, nofollow
-
+# Header cho static assets (Workers Static Assets đọc file này giống Pages).
 # Asset build có hash trong tên -> cache vĩnh viễn
 /assets/*
   Cache-Control: public, max-age=31536000, immutable

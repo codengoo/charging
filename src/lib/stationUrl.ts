@@ -1,6 +1,6 @@
 /**
- * Đường dẫn chia sẻ của một trạm. Dùng chung cho app (client), Pages Function SEO
- * (`functions/tram/[[path]].ts`) và plugin sinh sitemap (seo.plugin.ts) — giữ MỘT chỗ định nghĩa để ba bên
+ * Đường dẫn chia sẻ của một trạm. Dùng chung cho app (client) và Worker
+ * (`worker/index.ts`, route `/tram/*`) — giữ MỘT chỗ định nghĩa để hai bên
  * không lệch nhau.
  *
  * Dạng: `/tram/<entityId>-<slug>`. Chỉ id là thứ để tra; slug chỉ để link đọc được và tốt
@@ -8,7 +8,7 @@
  */
 
 /** Domain chính thức — dùng khi đang chạy local (QR trỏ về localhost thì điện thoại không mở được). */
-export const SITE_URL = 'https://tramsac.pages.dev'
+export const SITE_URL = 'https://charging.cangao.asia'
 
 /** Hạ dấu tiếng Việt + gạch nối: "Vincom Hầm B3" -> "vincom-ham-b3". */
 export function slugify(s: string): string {
@@ -36,9 +36,11 @@ export function parseStationId(pathname: string): string | null {
 
 /** Origin để đưa vào link chia sẻ / QR. */
 export function shareOrigin(): string {
-  if (typeof location === 'undefined') return SITE_URL
-  const local = /^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(location.hostname)
-  return local ? SITE_URL : location.origin
+  // File này cũng được Worker import (không có `location`) — đọc qua globalThis, không cần lib DOM.
+  const loc = (globalThis as { location?: { hostname: string; origin: string } }).location
+  if (!loc) return SITE_URL
+  const local = /^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(loc.hostname)
+  return local ? SITE_URL : loc.origin
 }
 
 export function stationShareUrl(st: { entityId: string; name: string }): string {
@@ -51,11 +53,4 @@ export function stationShareUrl(st: { entityId: string; name: string }): string 
  */
 export function googleMapsUrl(st: { lat: number; lng: number }): string {
   return `https://www.google.com/maps/search/?api=1&query=${st.lat},${st.lng}`
-}
-
-/** Số shard dữ liệu SEO (`/seo/<n>.json`) — xem seo.plugin.ts. */
-export const SEO_SHARDS = 128
-
-export function seoShardOf(entityId: string): number {
-  return Number(entityId) % SEO_SHARDS
 }

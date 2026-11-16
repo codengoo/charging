@@ -10,6 +10,17 @@ const { manifest, base, power } = await buildData((m) => console.log('·', m))
 await mkdir(new URL('./out/', import.meta.url), { recursive: true })
 const out = (name) => new URL(`./out/${name}`, import.meta.url)
 
+// Shard tra cứu cho preview link /tram/<id> (worker/index.ts): trạm chia theo id % SEO_SHARDS,
+// mỗi file chỉ [name, address, flags]. Worker đọc MỘT shard (~130 KB) thay vì base 4 MB —
+// parse cả base vượt hạn 10 ms CPU của Workers Free plan.
+const SEO_SHARDS = 32
+const seoDir = `seo-${manifest.generation}`
+const shards = Array.from({ length: SEO_SHARDS }, () => ({}))
+for (const r of base.rows) shards[Number(r[0]) % SEO_SHARDS][r[0]] = [r[2], r[3], r[6]]
+await mkdir(out(`${seoDir}/`), { recursive: true })
+await Promise.all(shards.map((sh, i) => writeFile(out(`${seoDir}/${i}.json`), JSON.stringify(sh))))
+manifest.seo = { dir: seoDir, shards: SEO_SHARDS }
+
 // Lưu JSON THÔ — Cloudflare tự nén trên đường truyền (không tự gzip để tránh double-encode).
 await writeFile(out(manifest.base), JSON.stringify(base))
 await writeFile(out(manifest.power), JSON.stringify(power))

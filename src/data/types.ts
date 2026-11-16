@@ -34,6 +34,31 @@ export interface StationPower {
 }
 
 /**
+ * Chi tiết một trạm từ `get-locator/<entityId>` của VinFast, qua Worker (`/api/station/<id>`).
+ * Chỉ tải khi người dùng MỞ trạm — không có trong gói dữ liệu ngày.
+ */
+export interface StationDetail {
+  /** Ảnh thật của trạm (S3 VinFast). */
+  images: string[]
+  /** Theo connector của VinFast; trạm thiếu connector thì 0 / rỗng — dùng My Maps thay. */
+  portCount: number
+  maxKw: number | null
+  dcCount: number
+  groups: PortGroup[]
+  /** Chuẩn đầu sạc đã đổi sang tên quen: "CCS2", "Type 2", "CHAdeMO". */
+  standards: string[]
+  reservable: boolean
+  open247: boolean
+  /** Giờ mở cửa khi không 24/7, vd "06:00–22:00"; null = không rõ. */
+  hours: string | null
+  hotline: string | null
+  /** `extra_data.depot_status`: Available | AllBusy | Maintaining | OutOfService. */
+  depotStatus: string | null
+  /** `last_updated` của trạm phía VinFast (ISO). */
+  updatedAt: string | null
+}
+
+/**
  * Con trỏ "bản mới nhất" do builder (GitHub Action, chạy mỗi ngày) ghi lên R2, phục vụ ở
  * `/data/manifest.json`. Tên file base/power mang generation nên cache vĩnh viễn được.
  */
@@ -43,6 +68,8 @@ export interface DataManifest {
   base: string
   power: string
   counts: { stations: number; enriched: number }
+  /** Shard tra cứu cho preview link /tram/* (chỉ Worker dùng). */
+  seo?: { dir: string; shards: number }
 }
 
 /** `base-<gen>.json` / `power-<gen>.json`: hàng packed theo `fields`. */

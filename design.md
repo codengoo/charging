@@ -87,6 +87,11 @@ Thân (flex-col gap-3 sm:gap-4)
 Hàng hành động   2 nút outline chia đôi  — hoặc —  Footer: [phụ outline] [CTA brand]
 ```
 
+- **Bảng luôn gắn sẵn, chỉ đổi `open`** — KHÔNG render kiểu `{show && <Sheet open />}`. Gỡ
+  component lúc đóng thì vaul/Radix không kịp chạy hiệu ứng trôi xuống / mờ dần. Bảng hiện dữ
+  liệu (vd. trạm) thì giữ bản cuối cùng để còn nội dung trong lúc đóng.
+- Variant `data-open:` / `data-closed:` phải khớp `data-state` của Radix — đã định nghĩa trong
+  `src/index.css` (chiatien lấy từ `shadcn/tailwind.css`). Thiếu là mất hết hiệu ứng mở/đóng.
 - Desktop dialog có `max-h-[calc(100dvh-2rem)]` + cuộn trong; drawer mobile tự cuộn.
 - Bảng chỉ đọc dài (changelog): không footer.
 - Xoá: bấm 2 lần (nút đổi thành "Xoá?"), không mở hộp xác nhận riêng.
