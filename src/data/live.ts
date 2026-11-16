@@ -126,6 +126,44 @@ export async function fetchHistory(storeId: string, signal?: AbortSignal): Promi
   return { all: points(j.all), byKw }
 }
 
+/** Điểm lịch sử cuối cũ hơn mức này thì không dùng để ước tính "lúc này". */
+const ESTIMATE_MAX_AGE_MS = 30 * 60_000
+
+/**
+ * Dự phòng khi `/charging` không lấy được (EVCS chặn request từ Cloudflare Worker bằng trang
+ * "Just a moment"): lấy số xe đang sạc ở điểm CUỐI của chuỗi lịch sử theo từng mức kW, trừ vào
+ * số cổng của VinFast. Không trừ được cổng hỏng / đặt trước nên chỉ là ước tính — UI ghi rõ.
+ * null khi không đủ dữ liệu (không có chuỗi theo kW, hoặc điểm cuối quá cũ).
+ */
+export function estimateFromHistory(
+  history: LiveHistory | null,
+  groups: Array<{ kw: number; count: number }>,
+  now = Date.now(),
+): { ports: LivePorts[]; charging: number; at: number } | null {
+  if (!history || !groups.length) return null
+  const lastAll = history.all[history.all.length - 1]
+  if (!lastAll || now - lastAll.at > ESTIMATE_MAX_AGE_MS) return null
+  const busyByKw = new Map<number, number>()
+  for (const [kw, pts] of history.byKw) {
+    const last = pts[pts.length - 1]
+    // Chuỗi theo kW chỉ có điểm khi số đổi — điểm cuối cũ vẫn là giá trị hiện tại, miễn
+    // chuỗi gộp còn tươi (đã kiểm ở trên).
+    if (last) busyByKw.set(kw, last.cars)
+  }
+  // Không có chuỗi theo kW: chỉ ước tính được khi trạm có đúng một mức công suất.
+  if (!busyByKw.size) {
+    if (groups.length !== 1) return null
+    busyByKw.set(groups[0].kw, lastAll.cars)
+  }
+  const ports = groups
+    .map((g) => {
+      const busy = Math.min(g.count, busyByKw.get(g.kw) ?? 0)
+      return { kw: g.kw, free: g.count - busy, total: g.count }
+    })
+    .sort((a, b) => b.kw - a.kw)
+  return { ports, charging: lastAll.cars, at: lastAll.at }
+}
+
 // ------------------------------------------------------------ thống kê 24h
 
 export interface HourSlot {

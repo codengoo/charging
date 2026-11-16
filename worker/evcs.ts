@@ -28,7 +28,8 @@ const HISTORY_TIMEOUT_MS = 8000
 const KW_GRACE_MS = 2000
 
 const TTL_LIVE = 60
-const TTL_HISTORY = 300
+/** Ngắn hơn 5' vì lịch sử còn là nguồn dự phòng cho số cổng trống khi /charging bị chặn. */
+const TTL_HISTORY = 120
 const TTL_NEARBY = 300
 
 /** Token ở cấp phiên, không gắn theo trạm. Sống theo isolate — đủ để đỡ phần lớn lượt xin. */
@@ -78,12 +79,12 @@ async function liveOnce(storeId: string): Promise<string> {
     headers: { ...browser(pageOf(storeId)), 'x-t': t.charge, 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: storeId, t: 'vinfast' }),
   })
-  if (res.status === 503) throw new Transient('503')
+  if (res.status === 503) throw new Transient('http 503')
   const text = await res.text()
   // HTML thay vì JSON = Cloudflare chặn hoặc phiên chết: vứt token để lần thử sau xin mới.
   if (!text.startsWith('{')) {
     tokens = null
-    throw new Transient('charging: không phải JSON')
+    throw new Transient(`charging http ${res.status}`)
   }
   // {"ok":false,…} đi kèm mã 200 — bận, không phải "trạm không có số liệu".
   if (/^\{\s*"ok"\s*:\s*false/.test(text)) throw new Transient('ok:false')
@@ -95,7 +96,9 @@ async function live(storeId: string): Promise<Response> {
     try {
       return json(await liveOnce(storeId), 200, TTL_LIVE)
     } catch (e) {
-      if (attempt >= BACKOFF_MS.length) return failJson(e instanceof Transient ? 503 : 502, 'EVCS đang bận')
+      if (attempt >= BACKOFF_MS.length) {
+        return failJson(e instanceof Transient ? 503 : 502, `EVCS đang bận (${e instanceof Error ? e.message : 'lỗi'})`)
+      }
       await sleep(BACKOFF_MS[attempt])
     }
   }
@@ -188,7 +191,9 @@ async function nearby(at: string): Promise<Response> {
     body: JSON.stringify({ latitude: lat, longitude: lng }),
   })
   const text = await res.text()
-  if (!res.ok || !text.startsWith('{')) return failJson(503, 'EVCS đang bận')
+  if (!res.ok || !text.startsWith('{')) {
+    return failJson(503, `EVCS đang bận (search http ${res.status})`)
+  }
   return json(text, 200, TTL_NEARBY)
 }
 

@@ -3,7 +3,7 @@ import { Activity, Clock, RefreshCw, Wrench } from 'lucide-react'
 import { Chip } from '@/components/ui/chip'
 import { Button } from '@/components/ui/button'
 import { fmtKw } from '@/lib/format'
-import { analyseHistory, type HistoryStats, type LiveState } from '../data/live'
+import { analyseHistory, estimateFromHistory, type HistoryStats, type LiveState } from '../data/live'
 import type { StationPower } from '../data/types'
 
 /**
@@ -29,6 +29,11 @@ export function LiveSection({ live, power }: { live: LiveState; power?: StationP
     }
     return out.sort((a, b) => b[0] - a[0])
   }, [history, portsByKw])
+  // /charging hỏng (thường do EVCS chặn) → ước tính từ điểm cuối của lịch sử 24h.
+  const estimate = useMemo(
+    () => (!st && liveError ? estimateFromHistory(history, power?.groups ?? []) : null),
+    [st, liveError, history, power],
+  )
   const [pickedKw, setPickedKw] = useState<number | null>(null)
   const shown = (pickedKw !== null && statsByKw.find(([kw]) => kw === pickedKw)?.[1]) || statsAll
 
@@ -41,7 +46,26 @@ export function LiveSection({ live, power }: { live: LiveState; power?: StationP
         {st && !liveLoading && <span className="text-muted-foreground">· cập nhật {clock(st.at)}</span>}
       </div>
 
-      {liveError && <ErrorRow text={`${liveError} — chưa lấy được số cổng trống`} onRetry={retry} />}
+      {estimate && (
+        <>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {estimate.ports.map((p) => (
+              <Chip key={p.kw} size="sm" variant="outline">
+                <span className="font-semibold">{fmtKw(p.kw)} kW</span>
+                <span className="text-muted-foreground">
+                  trống ~<span className={p.free > 0 ? 'font-semibold text-brand' : 'font-semibold'}>{p.free}</span>/{p.total}
+                </span>
+              </Chip>
+            ))}
+          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Ước tính từ số xe đang sạc lúc {clock(estimate.at)} ({estimate.charging} xe) — chưa trừ cổng hỏng / đặt trước.
+          </p>
+        </>
+      )}
+      {liveError && !estimate && !historyLoading && (
+        <ErrorRow text={`${liveError} — chưa lấy được số cổng trống`} onRetry={retry} />
+      )}
 
       {st?.maintenance && (
         <p className="mt-2 flex items-center gap-1.5 text-sm font-medium text-destructive">
