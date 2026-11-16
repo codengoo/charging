@@ -110,9 +110,11 @@ export async function buildData(log = () => {}) {
   const baseRows = []
   const powerRows = []
   let matched = 0
+  const statusCount = [0, 0, 0, 0]
   const snapText = await toTextStream(await fetchStream(`${CDN}/${meta.full}`))
   for await (const r of streamCarStations(snapText)) {
-    baseRows.push([r.entityId, r.storeId, r.name, r.address, r.lat, r.lng, r.flags, r.availableDate ?? 0])
+    baseRows.push([r.entityId, r.storeId, r.name, r.address, r.lat, r.lng, r.flags, r.availableDate ?? 0, r.status])
+    statusCount[r.status]++
     const hit = lookupPower(index, r.lat, r.lng)
     if (!hit) {
       powerRows.push(null) // lệch → bỏ qua, để trống
@@ -127,13 +129,19 @@ export async function buildData(log = () => {}) {
     matched++
   }
   log(`base: ${baseRows.length} trạm ô tô | enrich khớp: ${matched} (${((matched / baseRows.length) * 100).toFixed(1)}%)`)
+  log(
+    `trạng thái: hoạt động ${statusCount[0]} | bảo trì ${statusCount[1]} | ngừng ${statusCount[2]} | ` +
+      `chưa khai trương ${statusCount[3]}`,
+  )
 
   const builtAt = new Date().toISOString()
   const base = {
-    v: 2,
+    v: 3,
     generation,
     builtAt,
-    fields: ['id', 'storeId', 'name', 'address', 'lat', 'lng', 'flags', 'availableDate'],
+    // v3 = v2 + cột status (0 hoạt động, 1 bảo trì, 2 ngừng, 3 chưa khai trương). Client cũ bỏ
+    // qua cột thừa nên không vỡ.
+    fields: ['id', 'storeId', 'name', 'address', 'lat', 'lng', 'flags', 'availableDate', 'status'],
     rows: baseRows,
   }
   const power = {

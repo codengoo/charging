@@ -20,7 +20,7 @@ export function foldText(s: string): string {
     .trim()
 }
 
-/** Giải mã một dòng packed [id,storeId,name,address,lat,lng,flags,availableDate]. */
+/** Giải mã một dòng packed [id,storeId,name,address,lat,lng,flags,availableDate,status]. */
 function parseRow(r: unknown[]): Station {
   const lat = r[4] as number
   const lng = r[5] as number
@@ -28,6 +28,7 @@ function parseRow(r: unknown[]): Station {
   const name = r[2] as string
   const address = r[3] as string
   const available = r[7]
+  const status = r[8]
   return {
     entityId: r[0] as string,
     storeId: r[1] as string,
@@ -42,6 +43,8 @@ function parseRow(r: unknown[]): Station {
     hasLink: (flags & 4) !== 0,
     // Builder ghi 0 khi không có ngày.
     availableDate: typeof available === 'string' && available ? available : null,
+    // Base v2 chưa có cột này; mã lạ cũng coi như hoạt động.
+    status: status === 1 || status === 2 || status === 3 ? status : 0,
   }
 }
 

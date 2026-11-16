@@ -13,7 +13,15 @@ export interface Station {
   parkingFee: boolean
   hasLink: boolean
   availableDate: string | null
+  /** Base v2 (chưa có cột) → 0. */
+  status: StationStatus
 }
+
+/**
+ * Trạng thái trạm theo bản build ngày (cột 9 của base). 0 hoạt động, 1 bảo trì, 2 ngừng hoạt
+ * động, 3 chưa khai trương. "Hết cổng trống" không có ở đây — chỉ có realtime khi mở trạm.
+ */
+export type StationStatus = 0 | 1 | 2 | 3
 
 /** Một nhóm cổng cùng công suất: "250 kW × 2, DC". */
 export interface PortGroup {

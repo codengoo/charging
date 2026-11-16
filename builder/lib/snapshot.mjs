@@ -4,6 +4,15 @@
 
 const CAR = '2444'
 
+/**
+ * `charging_status` của snapshot → mã gọn. Đối chiếu với `extra_data.depot_status` của
+ * get-locator: ACTIVE=Available, INACTIVE=Maintaining, UNAVAILABLE=Planned (chưa khai trương),
+ * OUTOFSERVICE=OutOfService. BUSY (=AllBusy) gộp vào hoạt động: build chạy mỗi ngày một lần,
+ * "hết cổng trống" lúc 02:00 sai gần cả ngày. Giá trị lạ → coi như hoạt động.
+ */
+// __proto__: null — chuỗi lạ như "constructor" không tra ra hàm của Object.prototype.
+const STATUS = { __proto__: null, INACTIVE: 1, OUTOFSERVICE: 2, UNAVAILABLE: 3 }
+
 function str(v) {
   return v == null ? '' : String(v)
 }
@@ -28,6 +37,7 @@ function toRow(o) {
     lng,
     flags,
     availableDate: o.charging_avaiable_date ? str(o.charging_avaiable_date) : null,
+    status: STATUS[str(o.charging_status)] ?? 0,
   }
 }
 
