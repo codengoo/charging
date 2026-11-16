@@ -86,3 +86,9 @@ limits pins to corridor stations and lists them by km with a 2/5/10 km
 radius switch. /trip?link=... reopens a trip; station URLs are not written
 while a trip is open.
 ```
+
+## 8. Kết quả thực hiện (2026-11-16)
+
+- Lệch: bảng hành trình là **panel không modal** (`src/ui/TripPanel.tsx`, thay cho `TripSheet` dùng vaul): dải đáy trên điện thoại (tay cầm thu/mở, tự thu khi mở chi tiết trạm), thẻ nổi góc trái trên màn rộng. Lý do: `ResponsiveDialog` của repo là modal trên desktop; cần kéo/zoom bản đồ và để `StationSheet` mở đè lên. Ghim dọc tuyến dùng chung kiểu vẽ với ghim thường (màu theo kW, mờ theo trạng thái) qua `POINT_LAYOUT`/`POINT_PAINT`. Chip "Dọc đường" bấm lần nữa thì đóng hành trình.
+- Đã kiểm bằng Playwright với **HERE giả** (mock server scratchpad mã hoá flexible polyline, `/api/maps-link` + `/api/station` chuyển sang `wrangler dev` thật), viewport 390×844 và 1280×800: dán link HN→HP → tuyến vẽ, ẩn lớp cụm, 270 trạm, km tăng dần, tóm tắt "109 km · 1 giờ 31 phút"; 2→5 km → 815 trạm (hiện 400), không gọi `/api/route` thêm; bấm trạm → `StationSheet`, URL vẫn `/trip?link=…`; đóng → tuyến mất, cụm hiện lại, URL `/`; mở thẳng `/trip?link=…` và `/trip?text=…` → tự tính, URL về `/trip?link=<chỉ link>`; link rác → "Không đọc được liên kết Google Maps này."; link rút gọn thật → 2 chặng tên đầy đủ; link một địa điểm + GPS → "Vị trí của tôi → Hải Phòng"; không GPS → câu báo bật định vị; nền tối (class `.dark`) đọc được; regression lọc / trạng thái / `/station` chạy.
+- **Chưa kiểm tra:** tuyến thật từ HERE (chưa có key).

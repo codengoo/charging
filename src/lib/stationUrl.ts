@@ -57,3 +57,22 @@ export function stationShareUrl(st: { entityId: string; name: string }): string 
 export function googleMapsUrl(st: { lat: number; lng: number }): string {
   return `https://www.google.com/maps/search/?api=1&query=${st.lat},${st.lng}`
 }
+
+/** Trang hành trình "trạm dọc đường": `/trip?link=<link Google Maps>`. Không cần Worker (SPA). */
+export const TRIP_PATH = '/trip'
+
+export function tripPath(link: string | null): string {
+  return link ? `${TRIP_PATH}?link=${encodeURIComponent(link)}` : TRIP_PATH
+}
+
+/**
+ * Link hành trình trong URL lúc mở app. `link` do app ghi; `url` / `text` do Web Share Target gửi
+ * (Google Maps Android để link trong `text` kèm tên địa điểm, có khi trong `url`) — trả nguyên
+ * đoạn text, nơi gọi tự rút link ra. `undefined` = không phải trang hành trình; `null` = trang
+ * hành trình chưa có link.
+ */
+export function readTripLink(loc: { pathname: string; search: string }): string | null | undefined {
+  if (loc.pathname !== TRIP_PATH && loc.pathname !== `${TRIP_PATH}/`) return undefined
+  const q = new URLSearchParams(loc.search)
+  return q.get('link') || q.get('url') || q.get('text') || null
+}

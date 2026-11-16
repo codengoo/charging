@@ -5,6 +5,7 @@ import type { Station, StationPower } from '../data/types'
 import { passesFilters, tierOf, type Filters, type StationIndex } from '../data/stations'
 import { allSaved, pinGroupOf, type GroupBook, type StationGroup } from '../data/groups'
 import { TIER_COLORS, pinTipOffset, rasterizePin, type PinSpec } from './pins'
+import type { GeoPoint } from '../lib/flexiblePolyline'
 
 // Trung tâm VN (Đà Nẵng) làm mặc định khi chưa có vị trí người dùng.
 const DEFAULT_CENTER: [number, number] = [108.2, 16.05]
@@ -14,6 +15,21 @@ const STYLE = 'https://tiles.openfreemap.org/styles/positron'
 
 const SRC = 'stations'
 const SRC_SELECTED = 'station-selected'
+/** Chế độ hành trình: tuyến + chỉ trạm dọc tuyến, KHÔNG gom cụm (≤ 400 điểm, gom sẽ giấu trạm). */
+const SRC_TRIP = 'stations-trip'
+const SRC_ROUTE = 'trip-route'
+/** Các lớp của bản đồ thường, ẩn đi khi đang có tuyến. */
+const NORMAL_LAYERS = ['clusters', 'cluster-count', 'point']
+const ROUTE_COLOR = '#009966'
+
+/** Tuyến đang mở: đường vẽ, id trạm dọc tuyến, khung bay camera. */
+export interface TripLayer {
+  path: GeoPoint[]
+  stationIds: Set<string>
+  bounds: [[number, number], [number, number]] | null
+  /** Chừa chỗ cho bảng hành trình khi fitBounds (px). */
+  padding: { top: number; bottom: number; left: number; right: number }
+}
 
 /** Ghim thường: trụ sạc, màu theo mức công suất (TIER_COLORS). */
 const IMG_DEFAULT = 'pin-default'
@@ -37,18 +53,92 @@ function toGeoJSON(
   const saved = allSaved(book)
   const features: GeoJSON.Feature[] = []
   for (const st of index.all) {
-    if (!passesFilters(st, filters, power, saved)) continue
-    const grp = saved.has(st.entityId) ? (pinGroupOf(book, st.entityId) ?? '') : ''
-    features.push({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [st.lng, st.lat] },
-      // grp = nhóm đại diện cho ghim; chuỗi rỗng = chưa lưu ở đâu. st = trạng thái (0 hoạt động).
-      // tier = mức công suất, quyết định màu ghim thường.
-      properties: { id: st.entityId, grp, rank: grp ? 1 : 0, st: st.status, tier: tierOf(power?.get(st.entityId)) },
-    })
+    if (passesFilters(st, filters, power, saved)) features.push(feature(st, book, saved, power))
   }
   return { type: 'FeatureCollection', features }
 }
+
+/** Ghim của trạm dọc tuyến — bỏ qua chip lọc, danh sách dọc đường đã tự lọc. */
+function tripGeoJSON(
+  index: StationIndex,
+  ids: Set<string>,
+  book: GroupBook,
+  power: Map<string, StationPower> | null,
+): GeoJSON.FeatureCollection {
+  const saved = allSaved(book)
+  const features: GeoJSON.Feature[] = []
+  for (const id of ids) {
+    const st = index.byId.get(id)
+    if (st) features.push(feature(st, book, saved, power))
+  }
+  return { type: 'FeatureCollection', features }
+}
+
+function feature(
+  st: Station,
+  book: GroupBook,
+  saved: Set<string>,
+  power: Map<string, StationPower> | null,
+): GeoJSON.Feature {
+  const grp = saved.has(st.entityId) ? (pinGroupOf(book, st.entityId) ?? '') : ''
+  return {
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates: [st.lng, st.lat] },
+    // grp = nhóm đại diện cho ghim; chuỗi rỗng = chưa lưu ở đâu. st = trạng thái (0 hoạt động).
+    // tier = mức công suất, quyết định màu ghim thường.
+    properties: { id: st.entityId, grp, rank: grp ? 1 : 0, st: st.status, tier: tierOf(power?.get(st.entityId)) },
+  }
+}
+
+function routeGeoJSON(path: GeoPoint[]): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features:
+      path.length > 1
+        ? [{ type: 'Feature', geometry: { type: 'LineString', coordinates: path.map((p) => [p.lng, p.lat]) }, properties: {} }]
+        : [],
+  }
+}
+
+/** Bật/tắt chế độ hành trình: đổi dữ liệu nguồn tuyến + ẩn/hiện lớp thường. */
+function applyTrip(
+  map: maplibregl.Map,
+  trip: TripLayer | null,
+  index: StationIndex,
+  book: GroupBook,
+  power: Map<string, StationPower> | null,
+) {
+  const on = !!trip && trip.path.length > 1
+  ;(map.getSource(SRC_ROUTE) as maplibregl.GeoJSONSource | undefined)?.setData(routeGeoJSON(on ? trip.path : []))
+  ;(map.getSource(SRC_TRIP) as maplibregl.GeoJSONSource | undefined)?.setData(
+    on ? tripGeoJSON(index, trip.stationIds, book, power) : { type: 'FeatureCollection', features: [] },
+  )
+  for (const id of NORMAL_LAYERS) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'none' : 'visible')
+}
+
+/** Ghim thường và ghim dọc tuyến dùng chung kiểu vẽ. */
+const POINT_LAYOUT: maplibregl.SymbolLayerSpecification['layout'] = {
+  'icon-image': [
+    'case',
+    ['!=', ['get', 'grp'], ''],
+    ['concat', 'pin-grp-', ['get', 'grp']],
+    ['match', ['get', 'tier'], 1, IMG_DC, 2, IMG_DC120, IMG_DEFAULT],
+  ],
+  // Mũi ghim mới là toạ độ thật; neo đáy rồi bù lề đáy của ảnh để ghim "cắm" đúng chỗ.
+  'icon-anchor': 'bottom',
+  'icon-offset': [0, pinTipOffset(PIN_W)],
+  // Trạm nằm sát nhau rất nhiều; để MapLibre tự giấu bớt thì bấm trạm nào trạm đó mất.
+  'icon-allow-overlap': true,
+  'icon-ignore-placement': true,
+  // Trạm không hoạt động vẽ dưới trạm thường; trạm đã lưu vẫn nổi nhất.
+  'symbol-sort-key': ['-', ['get', 'rank'], ['case', ['==', ['get', 'st'], 0], 0, 2]],
+}
+const POINT_PAINT: maplibregl.SymbolLayerSpecification['paint'] = {
+  // Bảo trì / ngừng / chưa khai trương: vẫn vẽ để biết có trạm, nhưng lùi ra sau.
+  'icon-opacity': ['case', ['==', ['get', 'st'], 0], 1, 0.45],
+}
+
+const notSelected = (id: string): maplibregl.ExpressionSpecification => ['!=', ['get', 'id'], id]
 
 function selectedGeoJSON(st: Station | null): GeoJSON.FeatureCollection {
   return {
@@ -95,15 +185,17 @@ interface Props {
   onLocate?: (pos: { lat: number; lng: number }) => void
   /** Tâm bản đồ sau mỗi lần kéo/zoom — "Gần tôi" dùng khi chưa có GPS. */
   onMoveEnd?: (center: { lat: number; lng: number }) => void
+  /** Hành trình đang mở (null = bản đồ thường). */
+  trip?: TripLayer | null
 }
 
-export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate, onMoveEnd }: Props) {
+export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate, onMoveEnd, trip = null }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const loadedRef = useRef(false)
   // Giá trị mới nhất cho các handler đăng ký một lần trong lúc khởi tạo.
-  const latest = useRef({ index, filters, book, power, selected, onSelect, onLocate, onMoveEnd })
-  latest.current = { index, filters, book, power, selected, onSelect, onLocate, onMoveEnd }
+  const latest = useRef({ index, filters, book, power, selected, onSelect, onLocate, onMoveEnd, trip })
+  latest.current = { index, filters, book, power, selected, onSelect, onLocate, onMoveEnd, trip }
 
   // Khởi tạo map một lần.
   useEffect(() => {
@@ -147,6 +239,24 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
         clusterMaxZoom: 12,
       })
       map.addSource(SRC_SELECTED, { type: 'geojson', data: selectedGeoJSON(sel) })
+      map.addSource(SRC_TRIP, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      map.addSource(SRC_ROUTE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+
+      // Tuyến hành trình: viền trắng + lõi màu brand, nằm DƯỚI mọi ghim.
+      map.addLayer({
+        id: 'trip-line-casing',
+        type: 'line',
+        source: SRC_ROUTE,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#ffffff', 'line-width': 8, 'line-opacity': 0.9 },
+      })
+      map.addLayer({
+        id: 'trip-line',
+        type: 'line',
+        source: SRC_ROUTE,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': ROUTE_COLOR, 'line-width': 5, 'line-opacity': 0.85 },
+      })
 
       map.addLayer({
         id: 'clusters',
@@ -176,27 +286,17 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
         id: 'point',
         type: 'symbol',
         source: SRC,
-        filter: ['all', ['!', ['has', 'point_count']], ['!=', ['get', 'id'], sel?.entityId ?? '']],
-        layout: {
-          'icon-image': [
-            'case',
-            ['!=', ['get', 'grp'], ''],
-            ['concat', 'pin-grp-', ['get', 'grp']],
-            ['match', ['get', 'tier'], 1, IMG_DC, 2, IMG_DC120, IMG_DEFAULT],
-          ],
-          // Mũi ghim mới là toạ độ thật; neo đáy rồi bù lề đáy của ảnh để ghim "cắm" đúng chỗ.
-          'icon-anchor': 'bottom',
-          'icon-offset': [0, pinTipOffset(PIN_W)],
-          // Trạm nằm sát nhau rất nhiều; để MapLibre tự giấu bớt thì bấm trạm nào trạm đó mất.
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          // Trạm không hoạt động vẽ dưới trạm thường; trạm đã lưu vẫn nổi nhất.
-          'symbol-sort-key': ['-', ['get', 'rank'], ['case', ['==', ['get', 'st'], 0], 0, 2]],
-        },
-        paint: {
-          // Bảo trì / ngừng / chưa khai trương: vẫn vẽ để biết có trạm, nhưng lùi ra sau.
-          'icon-opacity': ['case', ['==', ['get', 'st'], 0], 1, 0.45],
-        },
+        filter: ['all', ['!', ['has', 'point_count']], notSelected(sel?.entityId ?? '')],
+        layout: POINT_LAYOUT,
+        paint: POINT_PAINT,
+      })
+      map.addLayer({
+        id: 'trip-point',
+        type: 'symbol',
+        source: SRC_TRIP,
+        filter: notSelected(sel?.entityId ?? ''),
+        layout: POINT_LAYOUT,
+        paint: POINT_PAINT,
       })
       // Trạm đang chọn: nguồn riêng một điểm để đổi chọn không phải dựng lại 24k feature.
       map.addLayer({
@@ -221,18 +321,21 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
           map.easeTo({ center: geom.coordinates as [number, number], zoom })
         })
       })
-      map.on('click', 'point', (e) => {
-        const feat = e.features?.[0]
-        if (!feat) return
-        const st = latest.current.index.byId.get(feat.properties?.id as string)
-        if (st) latest.current.onSelect(st)
-      })
-      for (const layer of ['clusters', 'point']) {
+      for (const layer of ['point', 'trip-point']) {
+        map.on('click', layer, (e) => {
+          const feat = e.features?.[0]
+          if (!feat) return
+          const st = latest.current.index.byId.get(feat.properties?.id as string)
+          if (st) latest.current.onSelect(st)
+        })
+      }
+      for (const layer of ['clusters', 'point', 'trip-point']) {
         map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'))
         map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''))
       }
 
       loadedRef.current = true
+      applyTrip(map, latest.current.trip, idx, b, p)
       void ensurePinImages(map, latest.current.book.groups)
       // Thử lấy vị trí người dùng ngay lần mở (mirror: mở app là về vị trí hiện tại).
       geo.trigger()
@@ -270,13 +373,27 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
       selectedGeoJSON(selected),
     )
     if (map.getLayer('point')) {
-      map.setFilter('point', [
-        'all',
-        ['!', ['has', 'point_count']],
-        ['!=', ['get', 'id'], selected?.entityId ?? ''],
-      ])
+      map.setFilter('point', ['all', ['!', ['has', 'point_count']], notSelected(selected?.entityId ?? '')])
     }
+    if (map.getLayer('trip-point')) map.setFilter('trip-point', notSelected(selected?.entityId ?? ''))
   }, [selected])
+
+  // Hành trình: vẽ tuyến + chỉ ghim dọc tuyến; đóng thì về bản đồ cụm như cũ.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !loadedRef.current) return
+    applyTrip(map, trip, index, book, power)
+  }, [trip, index, book, power])
+
+  // Tuyến mới → bay camera cho vừa tuyến, chừa chỗ cho bảng hành trình. Theo khung TUYẾN, không
+  // theo bán kính: đổi 2 → 5 km không được kéo camera đi.
+  const boundsKey = trip?.bounds ? trip.bounds.flat().join(',') : ''
+  useEffect(() => {
+    const map = mapRef.current
+    const t = latest.current.trip
+    if (!map || !t?.bounds) return
+    map.fitBounds(t.bounds, { padding: t.padding, duration: 800 })
+  }, [boundsKey])
 
   // Bay tới trạm/địa điểm được chọn từ ngoài.
   useEffect(() => {

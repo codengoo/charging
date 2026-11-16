@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { List, LocateFixed } from 'lucide-react'
-import { MapView } from './map/MapView'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { List, LocateFixed, Route } from 'lucide-react'
+import { MapView, type TripLayer } from './map/MapView'
 import { SearchBar } from './ui/SearchBar'
 import { StationSheet } from './ui/StationSheet'
 import { GroupsSheet } from './ui/GroupsSheet'
@@ -12,6 +12,11 @@ import { NearbySheet } from './ui/NearbySheet'
 import { BackupSheet } from './ui/BackupSheet'
 import { ImportDialog, pendingImport, type PendingImport } from './ui/ImportDialog'
 import { IMPORT_HASH, decodeBackup } from './data/backup'
+import { TripPanel } from './ui/TripPanel'
+import { useTrip } from './data/useTrip'
+import { routeBounds } from './data/routeCorridor'
+import { firstUrl } from './lib/mapsLink'
+import { useIsMobile } from '@/hooks/use-media-query'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { useStationData } from './data/useStationData'
@@ -21,7 +26,7 @@ import { allSaved } from './data/groups'
 import { useGroupBook } from './data/useGroupBook'
 import { APP_VERSION } from './data/changelog'
 import type { Station } from './data/types'
-import { parseStationId, stationPath } from './lib/stationUrl'
+import { parseStationId, readTripLink, stationPath, tripPath } from './lib/stationUrl'
 
 const DEFAULT_TITLE = document.title
 
@@ -58,6 +63,11 @@ export function App() {
   const [nearby, setNearby] = useState<Nearby | null>(null)
   const groups = useGroupBook()
   const { book } = groups
+  const isMobile = useIsMobile()
+  // Trang hành trình /trip?link=… (hoặc ?text=/?url= từ Web Share Target): đọc NGAY lúc khởi tạo.
+  const [tripLink] = useState(() => readTripLink(location))
+  const tripCtl = useTrip(index, userPos)
+  const { trip, hits } = tripCtl
   const [showBackup, setShowBackup] = useState(false)
   // Link sao lưu `/#import=<payload>`: đọc NGAY lúc khởi tạo, effect đồng bộ URL sẽ xoá hash.
   const [importHash] = useState(readImportHash)
@@ -98,6 +108,29 @@ export function App() {
     return () => window.removeEventListener('hashchange', onHash)
   }, [importHash])
 
+  // Mở thẳng /trip: chạy hành trình khi có dữ liệu (một lần). Share target gửi cả đoạn text
+  // ("Hà Nội đến Hải Phòng https://…") — chỉ giữ link để URL /trip?link=… gọn.
+  const tripHandled = useRef(false)
+  useEffect(() => {
+    if (!index || tripHandled.current || tripLink === undefined) return
+    tripHandled.current = true
+    if (tripLink) tripCtl.open(firstUrl(tripLink) ?? tripLink)
+    else tripCtl.show()
+  }, [index, tripLink, tripCtl])
+
+  // Lớp tuyến cho bản đồ. Chừa chỗ cho bảng hành trình: điện thoại là dải dưới, màn rộng là thẻ trái.
+  const tripLayer = useMemo<TripLayer | null>(() => {
+    if (!trip.route) return null
+    return {
+      path: trip.route.points,
+      stationIds: new Set(hits.items.map((h) => h.station.entityId)),
+      bounds: routeBounds(trip.route.points),
+      padding: isMobile
+        ? { top: 130, bottom: Math.round(window.innerHeight * 0.55), left: 30, right: 30 }
+        : { top: 130, bottom: 60, left: 420, right: 60 },
+    }
+  }, [trip.route, hits, isMobile])
+
   // Generation mới (dữ liệu làm mới hằng ngày): trạm đang mở trỏ sang bản ghi mới cùng id.
   useEffect(() => {
     if (!index) return
@@ -106,13 +139,25 @@ export function App() {
 
   // URL theo trạm đang mở: copy thanh địa chỉ là ra đúng link chia sẻ. replaceState chứ không
   // pushState — bấm qua lại nhiều trạm không làm đầy lịch sử nút Back.
+  // Đang mở hành trình thì URL giữ /trip?link=… (mở trạm trong lúc đó KHÔNG đổi sang /station/…):
+  // copy URL là gửi được cả hành trình.
+  const tripOpen = trip.status !== 'closed'
   useEffect(() => {
     // Chưa tải xong dữ liệu thì chưa biết trạm trong link có tồn tại không — đừng đụng URL.
     if (!index) return
-    const path = selected ? stationPath(selected) : '/'
-    if (location.pathname !== path) history.replaceState(null, '', path + location.search)
+    // Hành trình từ link chưa kịp mở (effect trên chạy cùng lượt) — đừng ghi đè /trip.
+    if (tripLink !== undefined && !tripHandled.current) return
+    if (tripOpen) {
+      const url = tripPath(trip.link ? (firstUrl(trip.link) ?? trip.link) : null)
+      if (location.pathname + location.search !== url) history.replaceState(null, '', url)
+    } else {
+      const path = selected ? stationPath(selected) : '/'
+      // Rời /trip thì bỏ luôn ?link=…; còn lại giữ query (vd. utm_*).
+      const search = location.pathname.startsWith('/trip') ? '' : location.search
+      if (location.pathname !== path || search !== location.search) history.replaceState(null, '', path + search)
+    }
     document.title = selected ? `${selected.name} — Trạm sạc VinFast` : DEFAULT_TITLE
-  }, [index, selected])
+  }, [index, selected, tripOpen, trip.link, tripLink])
 
   function pick(st: Station) {
     setSelected(st)
@@ -148,6 +193,7 @@ export function App() {
         onSelect={pick}
         onLocate={setUserPos}
         onMoveEnd={(c) => (mapCenter.current = c)}
+        trip={tripLayer}
       />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] flex flex-col gap-2 p-3">
@@ -166,6 +212,10 @@ export function App() {
           >
             <LocateFixed />
             Gần tôi
+          </Chip>
+          <Chip variant="floating" selected={tripOpen} onClick={() => (tripOpen ? tripCtl.close() : tripCtl.show())}>
+            <Route />
+            Dọc đường
           </Chip>
           <FilterChip
             label={`Đã lưu${savedCount ? ` (${savedCount})` : ''}`}
@@ -187,6 +237,19 @@ export function App() {
       </div>
 
       <PowerLegend />
+
+      {tripOpen && (
+        <TripPanel
+          trip={trip}
+          hits={hits}
+          power={power}
+          stationOpen={selected !== null}
+          onOpen={tripCtl.open}
+          onRadius={tripCtl.setRadius}
+          onPick={pick}
+          onClose={tripCtl.close}
+        />
+      )}
 
       <Button
         variant="secondary"
