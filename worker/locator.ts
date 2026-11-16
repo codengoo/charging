@@ -13,8 +13,15 @@ const UA =
 
 /** Ảnh + cổng gần như không đổi trong ngày; giữ 6 giờ ở edge để VinFast không thấy dồn request. */
 const TTL_OK = 6 * 3600
-/** Lỗi/chặn: cache ngắn để không dội VinFast, nhưng cũng không kẹt lỗi lâu. */
+/** Lỗi/chặn: cache ngắn ở edge để không dội VinFast, nhưng cũng không kẹt lỗi lâu. */
 const TTL_FAIL = 60
+
+/**
+ * Bản tốt gần nhất của mỗi trạm, trong R2. VinFast chặn Worker LÁC ĐÁC (đo 16/11: ~1/15 lần
+ * gọi từ edge ăn 403/trang chặn, cùng lúc gọi từ máy thường vẫn 200) — gặp lúc đó thì trả
+ * bản cũ (ảnh + cổng hầu như không đổi) thay vì để người dùng thấy trạm "không có ảnh".
+ */
+const stashKey = (id: string) => `detail/${id}.json`
 
 const STANDARD: Record<string, string> = {
   IEC_62196_T2_COMBO: 'CCS2',
@@ -25,7 +32,7 @@ const STANDARD: Record<string, string> = {
   GBT_AC: 'GB/T AC',
 }
 
-export async function serveStationDetail(url: URL, ctx: ExecutionContext): Promise<Response> {
+export async function serveStationDetail(url: URL, data: R2Bucket, ctx: ExecutionContext): Promise<Response> {
   const id = url.pathname.slice('/api/station/'.length)
   // entityId là số; chặn mọi thứ khác để Worker không thành proxy mở tới VinFast.
   if (!/^\d{1,9}$/.test(id)) return json({ error: 'bad id' }, 400, 0)
@@ -37,19 +44,52 @@ export async function serveStationDetail(url: URL, ctx: ExecutionContext): Promi
 
   let res: Response
   try {
-    const raw = await fetchLocator(id)
+    const raw = await fetchLocatorRetry(id)
     const detail = raw && parseDetail(raw)
-    res = detail ? json(detail, 200, TTL_OK) : json({ error: 'not found' }, 404, TTL_FAIL)
-  } catch {
-    res = json({ error: 'upstream' }, 502, TTL_FAIL)
+    if (detail) {
+      res = json(detail, 200, TTL_OK)
+      const body = JSON.stringify(detail)
+      ctx.waitUntil(data.put(stashKey(id), body, { httpMetadata: { contentType: 'application/json' } }))
+    } else {
+      res = json({ error: 'not found' }, 404, TTL_FAIL)
+    }
+  } catch (e) {
+    const stale = await data.get(stashKey(id))
+    if (stale) {
+      // Bản cũ: cache edge ngắn để lần sau thử lấy bản mới; báo qua header để còn soi.
+      res = new Response(stale.body, { headers: headers(TTL_FAIL) })
+      res.headers.set('X-Detail-Stale', stale.uploaded.toISOString())
+    } else {
+      res = json({ error: 'upstream', reason: e instanceof Error ? e.message : String(e) }, 502, TTL_FAIL)
+    }
   }
   ctx.waitUntil(cache.put(key, res.clone()))
+  // Trình duyệt KHÔNG được giữ lỗi: zone đặt Browser Cache TTL 4h, đè max-age=60 của ta thành
+  // 14400 — một lần bị chặn sẽ kẹt "không ảnh" cả buổi. no-store thì Cloudflare để nguyên.
+  if (res.status !== 200 || res.headers.has('X-Detail-Stale')) {
+    res = new Response(res.body, res)
+    res.headers.set('Cache-Control', 'no-store')
+  }
   return res
 }
 
 /**
+ * Chặn lác đác nên thử lại hầu như là qua: một lần nữa sau ~400 ms (chậm hơn chút khi gặp
+ * chặn còn hơn hiện trạm thiếu ảnh). 404 = trạm không có, không thử lại.
+ */
+async function fetchLocatorRetry(id: string): Promise<Record<string, unknown> | null> {
+  try {
+    return await fetchLocator(id)
+  } catch {
+    await new Promise((r) => setTimeout(r, 400))
+    return fetchLocator(id)
+  }
+}
+
+/**
  * Gọi get-locator. Hiện không cần cookie, nhưng Cloudflare của VinFast có lúc đòi `__cf_bm`:
- * 403 thì ghé trang tìm trạm lấy cookie rồi thử lại MỘT lần (mỗi lần mở trạm tối đa 3 subrequest).
+ * 403 thì ghé trang tìm trạm lấy cookie rồi thử lại MỘT lần (một lượt tối đa 3 subrequest; kèm thử lại ở
+ * [fetchLocatorRetry] là 6 — xa giới hạn 50 của Free plan).
  */
 async function fetchLocator(id: string): Promise<Record<string, unknown> | null> {
   let res = await call(id)
@@ -152,13 +192,14 @@ function hoursOf(opening: Obj | undefined): string | null {
   return spans.size === 1 ? [...spans][0] : null
 }
 
-function json(body: unknown, status: number, ttl: number): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': ttl ? `public, max-age=${ttl}` : 'no-store',
-      'X-Robots-Tag': 'noindex, nofollow',
-    },
+function headers(ttl: number): Headers {
+  return new Headers({
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': ttl ? `public, max-age=${ttl}` : 'no-store',
+    'X-Robots-Tag': 'noindex, nofollow',
   })
+}
+
+function json(body: unknown, status: number, ttl: number): Response {
+  return new Response(JSON.stringify(body), { status, headers: headers(ttl) })
 }

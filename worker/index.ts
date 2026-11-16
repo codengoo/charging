@@ -29,7 +29,7 @@ const NOINDEX = 'noindex, nofollow, noarchive'
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url)
-    if (url.pathname.startsWith('/api/station/')) return serveStationDetail(url, ctx)
+    if (url.pathname.startsWith('/api/station/')) return serveStationDetail(url, env.DATA, ctx)
     if (url.pathname.startsWith('/data/')) return serveData(url, env)
     if (url.pathname.startsWith('/tram/')) return serveStation(url, env)
     return env.ASSETS.fetch(req)
