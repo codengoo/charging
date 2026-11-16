@@ -76,7 +76,7 @@ export interface DataManifest {
   base: string
   power: string
   counts: { stations: number; enriched: number }
-  /** Shard tra cứu cho preview link /tram/* (chỉ Worker dùng). */
+  /** Shard tra cứu cho preview link /station/* (chỉ Worker dùng). */
   seo?: { dir: string; shards: number }
 }
 

@@ -1,8 +1,8 @@
-// Worker tramsac: phục vụ /data/* từ R2 (JSON thô, Cloudflare tự nén), preview link /tram/*,
+// Worker tramsac: phục vụ /data/* từ R2 (JSON thô, Cloudflare tự nén), preview link /station/*,
 // chi tiết trạm /api/station/* (proxy get-locator VinFast), còn lại static assets.
 // Build dữ liệu KHÔNG ở đây — chạy bằng GitHub Action (.github/workflows/build-data.yml)
 // vì Workers Free plan giới hạn 10ms CPU, không đủ cho parse 72MB snapshot.
-import { SITE_URL, parseStationId, stationPath } from '../src/lib/stationUrl'
+import { SITE_URL, STATION_PREFIX, parseStationId, stationPath } from '../src/lib/stationUrl'
 import { serveStationDetail } from './locator'
 
 interface Env {
@@ -31,7 +31,12 @@ export default {
     const url = new URL(req.url)
     if (url.pathname.startsWith('/api/station/')) return serveStationDetail(url, env.DATA, ctx)
     if (url.pathname.startsWith('/data/')) return serveData(url, env)
-    if (url.pathname.startsWith('/tram/')) return serveStation(url, env)
+    // Path cũ (QR đã in, link đã gửi) -> path tiếng Anh. 301 để trình duyệt/bot nhớ luôn.
+    if (url.pathname === '/tram' || url.pathname.startsWith('/tram/')) {
+      const rest = url.pathname.slice('/tram'.length)
+      return Response.redirect(new URL('/station' + rest + url.search, url).toString(), 301)
+    }
+    if (url.pathname.startsWith(STATION_PREFIX)) return serveStation(url, env)
     return env.ASSETS.fetch(req)
   },
 }
@@ -55,7 +60,7 @@ async function readJson<T>(env: Env, key: string): Promise<T | null> {
 }
 
 /**
- * Trang chia sẻ một trạm `/tram/<entityId>-<slug>`: lấy index.html rồi thay meta (title,
+ * Trang chia sẻ một trạm `/station/<entityId>-<slug>`: lấy index.html rồi thay meta (title,
  * description, Open Graph, Twitter) theo trạm để Zalo/Messenger hiện đúng tên + địa chỉ khi
  * gửi link. Phần còn lại do client lo (App đọc URL, mở trạm, bay tới).
  *
@@ -63,7 +68,7 @@ async function readJson<T>(env: Env, key: string): Promise<T | null> {
  * vượt hạn CPU Free plan.
  */
 async function serveStation(url: URL, env: Env): Promise<Response> {
-  // `/` thay vì `/tram/…`: lấy đúng index.html (asset SPA).
+  // `/` thay vì `/station/…`: lấy đúng index.html (asset SPA).
   const shell = () => env.ASSETS.fetch(new Request(new URL('/', url)))
 
   const id = parseStationId(url.pathname)

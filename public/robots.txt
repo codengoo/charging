@@ -1,7 +1,7 @@
 User-agent: *
 Allow: /
 # Dữ liệu trạm là nội bộ: không cho thu thập file dữ liệu thô (Worker đọc R2).
-# Trang /tram/* KHÔNG chặn ở đây — chúng tự gắn noindex (bot phải đọc được trang mới thấy noindex).
+# Trang /station/* (và /tram/* cũ, 301 sang) KHÔNG chặn ở đây — chúng tự gắn noindex (bot phải đọc được trang mới thấy noindex).
 Disallow: /data/
 
 Sitemap: https://charging.cangao.asia/sitemap.xml

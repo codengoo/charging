@@ -47,15 +47,16 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
 
 ## Link trạm & chia sẻ
 
-- Mỗi trạm có URL `/tram/<entityId>-<slug>` (`src/lib/stationUrl.ts`). App đọc URL lúc mở để
+- Mỗi trạm có URL `/station/<entityId>-<slug>` (`src/lib/stationUrl.ts`; trước 0.7.0 là `/tram/…`,
+  Worker 301 `/tram/<rest>` → `/station/<rest>` giữ query để QR đã in vẫn mở được). App đọc URL lúc mở để
   chọn trạm, và đổi URL theo trạm đang mở.
-- `worker/index.ts` (route `/tram/*`, khai trong `run_worker_first`) thay meta title /
+- `worker/index.ts` (route `/station/*`, khai trong `run_worker_first`) thay meta title /
   description / Open Graph theo trạm trong `index.html` để link gửi qua Zalo, Messenger có
   preview đúng; slug sai → 301 về slug đúng, id không tồn tại → 404. HTML không cache.
 - Tra trạm từ shard `seo-<gen>/<id % 32>.json` (~100 KB) do builder ghi lên R2 — parse cả base
   4 MB vượt hạn 10 ms CPU Free plan. Manifest chưa có `seo` (bản build cũ) thì vẫn mở app,
   chỉ thiếu preview.
-- **Dữ liệu trạm là nội bộ:** trang `/tram/*` gắn `noindex` (header `X-Robots-Tag` + thẻ meta),
+- **Dữ liệu trạm là nội bộ:** trang `/station/*` gắn `noindex` (header `X-Robots-Tag` + thẻ meta),
   không JSON-LD; `/data/*` cũng `noindex` + `Disallow` trong robots.txt. `public/sitemap.xml`
   chỉ có trang chủ.
 
@@ -67,7 +68,7 @@ npm run dev        # http://localhost:5173 — /data/* proxy sang https://chargi
 npm run build      # ra thư mục dist/
 ```
 
-Thử cả Worker (`/data/*` từ R2 giả lập + preview `/tram/*`):
+Thử cả Worker (`/data/*` từ R2 giả lập + preview `/station/*`):
 
 ```bash
 node builder/run-local.mjs                       # sinh builder/out/
@@ -116,7 +117,7 @@ GitHub Action (.github/workflows/build-data.yml), cron 0 19 * * * (02:00 VN):
     1. GET locators-meta.json → generation
     2. STREAM snapshot + 2 KML My Maps (streaming, không load nguyên khối)
     3. Lọc type=2444, trộn enrich theo toạ độ (lệch → để trống), charging_status → cột status
-    4. ghi builder/out/{base,power}-{gen}.json, seo-{gen}/*.json (preview /tram), manifest.json
+    4. ghi builder/out/{base,power}-{gen}.json, seo-{gen}/*.json (preview /station), manifest.json
   → wrangler r2 object put … (JSON THÔ)
 R2 "tramsac-data" → Worker (worker/index.ts) phục vụ /data/* → Cloudflare auto-nén (zstd/gzip)
 ```

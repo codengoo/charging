@@ -10,7 +10,7 @@ const { manifest, base, power } = await buildData((m) => console.log('·', m))
 await mkdir(new URL('./out/', import.meta.url), { recursive: true })
 const out = (name) => new URL(`./out/${name}`, import.meta.url)
 
-// Shard tra cứu cho preview link /tram/<id> (worker/index.ts): trạm chia theo id % SEO_SHARDS,
+// Shard tra cứu cho preview link /station/<id> (worker/index.ts): trạm chia theo id % SEO_SHARDS,
 // mỗi file chỉ [name, address, flags]. Worker đọc MỘT shard (~130 KB) thay vì base 4 MB —
 // parse cả base vượt hạn 10 ms CPU của Workers Free plan.
 const SEO_SHARDS = 32

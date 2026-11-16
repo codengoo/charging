@@ -73,7 +73,7 @@ export function App() {
   // Hai mức công suất loại trừ nhau; bấm lại chip đang bật thì về tất cả.
   const setPower = (p: Filters['power']) => setFilters((f) => ({ ...f, power: f.power === p ? 'all' : p }))
 
-  // Mở từ link chia sẻ /tram/<id>-<slug>: chọn trạm và bay tới ngay khi có dữ liệu (một lần).
+  // Mở từ link chia sẻ /station/<id>-<slug>: chọn trạm và bay tới ngay khi có dữ liệu (một lần).
   const linkHandled = useRef(false)
   useEffect(() => {
     if (!index || linkHandled.current) return
