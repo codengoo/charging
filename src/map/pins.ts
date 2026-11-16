@@ -185,3 +185,9 @@ export async function rasterizePin(
   ctx.drawImage(img, 0, 0, w, h)
   return ctx.getImageData(0, 0, w, h)
 }
+
+/**
+ * Màu ghim thường theo mức công suất (index = PowerTier): AC hoặc chưa rõ / DC < 120 kW /
+ * DC ≥ 120 kW. Tránh xanh #2563EB của nhóm "Sẽ đến" để ghim nhóm và ghim mức không lẫn.
+ */
+export const TIER_COLORS = ['#12B76A', '#0284C7', '#7C3AED'] as const

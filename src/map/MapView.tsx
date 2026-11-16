@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import type { Station } from '../data/types'
-import type { StationIndex } from '../data/stations'
+import type { Station, StationPower } from '../data/types'
+import { passesFilters, tierOf, type Filters, type StationIndex } from '../data/stations'
 import { allSaved, pinGroupOf, type GroupBook, type StationGroup } from '../data/groups'
-import { pinTipOffset, rasterizePin, type PinSpec } from './pins'
+import { TIER_COLORS, pinTipOffset, rasterizePin, type PinSpec } from './pins'
 
 // Trung tâm VN (Đà Nẵng) làm mặc định khi chưa có vị trí người dùng.
 const DEFAULT_CENTER: [number, number] = [108.2, 16.05]
@@ -15,39 +15,36 @@ const STYLE = 'https://tiles.openfreemap.org/styles/positron'
 const SRC = 'stations'
 const SRC_SELECTED = 'station-selected'
 
-/** Ghim thường: trụ sạc trên đĩa xanh. */
+/** Ghim thường: trụ sạc, màu theo mức công suất (TIER_COLORS). */
 const IMG_DEFAULT = 'pin-default'
+const IMG_DC = 'pin-dc'
+const IMG_DC120 = 'pin-dc120'
 /** Trạm đang chọn: tia sét trên đĩa xanh đậm, cỡ lớn hơn. */
 const IMG_SELECTED = 'pin-selected'
 const imgGroup = (id: string) => `pin-grp-${id}`
 
-const PIN_GREEN = '#12B76A'
 const PIN_SELECTED = '#0B6B3A'
 /** Chiều rộng ghim, px CSS. Khớp PIN_DP / PIN_DP_BIG bên Android. */
 const PIN_W = 34
 const PIN_W_BIG = 44
 
-interface Filters {
-  favoritesOnly: boolean
-  activeOnly: boolean
-}
-
 function toGeoJSON(
   index: StationIndex,
   filters: Filters,
   book: GroupBook,
+  power: Map<string, StationPower> | null,
 ): GeoJSON.FeatureCollection {
   const saved = allSaved(book)
   const features: GeoJSON.Feature[] = []
   for (const st of index.all) {
-    if (filters.favoritesOnly && !saved.has(st.entityId)) continue
-    if (filters.activeOnly && st.status !== 0) continue
+    if (!passesFilters(st, filters, power, saved)) continue
     const grp = saved.has(st.entityId) ? (pinGroupOf(book, st.entityId) ?? '') : ''
     features.push({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [st.lng, st.lat] },
       // grp = nhóm đại diện cho ghim; chuỗi rỗng = chưa lưu ở đâu. st = trạng thái (0 hoạt động).
-      properties: { id: st.entityId, grp, rank: grp ? 1 : 0, st: st.status },
+      // tier = mức công suất, quyết định màu ghim thường.
+      properties: { id: st.entityId, grp, rank: grp ? 1 : 0, st: st.status, tier: tierOf(power?.get(st.entityId)) },
     })
   }
   return { type: 'FeatureCollection', features }
@@ -66,7 +63,9 @@ function selectedGeoJSON(st: Station | null): GeoJSON.FeatureCollection {
 async function ensurePinImages(map: maplibregl.Map, groups: StationGroup[]) {
   const ratio = Math.max(1, Math.min(3, window.devicePixelRatio || 1))
   const wanted: Array<[string, PinSpec, number]> = [
-    [IMG_DEFAULT, { colorHex: PIN_GREEN, glyph: 'charger' }, PIN_W],
+    [IMG_DEFAULT, { colorHex: TIER_COLORS[0], glyph: 'charger' }, PIN_W],
+    [IMG_DC, { colorHex: TIER_COLORS[1], glyph: 'charger' }, PIN_W],
+    [IMG_DC120, { colorHex: TIER_COLORS[2], glyph: 'charger' }, PIN_W],
     [IMG_SELECTED, { colorHex: PIN_SELECTED, glyph: 'selected' }, PIN_W_BIG],
     ...groups.map(
       (g) => [imgGroup(g.id), { colorHex: g.colorHex, glyph: g.iconKey }, PIN_W] as [string, PinSpec, number],
@@ -88,19 +87,21 @@ interface Props {
   index: StationIndex
   filters: Filters
   book: GroupBook
+  /** Số cổng + kW (tải sau base). null = chưa có — ghim tạm một màu, lọc công suất ẩn hết. */
+  power: Map<string, StationPower> | null
   selected: Station | null
   flyTo: { lng: number; lat: number; zoom?: number } | null
   onSelect: (st: Station) => void
   onLocate?: (pos: { lat: number; lng: number }) => void
 }
 
-export function MapView({ index, filters, book, selected, flyTo, onSelect, onLocate }: Props) {
+export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const loadedRef = useRef(false)
   // Giá trị mới nhất cho các handler đăng ký một lần trong lúc khởi tạo.
-  const latest = useRef({ index, filters, book, selected, onSelect, onLocate })
-  latest.current = { index, filters, book, selected, onSelect, onLocate }
+  const latest = useRef({ index, filters, book, power, selected, onSelect, onLocate })
+  latest.current = { index, filters, book, power, selected, onSelect, onLocate }
 
   // Khởi tạo map một lần.
   useEffect(() => {
@@ -130,10 +131,10 @@ export function MapView({ index, filters, book, selected, flyTo, onSelect, onLoc
     })
 
     map.on('load', () => {
-      const { index: idx, filters: f, book: b, selected: sel } = latest.current
+      const { index: idx, filters: f, book: b, power: p, selected: sel } = latest.current
       map.addSource(SRC, {
         type: 'geojson',
-        data: toGeoJSON(idx, f, b),
+        data: toGeoJSON(idx, f, b, p),
         cluster: true,
         clusterRadius: 50,
         clusterMaxZoom: 12,
@@ -174,7 +175,7 @@ export function MapView({ index, filters, book, selected, flyTo, onSelect, onLoc
             'case',
             ['!=', ['get', 'grp'], ''],
             ['concat', 'pin-grp-', ['get', 'grp']],
-            IMG_DEFAULT,
+            ['match', ['get', 'tier'], 1, IMG_DC, 2, IMG_DC120, IMG_DEFAULT],
           ],
           // Mũi ghim mới là toạ độ thật; neo đáy rồi bù lề đáy của ảnh để ghim "cắm" đúng chỗ.
           'icon-anchor': 'bottom',
@@ -239,13 +240,13 @@ export function MapView({ index, filters, book, selected, flyTo, onSelect, onLoc
     // dựng lại map sẽ chớp màn hình và mất vị trí đang xem.
   }, [])
 
-  // Cập nhật dữ liệu khi filter / sổ nhóm đổi.
+  // Cập nhật dữ liệu khi filter / sổ nhóm đổi, hoặc power tải xong (có màu theo mức).
   useEffect(() => {
     const map = mapRef.current
     if (!map || !loadedRef.current) return
     const src = map.getSource(SRC) as maplibregl.GeoJSONSource | undefined
-    src?.setData(toGeoJSON(index, filters, book))
-  }, [index, filters, book])
+    src?.setData(toGeoJSON(index, filters, book, power))
+  }, [index, filters, book, power])
 
   // Nhóm mới tạo cần ảnh ghim riêng.
   useEffect(() => {

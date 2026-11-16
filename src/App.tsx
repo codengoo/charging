@@ -7,10 +7,12 @@ import { GroupsSheet } from './ui/GroupsSheet'
 import { SavedSheet } from './ui/SavedSheet'
 import { ShareSheet } from './ui/ShareSheet'
 import { ChangelogModal } from './ui/ChangelogModal'
+import { PowerLegend } from './ui/PowerLegend'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { useStationData } from './data/useStationData'
 import { useStationDetail } from './data/useStationDetail'
+import { DEFAULT_FILTERS, FAST_KW, type Filters } from './data/stations'
 import { allSaved } from './data/groups'
 import { useGroupBook } from './data/useGroupBook'
 import { APP_VERSION } from './data/changelog'
@@ -18,11 +20,6 @@ import type { Station } from './data/types'
 import { parseStationId, stationPath } from './lib/stationUrl'
 
 const DEFAULT_TITLE = document.title
-
-interface Filters {
-  favoritesOnly: boolean
-  activeOnly: boolean
-}
 
 export function App() {
   const { index, power, error } = useStationData()
@@ -43,10 +40,9 @@ export function App() {
   const groups = useGroupBook()
   const { book } = groups
   const savedCount = allSaved(book).size
-  const [filters, setFilters] = useState<Filters>({
-    favoritesOnly: false,
-    activeOnly: false,
-  })
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
+  // Hai mức công suất loại trừ nhau; bấm lại chip đang bật thì về tất cả.
+  const setPower = (p: Filters['power']) => setFilters((f) => ({ ...f, power: f.power === p ? 'all' : p }))
 
   // Mở từ link chia sẻ /tram/<id>-<slug>: chọn trạm và bay tới ngay khi có dữ liệu (một lần).
   const linkHandled = useRef(false)
@@ -101,6 +97,7 @@ export function App() {
         index={index}
         filters={filters}
         book={book}
+        power={power}
         selected={selected}
         flyTo={flyTo}
         onSelect={pick}
@@ -111,12 +108,16 @@ export function App() {
         <div className="pointer-events-auto">
           <SearchBar index={index} onPick={pick} />
         </div>
-        <div className="pointer-events-auto flex flex-wrap gap-2">
+        {/* Một hàng vuốt ngang: nhiều chip quá thì không xuống dòng che bản đồ. py/-my chừa chỗ
+            cho bóng chip khỏi bị overflow cắt. */}
+        <div className="pointer-events-auto -mx-3 -my-2 flex gap-2 overflow-x-auto px-3 py-2 no-scrollbar">
           <FilterChip
             label={`Đã lưu${savedCount ? ` (${savedCount})` : ''}`}
             on={filters.favoritesOnly}
             onClick={() => setFilters((f) => ({ ...f, favoritesOnly: !f.favoritesOnly }))}
           />
+          <FilterChip label="Sạc nhanh DC" on={filters.power === 'dc'} onClick={() => setPower('dc')} />
+          <FilterChip label={`≥ ${FAST_KW} kW`} on={filters.power === 'dc120'} onClick={() => setPower('dc120')} />
           <FilterChip
             label="Đang hoạt động"
             on={filters.activeOnly}
@@ -128,6 +129,8 @@ export function App() {
           </Chip>
         </div>
       </div>
+
+      <PowerLegend />
 
       <Button
         variant="secondary"

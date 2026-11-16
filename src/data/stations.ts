@@ -218,3 +218,41 @@ export const STATUS_LABEL: Record<Exclude<StatusKind, 'active'>, string> = {
 export function statusOf(st: Station, depotStatus?: string | null): StatusKind {
   return (depotStatus && Object.hasOwn(FROM_DEPOT, depotStatus) && FROM_DEPOT[depotStatus]) || FROM_BASE[st.status]
 }
+
+/** Mốc "siêu nhanh": dữ liệu My Maps có 120 kW ~2.300 trạm, 150–250 kW ~780 trạm. */
+export const FAST_KW = 120
+
+/** 0 = AC hoặc chưa có dữ liệu, 1 = DC dưới 120 kW, 2 = DC từ 120 kW. */
+export type PowerTier = 0 | 1 | 2
+
+/** Theo cổng DC mạnh nhất, không theo maxKw chung (AC 11 kW + DC 60 kW là tier 1). */
+export function tierOf(p: StationPower | undefined): PowerTier {
+  if (!p || p.dcCount === 0) return 0
+  const dcMax = p.groups.reduce((m, g) => (g.dc ? Math.max(m, g.kw) : m), 0)
+  return dcMax >= FAST_KW ? 2 : 1
+}
+
+export interface Filters {
+  favoritesOnly: boolean
+  activeOnly: boolean
+  /** 'dc' = có cổng DC; 'dc120' = có cổng DC ≥ 120 kW. Trạm chưa có dữ liệu power bị ẩn. */
+  power: 'all' | 'dc' | 'dc120'
+}
+
+export const DEFAULT_FILTERS: Filters = { favoritesOnly: false, activeOnly: false, power: 'all' }
+
+/** Lọc chung cho bản đồ và bảng "Gần tôi". `saved` chỉ cần khi favoritesOnly. */
+export function passesFilters(
+  st: Station,
+  f: Filters,
+  power: Map<string, StationPower> | null,
+  saved?: Set<string>,
+): boolean {
+  if (f.favoritesOnly && !saved?.has(st.entityId)) return false
+  if (f.activeOnly && st.status !== 0) return false
+  if (f.power !== 'all') {
+    const t = tierOf(power?.get(st.entityId))
+    if (f.power === 'dc' ? t < 1 : t < 2) return false
+  }
+  return true
+}
