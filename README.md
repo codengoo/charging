@@ -34,6 +34,13 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
 - Nút **Chỉ đường** mở Google Maps.
 - **Chia sẻ bằng QR** (`src/ui/ShareSheet.tsx`): QR link trạm (mở app) và QR vị trí Google Maps,
   tải ảnh thẻ QR / Web Share.
+- **Trạm dọc đường** (`src/ui/TripPanel.tsx`, `src/data/useTrip.ts`, port từ `charge-map-android`):
+  dán link chỉ đường Google Maps (hoặc chia sẻ từ Google Maps vào PWA đã cài trên Android — Web
+  Share Target `action: /trip`). Link rút gọn mở qua `/api/maps-link`; chặng chỉ có tên đoán toạ
+  độ bằng HERE; tuyến tính bằng HERE Routing (`/api/route`). Client giải mã flexible polyline
+  (`src/lib/flexiblePolyline.ts`), lọc hành lang 2/5/10 km (`src/data/routeCorridor.ts`: đo phẳng,
+  bỏ trạm bên kia dải phân cách cao tốc, trần 400 trạm theo độ lệch), xếp theo km gặp trên đường.
+  URL `/trip?link=…` mở lại hành trình. Cần secret `HERE_API_KEY` (xem "API proxy HERE").
 - **Sao lưu / chuyển máy** (`src/data/backup.ts`, `src/ui/BackupSheet.tsx`): sổ nhóm nén
   `deflate-raw` + base64url trong hash `/#import=…` (không tới server), QR khi link ≤ 2.000 ký
   tự, tải / nhập file `.json`. Nhập luôn **gộp**, hỏi xác nhận trước.

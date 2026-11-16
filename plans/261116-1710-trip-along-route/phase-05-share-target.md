@@ -55,3 +55,9 @@ manifest share_target opens /trip with the shared text/url; App extracts
 the Maps link and starts the trip. Changelog 0.5.0 + README cover the
 along-route feature, the /station path rename and the HERE API proxy.
 ```
+
+## 7. Kết quả thực hiện (2026-11-16)
+
+- Bản phát hành là **0.7.0** (0.5.0/0.6.0 đã dùng). `package.json` giữ nguyên (repo không đồng bộ version ở đó). Thêm `enctype` vào `share_target` vì Chrome cảnh báo khi thiếu.
+- Đã kiểm: `npm run build` pass, `dist/manifest.webmanifest` có `share_target`; CDP `Page.getAppManifest` → `errors: []`; `/trip?text=Hà Nội đến Hải Phòng <link>` → tính hành trình, URL về `/trip?link=<link>` (phase 04); nút "Có gì mới" hiện v0.7.0.
+- **Chưa kiểm tra:** chia sẻ thật từ Google Maps trên Android (cần cài PWA sau deploy), tuyến HERE thật (cần `HERE_API_KEY`).

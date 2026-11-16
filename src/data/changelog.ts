@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.0',
+    date: '2026-11-16',
+    title: 'Trạm sạc dọc đường',
+    changes: [
+      'Trạm sạc dọc đường: chia sẻ chỉ đường từ Google Maps (Android, khi đã cài app lên màn hình chính) hoặc dán link vào app — app vẽ tuyến và liệt kê trạm theo thứ tự gặp trên đường.',
+      'Chọn bề rộng hành lang 2 / 5 / 10 km; mỗi trạm ghi km trên tuyến và khoảng cách lệch khỏi đường.',
+      'Trên cao tốc, tự bỏ trạm ở chiều ngược lại (bên kia dải phân cách).',
+      'Link hành trình /trip?link=… mở lại được hành trình.',
+      'Link trạm đổi sang /station/<id>-<tên>; link /tram/… cũ và mã QR đã in vẫn mở được.',
+    ],
+  },
+  {
     version: '0.6.0',
     date: '2026-11-16',
     title: 'Lọc sạc nhanh, trạng thái trạm, trạm gần bạn',

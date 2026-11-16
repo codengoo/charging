@@ -1,12 +1,20 @@
 {
   "name": "Bản đồ trạm sạc ô tô VinFast",
   "short_name": "Trạm Sạc",
-  "description": "Bản đồ 23.942 trạm sạc ô tô VinFast — tìm trạm gần bạn, lọc, lưu yêu thích, chỉ đường.",
+  "description": "Bản đồ ~25.000 trạm sạc ô tô VinFast — trạm gần bạn, trạm dọc đường, lọc, lưu yêu thích, chỉ đường.",
   "lang": "vi",
+  "id": "/",
+  "scope": "/",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#009966",
+  "share_target": {
+    "action": "/trip",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": { "title": "title", "text": "text", "url": "url" }
+  },
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
