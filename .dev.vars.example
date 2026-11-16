@@ -1,0 +1,2 @@
+# Chép thành .dev.vars (đã gitignore) cho `wrangler dev`. Production: npx wrangler secret put HERE_API_KEY
+HERE_API_KEY=

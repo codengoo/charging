@@ -77,6 +77,23 @@ npm run build && npx wrangler dev --local        # http://127.0.0.1:8787
 # hoặc: DATA_ORIGIN=http://127.0.0.1:8787 npm run dev
 ```
 
+## API proxy HERE (`worker/api.ts`)
+
+Trạm dọc đường cần tính tuyến (HERE Routing v8) và đoán toạ độ từ tên (HERE geocode). Key nằm
+ở Worker, không xuống client:
+
+| Endpoint | Việc |
+|---|---|
+| `GET /api/route?stops=lat,lng;lat,lng[;…]` | HERE Routing v8 (`polyline,summary` + spans `length,functionalClass`), 2–22 điểm |
+| `GET /api/geocode?q=…[&at=lat,lng]` | HERE discover (có `at`) / geocode trong VN |
+| `GET /api/revgeocode?at=lat,lng` | Tên điểm từ toạ độ |
+| `GET /api/maps-link?url=<maps.app.goo.gl/…>` | Mở link rút gọn, trả `{ url }` thuộc `google.*/maps` |
+
+- Body HERE trả **nguyên** (stream, không parse) để dưới hạn 10 ms CPU; client tự giải mã.
+- Chỉ nhận request cùng origin (`Sec-Fetch-Site` / `Origin` / `Referer`) + rate limit 30 request /
+  60 s theo IP (binding `API_LIMIT`). Chưa đặt key thì 3 endpoint HERE trả 503.
+- Secret: `npx wrangler secret put HERE_API_KEY`. Local: chép `.dev.vars.example` → `.dev.vars`.
+
 ## Deploy
 
 ```bash

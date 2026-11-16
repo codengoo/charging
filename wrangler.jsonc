@@ -14,6 +14,11 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/data/*", "/station/*", "/tram", "/tram/*", "/api/*"]
   },
+  // Giới hạn /api/{route,geocode,revgeocode,maps-link} theo IP — chặn người ngoài dùng ké quota
+  // HERE. period chỉ nhận 10 hoặc 60. Key HERE: `npx wrangler secret put HERE_API_KEY`.
+  "ratelimits": [
+    { "name": "API_LIMIT", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } }
+  ],
   // R2 chứa base/power/manifest do builder sinh ra.
   "r2_buckets": [{ "binding": "DATA", "bucket_name": "tramsac-data" }],
   // Domain riêng (zone cangao.asia nằm trong tài khoản này).

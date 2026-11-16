@@ -1,11 +1,13 @@
 // Worker tramsac: phục vụ /data/* từ R2 (JSON thô, Cloudflare tự nén), preview link /station/*,
-// chi tiết trạm /api/station/* (proxy get-locator VinFast), còn lại static assets.
+// chi tiết trạm /api/station/* (proxy get-locator VinFast), proxy HERE + link rút gọn
+// /api/{route,geocode,revgeocode,maps-link} (worker/api.ts), còn lại static assets.
 // Build dữ liệu KHÔNG ở đây — chạy bằng GitHub Action (.github/workflows/build-data.yml)
 // vì Workers Free plan giới hạn 10ms CPU, không đủ cho parse 72MB snapshot.
 import { SITE_URL, STATION_PREFIX, parseStationId, stationPath } from '../src/lib/stationUrl'
 import { serveStationDetail } from './locator'
+import { serveApi, type ApiEnv } from './api'
 
-interface Env {
+interface Env extends ApiEnv {
   DATA: R2Bucket
   ASSETS: Fetcher
 }
@@ -30,6 +32,7 @@ export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url)
     if (url.pathname.startsWith('/api/station/')) return serveStationDetail(url, env.DATA, ctx)
+    if (url.pathname.startsWith('/api/')) return serveApi(req, url, env)
     if (url.pathname.startsWith('/data/')) return serveData(url, env)
     // Path cũ (QR đã in, link đã gửi) -> path tiếng Anh. 301 để trình duyệt/bot nhớ luôn.
     if (url.pathname === '/tram' || url.pathname.startsWith('/tram/')) {

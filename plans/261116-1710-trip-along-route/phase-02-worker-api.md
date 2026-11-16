@@ -143,3 +143,9 @@ the HERE_API_KEY secret (bodies streamed untouched to stay under the 10ms CPU
 limit) and expands maps.app.goo.gl links server-side with a host allowlist.
 Requests must be same-origin and are rate limited per IP (API_LIMIT, 30/60s).
 ```
+
+## 9. Kết quả thực hiện (2026-11-16)
+
+- Lệch so với kế hoạch: kiểm input trước khi kiểm key (request sai luôn nhận 400); chưa có key thì 3 endpoint HERE trả **503** `Chưa cấu hình HERE_API_KEY`. `/api/station/*` (proxy VinFast có sẵn) không đi qua `serveApi`, không bị kiểm origin / rate limit. `vite.config.ts` đã proxy `/api` từ trước, `.gitignore` đã có `.dev.vars` → không sửa.
+- Đã kiểm (wrangler dev local): 403 khi thiếu `Sec-Fetch-Site`/`Origin`, khi `cross-site`, khi `Origin` lạ; 405 với POST; 400 với `stops=abc`, một điểm, `at=x`, `maps-link` host lạ; **maps-link với link thật `maps.app.goo.gl/Wa4BHQY94CRPMfuA7` → 200, URL `/maps/dir/…`**; key giả → HERE 401 → Worker 502 kèm body HERE (đường proxy chạy); 32 request liên tiếp → 429 từ lượt ~22 (cộng dồn lượt trước); `dist/` không có `apiKey`; `/data`, `/station`, `/tram` 301 vẫn chạy; `wrangler deploy --dry-run` nhận binding `API_LIMIT`.
+- **Chưa kiểm tra:** response thật của HERE (máy dev chưa có key).
