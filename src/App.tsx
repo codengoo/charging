@@ -9,6 +9,9 @@ import { ShareSheet } from './ui/ShareSheet'
 import { ChangelogModal } from './ui/ChangelogModal'
 import { PowerLegend } from './ui/PowerLegend'
 import { NearbySheet } from './ui/NearbySheet'
+import { BackupSheet } from './ui/BackupSheet'
+import { ImportDialog, pendingImport, type PendingImport } from './ui/ImportDialog'
+import { IMPORT_HASH, decodeBackup } from './data/backup'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { useStationData } from './data/useStationData'
@@ -21,6 +24,10 @@ import type { Station } from './data/types'
 import { parseStationId, stationPath } from './lib/stationUrl'
 
 const DEFAULT_TITLE = document.title
+
+function readImportHash(): string | null {
+  return location.hash.startsWith(IMPORT_HASH) ? location.hash.slice(IMPORT_HASH.length) : null
+}
 
 /** Lần mở bảng "Gần tôi": điểm gốc chụp lúc bấm, kèm nguồn (GPS hay tâm bản đồ). */
 interface Nearby {
@@ -51,6 +58,16 @@ export function App() {
   const [nearby, setNearby] = useState<Nearby | null>(null)
   const groups = useGroupBook()
   const { book } = groups
+  const [showBackup, setShowBackup] = useState(false)
+  // Link sao lưu `/#import=<payload>`: đọc NGAY lúc khởi tạo, effect đồng bộ URL sẽ xoá hash.
+  const [importHash] = useState(readImportHash)
+  const [showImport, setShowImport] = useState(false)
+  // Giữ lần nhập cuối để hộp xác nhận còn nội dung lúc trôi xuống.
+  const [pending, setPending] = useState<PendingImport | null>(null)
+  function askImport(incoming: Parameters<typeof pendingImport>[1]) {
+    setPending(pendingImport(book, incoming))
+    setShowImport(true)
+  }
   const savedCount = allSaved(book).size
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   // Hai mức công suất loại trừ nhau; bấm lại chip đang bật thì về tất cả.
@@ -64,6 +81,22 @@ export function App() {
     const st = linkedId ? index.byId.get(linkedId) : undefined
     if (st) pick(st)
   }, [index, linkedId])
+
+  // Mở bằng link sao lưu: bỏ hash ngay (nhập hay huỷ cũng không để lại), rồi hỏi xác nhận.
+  // Dán link vào tab ĐANG mở app chỉ đổi hash, không tải lại trang → nghe thêm hashchange.
+  const askImportRef = useRef(askImport)
+  askImportRef.current = askImport
+  useEffect(() => {
+    const handle = (payload: string | null) => {
+      if (!payload) return
+      history.replaceState(null, '', location.pathname + location.search)
+      void decodeBackup(payload).then((b) => askImportRef.current(b))
+    }
+    handle(importHash)
+    const onHash = () => handle(readImportHash())
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [importHash])
 
   // Generation mới (dữ liệu làm mới hằng ngày): trạm đang mở trỏ sang bản ghi mới cùng id.
   useEffect(() => {
@@ -210,7 +243,33 @@ export function App() {
           pick(st)
         }}
         onUnsave={groups.removeFromAll}
-        onClose={() => setShowSaved(false)}
+        onBackup={() => setShowBackup(true)}
+        onClose={() => {
+          setShowSaved(false)
+          setShowBackup(false)
+        }}
+      >
+        <BackupSheet
+          open={showBackup}
+          book={book}
+          onImportFile={(incoming) => {
+            setShowBackup(false)
+            setShowSaved(false)
+            askImport(incoming)
+          }}
+          onClose={() => setShowBackup(false)}
+        />
+      </SavedSheet>
+
+      <ImportDialog
+        open={showImport}
+        pending={pending}
+        onConfirm={(incoming) => {
+          groups.merge(incoming)
+          setShowImport(false)
+          setShowSaved(true) // cho thấy ngay các trạm vừa gộp
+        }}
+        onClose={() => setShowImport(false)}
       />
 
       {nearby && (

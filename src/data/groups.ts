@@ -255,42 +255,55 @@ export const STORAGE_KEY = 'tramsac.groups'
 /** Khoá danh sách yêu thích phẳng của bản 0.1–0.2. */
 const LEGACY_FAVORITES_KEY = 'tramsac.favorites'
 
-interface StoredBook {
+export interface StoredBook {
   v: 1
   groups: Array<Omit<StationGroup, 'builtIn'>>
   members: Record<string, Record<string, number>>
 }
 
 const VALID_ICONS = new Set<string>([...ICON_KEYS, 'heart', 'star', 'flag'])
+const HEX = /^#[0-9a-fA-F]{6}$/
+/** entityId của VinFast là số (xem parseStationId). */
+const ENTITY_ID = /^\d{1,9}$/
 
 /** Đọc từ JSON đã lưu. Dữ liệu hỏng thì lấy phần đọc được, không làm sập app. */
 export function parseBook(raw: string | null): GroupBook {
   if (!raw) return EMPTY_BOOK
   try {
-    const s = JSON.parse(raw) as Partial<StoredBook>
-    const custom: StationGroup[] = (s.groups ?? [])
-      .filter((g) => g && typeof g.id === 'string' && g.id && !BUILT_IN.some((b) => b.id === g.id))
-      .map((g) => ({
-        id: g.id,
-        label: String(g.label ?? ''),
-        builtIn: false,
-        iconKey: VALID_ICONS.has(g.iconKey) ? g.iconKey : 'bookmark',
-        colorHex: typeof g.colorHex === 'string' ? g.colorHex : '#64748B',
-        ttlHours: Number.isFinite(g.ttlHours) ? g.ttlHours : 0,
-      }))
-    const groups = sortGroups([...BUILT_IN, ...custom])
-    const known = new Set(groups.map((g) => g.id))
-    const members: GroupBook['members'] = {}
-    for (const [gid, m] of Object.entries(s.members ?? {})) {
-      if (!known.has(gid) || !m || typeof m !== 'object') continue
-      const clean: Record<string, number> = {}
-      for (const [id, at] of Object.entries(m)) clean[id] = typeof at === 'number' ? at : 0
-      members[gid] = clean
-    }
-    return { groups, members }
+    return bookFromStored(JSON.parse(raw) as Partial<StoredBook>)
   } catch {
     return EMPTY_BOOK
   }
+}
+
+/**
+ * Dựng sổ nhóm từ object đã parse (localStorage hoặc file / link sao lưu). Bỏ nhóm thiếu id,
+ * icon lạ, thành viên của nhóm không tồn tại — dữ liệu từ ngoài vào cũng đi qua đây.
+ */
+export function bookFromStored(s: Partial<StoredBook>): GroupBook {
+  const custom: StationGroup[] = (Array.isArray(s.groups) ? s.groups : [])
+    .filter((g) => g && typeof g.id === 'string' && g.id && !BUILT_IN.some((b) => b.id === g.id))
+    .map((g) => ({
+      id: g.id.slice(0, 40),
+      label: String(g.label ?? '').slice(0, 40),
+      builtIn: false,
+      iconKey: VALID_ICONS.has(g.iconKey) ? g.iconKey : 'bookmark',
+      // Màu được chèn vào chuỗi SVG của ghim (pins.ts) — chỉ nhận đúng dạng #rrggbb.
+      colorHex: typeof g.colorHex === 'string' && HEX.test(g.colorHex) ? g.colorHex : '#64748B',
+      ttlHours: Number.isFinite(g.ttlHours) ? g.ttlHours : 0,
+    }))
+  const groups = sortGroups([...BUILT_IN, ...custom])
+  const known = new Set(groups.map((g) => g.id))
+  const members: GroupBook['members'] = {}
+  for (const [gid, m] of Object.entries(s.members ?? {})) {
+    if (!known.has(gid) || !m || typeof m !== 'object') continue
+    const clean: Record<string, number> = {}
+    for (const [id, at] of Object.entries(m)) {
+      if (ENTITY_ID.test(id)) clean[id] = typeof at === 'number' && Number.isFinite(at) ? at : 0
+    }
+    members[gid] = clean
+  }
+  return { groups, members }
 }
 
 export function serializeBook(book: GroupBook): string {

@@ -102,3 +102,10 @@ Payload là StoredBook nén deflate-raw + base64url đặt trong hash #import= n
 không tới server. Nhập luôn GỘP (mergeBooks), hỏi xác nhận kèm số trạm/nhóm mới.
 Tách bookFromStored khỏi parseBook để dùng chung phần làm sạch dữ liệu.
 ```
+
+## 9. Lệch so với bản kế hoạch (ghi lúc thực hiện)
+
+- `bookFromStored` siết thêm điều kiện vì giờ nhận cả dữ liệu từ ngoài: `colorHex` phải là `#rrggbb` (màu được chèn vào chuỗi SVG của ghim), id trạm phải là số, `groups` không phải mảng thì bỏ, tên/id nhóm cắt 40 ký tự.
+- App nghe thêm `hashchange`: dán link `#import=` vào tab đang mở app chỉ đổi hash, không tải lại trang.
+- `ImportDialog` nhận `PendingImport` có `diff` chụp sẵn lúc mở (`pendingImport()`): gộp xong mà tính lại thì câu chữ nhảy thành "không có gì mới" lúc hộp thoại đang đóng.
+- Gộp xong thì mở lại bảng "Trạm sạc đã lưu" để thấy ngay kết quả. Nút "Sao lưu / chuyển máy" luôn hiện, kể cả khi chưa lưu gì (máy mới cần chỗ nhập từ file).

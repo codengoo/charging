@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { X } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { ArrowLeftRight, X } from 'lucide-react'
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -34,13 +34,16 @@ interface Props {
   userPos: { lat: number; lng: number } | null
   onPick: (st: Station) => void
   onUnsave: (entityId: string) => void
+  onBackup: () => void
   onClose: () => void
+  /** Bảng con (sao lưu), render BÊN TRONG cây hộp thoại này để vaul xếp chồng đúng. */
+  children?: ReactNode
 }
 
 const DEFAULT_PIN = { iconKey: 'charger', colorHex: '#12B76A' } as const
 
 /** Danh sách mọi trạm đã lưu, lọc theo nhóm. Port FavoritesTab (PlacesSheet.kt). */
-export function SavedSheet({ open, index, book, now, userPos, onPick, onUnsave, onClose }: Props) {
+export function SavedSheet({ open, index, book, now, userPos, onPick, onUnsave, onBackup, onClose, children }: Props) {
   // Rỗng = xem tất cả. Chọn NHIỀU nhóm là phép HOẶC: chọn "Sao" và "Sẽ đến" là muốn
   // thấy cả hai, không phải trạm nằm trong cả hai.
   const [filter, setFilter] = useState<Set<string>>(new Set())
@@ -78,6 +81,12 @@ export function SavedSheet({ open, index, book, now, userPos, onPick, onUnsave, 
                 : `${items.length} trạm đã lưu`}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
+
+        {/* Luôn hiện, kể cả khi chưa lưu gì: máy mới cần chỗ "Nhập từ file". */}
+        <Button variant="outline" size="sm" className="mt-2 self-start rounded-full" onClick={onBackup}>
+          <ArrowLeftRight />
+          Sao lưu / chuyển máy
+        </Button>
 
         {items.length > 0 && (
           <div className="mt-2 -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 no-scrollbar">
@@ -152,6 +161,7 @@ export function SavedSheet({ open, index, book, now, userPos, onPick, onUnsave, 
             )
           })}
         </ul>
+        {children}
       </ResponsiveDialogContent>
     </ResponsiveDialog>
   )

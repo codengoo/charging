@@ -14,6 +14,7 @@ import {
   type GroupBook,
   type StationGroup,
 } from './groups'
+import { mergeBooks } from './backup'
 
 /** Nhịp dọn bản ghi quá hạn và cập nhật đồng hồ đếm ngược trên màn hình. */
 const TICK_MS = 60_000
@@ -74,6 +75,8 @@ export function useGroupBook() {
       },
       remove: (groupId: string) => update((b) => deleteGroup(b, groupId)),
       setTtl: (groupId: string, hours: number) => update((b) => setGroupTtl(b, groupId, hours)),
+      /** Gộp sổ nhóm nhập từ link / file sao lưu (không xoá gì). */
+      merge: (incoming: GroupBook) => update((b) => mergeBooks(b, incoming)),
     }),
     [update],
   )
