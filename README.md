@@ -44,7 +44,7 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   `!5iN` (chỉ để gợi ý). Link iOS `maps.google.com/?saddr=…&daddr=…&geocode=…` cũng đọc được. Client giải mã flexible polyline
   (`src/lib/flexiblePolyline.ts`), lọc hành lang 2/5/10 km (`src/data/routeCorridor.ts`: đo phẳng,
   bỏ trạm bên kia dải phân cách cao tốc, trạm sát cao tốc mà không phải trạm dừng nghỉ cùng chiều (phải
-  > 150 m hoặc bên trái) gắn `viaExit` — kế hoạch sạc không chọn, trần 400 trạm theo độ lệch), xếp theo km gặp trên đường.
+  > 150 m hoặc bên trái) gắn `viaExit` — kế hoạch sạc chỉ dùng ở chặng không còn trạm vào thẳng nào, cộng quãng vòng ước tính `EXIT_ACCESS_KM` (2,5 km) mỗi chiều, trần 400 trạm theo độ lệch), xếp theo km gặp trên đường.
   URL `/trip?link=…` mở lại hành trình. Cần secret `HERE_API_KEY` (xem "API proxy HERE").
 - **% pin khi đến trạm** (`src/data/battery.ts`, `src/data/vehicles.ts`, `src/ui/BatteryControl.tsx`): chọn xe
   trong Cài đặt (10 mẫu VinFast hoặc Tuỳ chỉnh, công tắc điều hoà ×1,08), kéo % pin hiện tại (localStorage

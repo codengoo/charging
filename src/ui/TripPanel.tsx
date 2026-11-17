@@ -13,7 +13,7 @@ import { pick } from '../i18n'
 import { arrivalPct, avgKmh, type ArrivalEstimate, type BatteryReading } from '../data/battery'
 import type { Vehicle } from '../data/vehicles'
 import { BatteryControl, DANGER_PCT, fmtRange, pctOf, pctTone } from './BatteryControl'
-import { PLAN_MIN_DC_KW, type ChargePlan } from '../data/chargePlan'
+import { PLAN_MIN_DC_KW, accessKm, type ChargePlan } from '../data/chargePlan'
 import { fmtMinutes } from '../data/drive'
 import type { Avoid } from '../lib/mapsLink'
 import { SHEET_COMPACT, SHEET_EXPANDED, SHEET_TRANSITION, useExpandOnScroll } from '../lib/useExpandOnScroll'
@@ -34,6 +34,7 @@ const L = pick({
     listAria: 'Trạm theo thứ tự trên đường',
     offRoute: (d: string) => `cách tuyến ${d}`,
     viaExit: 'phải ra cao tốc',
+    exitDetour: (km: number) => `phải ra cao tốc, vòng thêm ~${km} km`,
     maxKw: (kw: string) => ` · tối đa ${kw} kW`,
     resolving: 'Đang đọc liên kết…',
     routing: 'Đang tính đường và tìm trạm…',
@@ -58,7 +59,7 @@ const L = pick({
       `${n} điểm dừng · sạc ~${charge} · tới nơi sau ~${total}, còn ${arrive}.`,
     planFail: (km: number) =>
       `Không đủ trạm sạc nhanh (DC ≥ ${PLAN_MIN_DC_KW} kW) sau km ${km} — thử mở rộng hành lang, bỏ lọc công suất hoặc xuất phát với nhiều pin hơn.`,
-    planNote: (r: number) => `Ước tính: ghé trạm xa nhất còn ≥ ${r}% pin, sạc lên 80% (điểm cuối sạc vừa đủ tới nơi). Không chọn trạm phải ra cao tốc mới tới. Đổi mức dự phòng trong Xe của bạn.`,
+    planNote: (r: number) => `Ước tính: ghé trạm xa nhất còn ≥ ${r}% pin, sạc lên 80% (điểm cuối sạc vừa đủ tới nơi). Ưu tiên trạm vào thẳng; chỉ ra cao tốc khi chặng đó không còn trạm nào khác. Đổi mức dự phòng trong Xe của bạn.`,
     routes: 'Tuyến đường',
     routeCard: (km: number, n: number) => `${km} km · ${n} trạm`,
     googleHint: (n: number) => `Trên Google bạn chọn tuyến thứ ${n} — chạm tuyến khớp bên dưới hoặc trên bản đồ.`,
@@ -87,6 +88,7 @@ const L = pick({
     listAria: 'Stations in order along the route',
     offRoute: (d: string) => `${d} from route`,
     viaExit: 'exit the highway',
+    exitDetour: (km: number) => `exit the highway, ~${km} km detour`,
     maxKw: (kw: string) => ` · up to ${kw} kW`,
     resolving: 'Reading link…',
     routing: 'Calculating route and finding stations…',
@@ -111,7 +113,7 @@ const L = pick({
       `${n} ${n === 1 ? 'stop' : 'stops'} · ~${charge} charging · arrive in ~${total} with ${arrive}.`,
     planFail: (km: number) =>
       `Not enough fast chargers (DC ≥ ${PLAN_MIN_DC_KW} kW) after km ${km} — try a wider corridor, fewer power filters or more starting battery.`,
-    planNote: (r: number) => `Estimate: stop at the farthest station with ≥ ${r}% left, charge to 80% (just enough at the last stop). Skips stations you'd have to exit the highway for. Change the reserve in Your car.`,
+    planNote: (r: number) => `Estimate: stop at the farthest station with ≥ ${r}% left, charge to 80% (just enough at the last stop). Prefers stations you can drive straight into; exits the highway only when a leg has no other option. Change the reserve in Your car.`,
     routes: 'Routes',
     routeCard: (km: number, n: number) => `${km} km · ${n} ${n === 1 ? 'station' : 'stations'}`,
     googleHint: (n: number) => `In Google Maps you picked route ${n} — tap the matching one below or on the map.`,
@@ -191,13 +193,13 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
 
   const busy = trip.status === 'resolving' || trip.status === 'routing'
 
-  // % pin khi ngang qua từng trạm: rẽ vào rồi quay ra tuyến (2 × độ lệch), tốc độ trung bình cả tuyến.
+  // % pin khi ngang qua từng trạm: rẽ vào rồi quay ra tuyến (2 × accessKm: độ lệch, cộng quãng ra nút giao nếu phải ra cao tốc), tốc độ trung bình cả tuyến.
   const startPct = pctOf(battery)
   const route = trip.route
   const estimates: ArrivalEstimate[] | null =
     vehicle && route && trip.status === 'ready'
       ? hits.items.map((h) =>
-          arrivalPct(startPct, h.atKm + 2 * h.offsetKm, avgKmh(route.meters, route.seconds), vehicle, climate),
+          arrivalPct(startPct, h.atKm + 2 * accessKm(h), avgKmh(route.meters, route.seconds), vehicle, climate),
         )
       : null
   let lastOk = -1
@@ -522,6 +524,9 @@ function PlanView({ plan, reservePct, onPick }: { plan: ChargePlan; reservePct: 
                   <span className={`text-xs ${pctTone(s.arrive.low)}`}>
                     {L.stopLine(fmtRange(s.arrive), s.toPct, s.chargeMin === null ? null : fmtMinutes(s.chargeMin * 60), fmtKw(s.kw))}
                   </span>
+                  {s.item.viaExit && (
+                    <span className="text-xs text-[#B45309] dark:text-[#F0A500]">{L.exitDetour(Math.round(s.detourKm))}</span>
+                  )}
                 </span>
               </button>
             </li>

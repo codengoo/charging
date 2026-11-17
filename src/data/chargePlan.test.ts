@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PLAN_MIN_DC_KW, planCharging } from '@/data/chargePlan'
+import { EXIT_ACCESS_KM, PLAN_MIN_DC_KW, planCharging } from '@/data/chargePlan'
 import type { AlongRoute } from '@/data/routeCorridor'
 import type { PortGroup, Station, StationPower } from '@/data/types'
 import type { Vehicle } from '@/data/vehicles'
@@ -87,11 +87,36 @@ describe('planCharging', () => {
     expect(p).toEqual({ ok: false, stops: [], stuckAtKm: 0 })
   })
 
-  it('bỏ trạm viaExit', () => {
+  it('ưu tiên trạm vào thẳng: trạm viaExit xa hơn vẫn không được chọn khi còn trạm vào thẳng', () => {
     const items = [item('s200', 200), item('s300', 300, { viaExit: true })]
     const power = powerOf([['s200', dc(150)], ['s300', dc(150)]])
     const p = planCharging(items, power, route(500), 80, V, false, RESERVE)
     expect(p.stops.map((s) => s.item.station.entityId)).toEqual(['s200'])
+  })
+
+  it('chặng không còn trạm vào thẳng → dùng trạm viaExit, cộng quãng vòng ước tính', () => {
+    // Chỉ có trạm phải ra cao tốc ở km 300, lệch 1 km: vào trạm = 300 + 1 + EXIT_ACCESS_KM.
+    const items = [item('x300', 300, { offsetKm: 1, viaExit: true })]
+    const power = powerOf([['x300', dc(150)]])
+    const p = planCharging(items, power, route(500), 80, V, false, RESERVE)
+    expect(p.ok).toBe(true)
+    if (!p.ok) return
+    expect(p.stops.map((s) => s.item.station.entityId)).toEqual(['x300'])
+    const access = 1 + EXIT_ACCESS_KM
+    expect(p.stops[0].detourKm).toBeCloseTo(2 * access, 6)
+    expect(p.stops[0].arrive.low).toBeCloseTo(80 - 0.216 * (300 + access), 6)
+    // Thời gian lái thêm vì vòng (60 km/h → 1 phút/km) cộng vào tổng.
+    expect(p.totalSeconds).toBeCloseTo(500 * 60 + 2 * access * 60 + p.chargeMin * 60, 6)
+  })
+
+  it('quãng vòng ra cao tốc có thể làm trạm không còn tới được', () => {
+    // Trạm vào thẳng ở km 322 tới được (còn 10,4%); cùng vị trí nhưng phải ra cao tốc thì
+    // 322 + 2,5 = 324,5 km → bi quan 9,9% < 10% → kẹt.
+    const at = 322
+    const ok = planCharging([item('d', at)], powerOf([['d', dc(150)]]), route(500), 80, V, false, RESERVE)
+    expect(ok.stops.map((s) => s.item.station.entityId)).toEqual(['d'])
+    const stuck = planCharging([item('x', at, { viaExit: true })], powerOf([['x', dc(150)]]), route(500), 80, V, false, RESERVE)
+    expect(stuck).toEqual({ ok: false, stops: [], stuckAtKm: 0 })
   })
 
   it(`bỏ trạm DC dưới ${PLAN_MIN_DC_KW} kW và trạm chỉ có AC`, () => {
