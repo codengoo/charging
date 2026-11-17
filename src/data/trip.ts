@@ -165,8 +165,9 @@ export async function resolveTrip(
   const raw = firstUrl(text)
   if (!raw) throw new TripError(MSG.badLink)
   const full = isShortLink(raw) ? await expandLink(raw, signal) : raw
-  const stops = full ? parseMapsUrl(full) : null
-  if (!stops) throw new TripError(MSG.badLink)
+  const parsed = full ? parseMapsUrl(full) : null
+  if (!parsed) throw new TripError(MSG.badLink)
+  const stops = parsed.stops
 
   const needGps = stops.length === 1
   const me = needGps || stops.some((s) => !hasFix(s)) ? await here() : null
