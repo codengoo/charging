@@ -3,7 +3,7 @@ import { DEFAULT_FILTERS, KW_BANDS, type Filters, type KwBand } from './stations
 import { TRIP_RADII, type TripRadius } from './useTrip'
 import { THEME_PREFS, type ThemePref } from '../lib/theme'
 import { VEHICLE_IDS } from './vehicles'
-import { RESERVE_OPTIONS, RESERVE_PCT } from './battery'
+import { RESERVE_MAX, RESERVE_MIN, RESERVE_PCT } from './battery'
 
 /**
  * Cấu hình hiển thị người dùng tự chọn, nhớ trong localStorage. Đây là giá trị MẶC ĐỊNH lúc mở
@@ -84,7 +84,8 @@ export function parseSettings(raw: string | null): Settings {
     customKwhPer100: inRange(o.customKwhPer100, 5, 60) ? o.customKwhPer100 : d.customKwhPer100,
     usageOverride: inRange(o.usageOverride, 5, 60) ? o.usageOverride : d.usageOverride,
     climate: typeof o.climate === 'boolean' ? o.climate : d.climate,
-    reservePct: (RESERVE_OPTIONS as readonly unknown[]).includes(o.reservePct) ? (o.reservePct as number) : d.reservePct,
+    reservePct:
+      inRange(o.reservePct, RESERVE_MIN, RESERVE_MAX) && Number.isInteger(o.reservePct) ? o.reservePct : d.reservePct,
   }
 }
 

@@ -4,7 +4,7 @@ Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app
 
 ## [0.12.0] — 2026-11-17 — Pin dự phòng, trạm trên cao tốc & bảng gọn hơn
 
-- Chọn mức pin dự phòng tối thiểu (5–25%) trong "Xe của bạn" — kế hoạch sạc và vạch "Trạm cuối còn kịp" dùng mức này thay cho 10% cố định.
+- Chọn mức pin dự phòng tối thiểu (10 / 15 / 20 / 30% hoặc tự nhập) trong "Xe của bạn" — kế hoạch sạc và vạch "Trạm cuối còn kịp" dùng mức này thay cho 10% cố định.
 - Kế hoạch sạc không chọn trạm sát cao tốc mà phải ra nút giao mới vào được; trạm dừng nghỉ chiều ngược vẫn bị loại. Danh sách ghi rõ "phải ra cao tốc".
 - Bảng Dọc đường: thu gọn hộp tuỳ chọn (còn một dòng tóm tắt), cả bảng cuộn được, vùng trạm không chắc kịp có nền vàng.
 - "Trạm gần bạn" có nút "Dùng vị trí của tôi" khi chưa bật định vị.

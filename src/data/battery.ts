@@ -26,8 +26,10 @@ export interface ArrivalEstimate {
 export const STALE_MS = 2 * 60 * 60 * 1000
 /** "Còn kịp" = ước tính bi quan vẫn còn ít nhất mức này. Mặc định; người dùng đổi ở Settings.reservePct. */
 export const RESERVE_PCT = 10
-/** Các mức pin dự phòng cho chọn trong "Xe của bạn". */
-export const RESERVE_OPTIONS = [5, 10, 15, 20, 25] as const
+/** Mẫu pin dự phòng trong "Xe của bạn"; ngoài các mức này người dùng tự nhập trong RESERVE_MIN..RESERVE_MAX. */
+export const RESERVE_OPTIONS = [10, 15, 20, 30] as const
+export const RESERVE_MIN = 1
+export const RESERVE_MAX = 50
 export const TARGET_PCT = 80
 /** % pin hiện khi chưa nhập lần nào. */
 export const DEFAULT_PCT = 80

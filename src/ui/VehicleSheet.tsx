@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -10,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { ResponsiveSelect } from '@/components/ui/responsive-select'
 import type { Settings } from '../data/settings'
 import { CUSTOM_ID, VEHICLES } from '../data/vehicles'
-import { RESERVE_OPTIONS } from '../data/battery'
+import { RESERVE_MAX, RESERVE_MIN, RESERVE_OPTIONS } from '../data/battery'
 import { LOCALE, pick } from '@/i18n'
 
 const L = pick({
@@ -26,6 +27,8 @@ const L = pick({
     realHint: (v: string) => `Đọc mức tiêu thụ trung bình trên màn hình xe. Để trống = ước tính ${v} kWh/100 km.`,
     climate: 'Điều hoà',
     reserve: 'Pin dự phòng tối thiểu',
+    other: 'Khác',
+    reserveInput: `Mức dự phòng (%, ${RESERVE_MIN}–${RESERVE_MAX})`,
     reserveHint: 'Kế hoạch sạc và vạch "Trạm cuối còn kịp" luôn chừa lại ít nhất mức này (theo ước tính bi quan).',
     on: 'Bật',
     off: 'Tắt',
@@ -42,6 +45,8 @@ const L = pick({
     realHint: (v: string) => `Read the average consumption on your car's display. Leave empty to use the ${v} kWh/100 km estimate.`,
     climate: 'Air conditioning',
     reserve: 'Minimum battery reserve',
+    other: 'Other',
+    reserveInput: `Reserve (%, ${RESERVE_MIN}–${RESERVE_MAX})`,
     reserveHint: 'The charging plan and the "last station you can reach" line always keep at least this much (pessimistic estimate).',
     on: 'On',
     off: 'Off',
@@ -166,18 +171,54 @@ export function VehicleSheet({ open, settings, onChange, onClose, nested = false
           {settings.vehicleId && (
             <section className="flex flex-col gap-1.5">
               <h3 className="text-sm font-semibold">{L.reserve}</h3>
-              <Segmented
-                label={L.reserve}
-                value={String(settings.reservePct)}
-                onChange={(v) => onChange({ reservePct: Number(v) })}
-                options={RESERVE_OPTIONS.map((p) => ({ value: String(p), label: `${p}%` }))}
-              />
+              <ReservePicker value={settings.reservePct} onChange={(reservePct) => onChange({ reservePct })} />
               <p className="text-xs text-muted-foreground">{L.reserveHint}</p>
             </section>
           )}
         </div>
       </ResponsiveDialogContent>
     </ResponsiveDialog>
+  )
+}
+
+const OTHER = 'other'
+
+/** Mẫu 10/15/20/30% + "Khác" để tự nhập. Giá trị không trùng mẫu thì mở sẵn ô nhập. */
+function ReservePicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const preset = (RESERVE_OPTIONS as readonly number[]).includes(value)
+  const [custom, setCustom] = useState(!preset)
+  return (
+    <>
+      <Segmented
+        label={L.reserve}
+        value={custom ? OTHER : String(value)}
+        onChange={(v) => {
+          if (v === OTHER) return setCustom(true)
+          setCustom(false)
+          onChange(Number(v))
+        }}
+        options={[...RESERVE_OPTIONS.map((p) => ({ value: String(p), label: `${p}%` })), { value: OTHER, label: L.other }]}
+      />
+      {custom && (
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          {L.reserveInput}
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={RESERVE_MIN}
+            max={RESERVE_MAX}
+            step="1"
+            defaultValue={value}
+            autoFocus={preset}
+            onChange={(e) => {
+              const v = Number(e.target.value)
+              if (e.target.value && Number.isInteger(v) && v >= RESERVE_MIN && v <= RESERVE_MAX) onChange(v)
+            }}
+            className="text-foreground"
+          />
+        </label>
+      )}
+    </>
   )
 }
 

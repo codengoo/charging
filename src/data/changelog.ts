@@ -15,7 +15,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-11-17',
     title: 'Pin dự phòng, trạm trên cao tốc & bảng gọn hơn',
     changes: [
-      "Chọn mức pin dự phòng tối thiểu (5–25%) trong \"Xe của bạn\" — kế hoạch sạc và vạch \"Trạm cuối còn kịp\" dùng mức này thay cho 10% cố định.",
+      "Chọn mức pin dự phòng tối thiểu (10 / 15 / 20 / 30% hoặc tự nhập) trong \"Xe của bạn\" — kế hoạch sạc và vạch \"Trạm cuối còn kịp\" dùng mức này thay cho 10% cố định.",
       "Kế hoạch sạc không chọn trạm sát cao tốc mà phải ra nút giao mới vào được; trạm dừng nghỉ chiều ngược vẫn bị loại. Danh sách ghi rõ \"phải ra cao tốc\".",
       "Bảng Dọc đường: thu gọn hộp tuỳ chọn (còn một dòng tóm tắt), cả bảng cuộn được, vùng trạm không chắc kịp có nền vàng.",
       "\"Trạm gần bạn\" có nút \"Dùng vị trí của tôi\" khi chưa bật định vị.",
@@ -23,7 +23,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
     titleEn: 'Battery reserve, highway stations & a tidier panel',
     changesEn: [
-      "Choose a minimum battery reserve (5–25%) in \"Your car\" — the charging plan and the \"last station you can reach\" line use it instead of a fixed 10%.",
+      "Choose a minimum battery reserve (10 / 15 / 20 / 30% or your own number) in \"Your car\" — the charging plan and the \"last station you can reach\" line use it instead of a fixed 10%.",
       "The charging plan skips stations next to a highway that you'd have to exit for; rest stops on the opposite side are still excluded. The list marks them \"exit the highway\".",
       "Along route panel: collapse the options box to a one-line summary, the whole panel scrolls, and stations you may not reach get a yellow background.",
       "\"Stations near you\" has a \"Use my location\" button when location is off.",
