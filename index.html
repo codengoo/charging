@@ -2,8 +2,12 @@
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#009966" />
+    <!-- PWA trên iOS: status bar trong suốt, bản đồ tràn lên dưới giờ/pin (chữ luôn trắng — App.tsx có dải mờ tối phía sau).
+         Android standalone không cho trong suốt, chỉ lấy màu theme-color. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <!-- Đặt giao diện sáng/tối TRƯỚC khi app nạp để khỏi nháy trắng. Cùng khoá + cách đọc với src/lib/theme.ts. -->
     <script>
       try {

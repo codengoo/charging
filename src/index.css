@@ -228,3 +228,9 @@
 .dark .maplibregl-ctrl-attrib-button {
   filter: invert(1);
 }
+
+/* viewport-fit=cover: chừa vùng thanh home cho dòng ghi công của bản đồ. */
+.maplibregl-ctrl-bottom-right,
+.maplibregl-ctrl-bottom-left {
+  margin-bottom: env(safe-area-inset-bottom);
+}

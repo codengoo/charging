@@ -291,7 +291,10 @@ export function App() {
         onPickRoute={tripCtl.selectRoute}
       />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] flex flex-col gap-2 p-3">
+      {/* Status bar trong suốt (PWA iOS): chữ giờ/pin luôn trắng — dải mờ tối cho đọc được trên nền bản đồ sáng.
+          Cao đúng bằng vùng tai thỏ, ngoài PWA thì bằng 0 nên không hiện. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] h-[env(safe-area-inset-top)] bg-gradient-to-b from-black/45 to-black/10" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] flex flex-col gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className="pointer-events-auto">
           <SearchBar index={index} onPick={pick} />
         </div>
@@ -365,7 +368,7 @@ export function App() {
       <Button
         variant="secondary"
         size="sm"
-        className="absolute bottom-3 left-3 z-[5] rounded-full bg-card/90 shadow-lg shadow-black/10 backdrop-blur"
+        className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 z-[5] rounded-full bg-card/90 shadow-lg shadow-black/10 backdrop-blur"
         onClick={() => setShowChangelog(true)}
       >
         v{APP_VERSION} · {T.whatsNew}

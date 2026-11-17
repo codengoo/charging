@@ -67,7 +67,7 @@ export function PowerLegend() {
       onClick={toggle}
       aria-expanded={open}
       aria-label={open ? L.collapse : L.expand}
-      className="absolute right-3 bottom-14 z-[5] rounded-xl bg-card/90 text-left shadow-lg shadow-black/10 backdrop-blur outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
+      className="absolute right-3 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-[5] rounded-xl bg-card/90 text-left shadow-lg shadow-black/10 backdrop-blur outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
     >
       {open ? (
         <span className="flex flex-col gap-2 px-3 py-2.5 text-[13px] leading-none">
