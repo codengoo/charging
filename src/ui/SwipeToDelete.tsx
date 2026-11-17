@@ -8,6 +8,8 @@ const L = pick({ vi: { remove: 'Xoá' }, en: { remove: 'Delete' } })
 const REVEAL = 84
 /** Vuốt quá chừng này (tỉ lệ bề ngang hàng) rồi thả → xoá luôn. */
 const COMMIT_RATIO = 0.5
+/** Bề rộng góc bo của hàng (rounded-xl) — nền đỏ chui vào dưới phần này. */
+const UNDER_RADIUS = 16
 /** Ngón tay đi chừng này mới quyết định là vuốt ngang (không phải cuộn dọc). */
 const SLOP = 8
 
@@ -81,7 +83,8 @@ export function SwipeToDelete({ onDelete, children }: { onDelete: () => void; ch
         onClick={remove}
         className="absolute inset-y-0 right-0 flex items-center justify-end gap-1.5 bg-destructive pr-5 text-sm font-semibold text-white"
         // Chỉ hiện khi đang vuốt / đang mở — để sẵn thì lộ viền đỏ ở góc bo của hàng.
-        style={{ width: dx < 0 ? Math.max(REVEAL, -dx) : 0, visibility: dx < 0 ? 'visible' : 'hidden' }}
+        // + UNDER_RADIUS: lan vào dưới góc bo của hàng đang trượt — không hở khe nền giữa góc bo và vùng đỏ.
+        style={{ width: dx < 0 ? Math.max(REVEAL, -dx) + UNDER_RADIUS : 0, visibility: dx < 0 ? 'visible' : 'hidden' }}
       >
         <Trash2 className="size-4" aria-hidden />
         {L.remove}

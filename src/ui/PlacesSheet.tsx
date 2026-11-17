@@ -81,7 +81,7 @@ function PlaceRow({ kind, place, onEdit, onRemove }: { kind: PlaceKind; place?: 
   const Icon = ICON[kind]
   const name = place ? placeName(place) : placeName({ kind, name: '' })
   const row = (
-    <div className="flex items-center gap-1 rounded-xl bg-muted pr-1">
+    <div className="flex items-center gap-1 rounded-xl bg-muted pr-2.5">
       <button type="button" onClick={onEdit} className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left outline-none">
         <Icon className="size-5 shrink-0 text-brand" aria-hidden />
         <span className="flex min-w-0 flex-col">
@@ -90,7 +90,8 @@ function PlaceRow({ kind, place, onEdit, onRemove }: { kind: PlaceKind; place?: 
         </span>
       </button>
       {place && (
-        <Button variant="ghost" size="icon-sm" aria-label={L.remove(name)} onClick={onRemove}>
+        // Cảm ứng (điện thoại, tablet): ẩn — vuốt sang trái để xoá; chuột / bàn phím vẫn dùng nút.
+        <Button variant="ghost" size="icon-sm" className="pointer-coarse:hidden" aria-label={L.remove(name)} onClick={onRemove}>
           <Trash2 />
         </Button>
       )}
