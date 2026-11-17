@@ -10,7 +10,7 @@ import type { Station, StationPower } from '../data/types'
 import { KW_BANDS, KW_BAND_LABEL, kwActive, tierOf, type KwBand } from '../data/stations'
 import { TIER_COLORS } from '../map/pins'
 import { pick } from '../i18n'
-import { RESERVE_PCT, arrivalPct, avgKmh, type ArrivalEstimate, type BatteryReading } from '../data/battery'
+import { arrivalPct, avgKmh, type ArrivalEstimate, type BatteryReading } from '../data/battery'
 import type { Vehicle } from '../data/vehicles'
 import { BatteryControl, fmtRange, pctOf, pctTone } from './BatteryControl'
 import { PLAN_MIN_DC_KW, type ChargePlan } from '../data/chargePlan'
@@ -43,8 +43,8 @@ const L = pick({
     min: (m: number) => `${m} phút`,
     hr: (h: number) => `${h} giờ`,
     hrMin: (h: number, m: number) => `${h} giờ ${m} phút`,
-    lastReachable: `Trạm cuối còn kịp (còn ≥ ${RESERVE_PCT}% pin)`,
-    noneReachable: (p: number) => `Với ${p}% pin, không trạm nào chắc chắn tới được (còn ≥ ${RESERVE_PCT}%)`,
+    lastReachable: (r: number) => `Trạm cuối còn kịp (còn ≥ ${r}% pin)`,
+    noneReachable: (p: number, r: number) => `Với ${p}% pin, không trạm nào chắc chắn tới được (còn ≥ ${r}%)`,
     pctAria: (p: number) => `còn khoảng ${p}% pin khi tới`,
     plan: 'Lên kế hoạch sạc',
     planAria: 'Các điểm dừng sạc theo kế hoạch',
@@ -56,7 +56,7 @@ const L = pick({
       `${n} điểm dừng · sạc ~${charge} · tới nơi sau ~${total}, còn ${arrive}.`,
     planFail: (km: number) =>
       `Không đủ trạm sạc nhanh (DC ≥ ${PLAN_MIN_DC_KW} kW) sau km ${km} — thử mở rộng hành lang, bỏ lọc công suất hoặc xuất phát với nhiều pin hơn.`,
-    planNote: 'Ước tính: ghé trạm xa nhất còn ≥ 10% pin, sạc lên 80% (điểm cuối sạc vừa đủ tới nơi).',
+    planNote: (r: number) => `Ước tính: ghé trạm xa nhất còn ≥ ${r}% pin, sạc lên 80% (điểm cuối sạc vừa đủ tới nơi). Đổi mức dự phòng trong Xe của bạn.`,
     routes: 'Tuyến đường',
     routeCard: (km: number, n: number) => `${km} km · ${n} trạm`,
     googleHint: (n: number) => `Trên Google bạn chọn tuyến thứ ${n} — chạm tuyến khớp bên dưới hoặc trên bản đồ.`,
@@ -95,8 +95,8 @@ const L = pick({
     min: (m: number) => `${m} min`,
     hr: (h: number) => `${h} h`,
     hrMin: (h: number, m: number) => `${h} h ${m} min`,
-    lastReachable: `Last station you can reach (≥ ${RESERVE_PCT}% battery left)`,
-    noneReachable: (p: number) => `With ${p}% battery, no station is safely reachable (≥ ${RESERVE_PCT}% left)`,
+    lastReachable: (r: number) => `Last station you can reach (≥ ${r}% battery left)`,
+    noneReachable: (p: number, r: number) => `With ${p}% battery, no station is safely reachable (≥ ${r}% left)`,
     pctAria: (p: number) => `about ${p}% battery left on arrival`,
     plan: 'Plan charging stops',
     planAria: 'Planned charging stops',
@@ -108,7 +108,7 @@ const L = pick({
       `${n} ${n === 1 ? 'stop' : 'stops'} · ~${charge} charging · arrive in ~${total} with ${arrive}.`,
     planFail: (km: number) =>
       `Not enough fast chargers (DC ≥ ${PLAN_MIN_DC_KW} kW) after km ${km} — try a wider corridor, fewer power filters or more starting battery.`,
-    planNote: 'Estimate: stop at the farthest station with ≥ 10% left, charge to 80% (just enough at the last stop).',
+    planNote: (r: number) => `Estimate: stop at the farthest station with ≥ ${r}% left, charge to 80% (just enough at the last stop). Change the reserve in Your car.`,
     routes: 'Routes',
     routeCard: (km: number, n: number) => `${km} km · ${n} ${n === 1 ? 'station' : 'stations'}`,
     googleHint: (n: number) => `In Google Maps you picked route ${n} — tap the matching one below or on the map.`,
@@ -144,6 +144,8 @@ interface Props {
   /** Xe đã chọn (null = không ước tính pin) + % pin lúc xuất phát. */
   vehicle: Vehicle | null
   climate: boolean
+  /** Pin dự phòng tối thiểu (%). */
+  reservePct: number
   battery: BatteryReading | null
   batteryStale: boolean
   onBattery: (pct: number) => void
@@ -158,7 +160,7 @@ interface Props {
  * tuyến, và bảng chi tiết trạm mở đè lên được. Điện thoại: dải dưới đáy, bấm tay cầm để thu/mở.
  * Màn rộng: thẻ nổi góc trái.
  */
-export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, routeTotals, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, onClose, vehicle, climate, battery, batteryStale, onBattery, planOn, plan, onTogglePlan }: Props) {
+export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, routeTotals, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, onClose, vehicle, climate, reservePct, battery, batteryStale, onBattery, planOn, plan, onTogglePlan }: Props) {
   const [text, setText] = useState(trip.link ?? '')
   const [expanded, setExpanded] = useState(true)
   // Link đổi từ ngoài (mở /trip?link=…, share target) → ô nhập theo.
@@ -194,7 +196,7 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
         )
       : null
   let lastOk = -1
-  if (estimates) for (let i = 0; i < estimates.length; i++) if (estimates[i].low >= RESERVE_PCT) lastOk = i
+  if (estimates) for (let i = 0; i < estimates.length; i++) if (estimates[i].low >= reservePct) lastOk = i
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -353,11 +355,11 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
             )}
           </div>
 
-          {planOn && plan && <PlanView plan={plan} onPick={onPick} />}
+          {planOn && plan && <PlanView plan={plan} reservePct={reservePct} onPick={onPick} />}
 
           {!(planOn && plan) && hits.items.length > 0 && (
             <ul className="-mx-4 px-4" aria-label={L.listAria}>
-              {estimates && lastOk === -1 && <ReachDivider text={L.noneReachable(startPct)} />}
+              {estimates && lastOk === -1 && <ReachDivider text={L.noneReachable(startPct, reservePct)} />}
               {hits.items.map(({ station, atKm, offsetKm }, i) => {
                 const p = power?.get(station.entityId)
                 const est = estimates?.[i]
@@ -387,7 +389,7 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
                         {est && <ArrivalPct est={est} />}
                       </button>
                     </li>
-                    {i === lastOk && i < hits.items.length - 1 && <ReachDivider text={L.lastReachable} />}
+                    {i === lastOk && i < hits.items.length - 1 && <ReachDivider text={L.lastReachable(reservePct)} />}
                   </Fragment>
                 )
               })}
@@ -467,7 +469,7 @@ function RoutePicker({ trip, totals, onSelect }: { trip: TripState; totals: numb
 }
 
 /** Tóm tắt kế hoạch + danh sách điểm dừng (thay danh sách trạm khi bật). */
-function PlanView({ plan, onPick }: { plan: ChargePlan; onPick: (st: Station) => void }) {
+function PlanView({ plan, reservePct, onPick }: { plan: ChargePlan; reservePct: number; onPick: (st: Station) => void }) {
   const head = !plan.ok
     ? L.planFail(Math.round(plan.stuckAtKm))
     : plan.stops.length === 0
@@ -477,7 +479,7 @@ function PlanView({ plan, onPick }: { plan: ChargePlan; onPick: (st: Station) =>
     <>
       <p className={`rounded-xl px-3 py-2 text-sm ${plan.ok ? 'bg-brand/10 text-foreground' : 'bg-destructive/10 text-destructive'}`}>
         {head}
-        <span className="mt-0.5 block text-[11px] text-muted-foreground">{L.planNote}</span>
+        <span className="mt-0.5 block text-[11px] text-muted-foreground">{L.planNote(reservePct)}</span>
       </p>
       {plan.stops.length > 0 && (
         <ol className="-mx-4 px-4" aria-label={L.planAria}>

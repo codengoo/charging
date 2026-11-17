@@ -3,13 +3,13 @@
  * đường đã có (routeCorridor) — không gọi thêm HERE / EVCS.
  *
  * Tham lam, kiểu "đi xa nhất có thể": từ chỗ đang đứng, tới được đích thì thôi; không thì ghé
- * trạm sạc nhanh XA NHẤT còn tới được với ước tính bi quan ≥ RESERVE_PCT, sạc lên TARGET_PCT,
- * lặp lại. Điểm dừng nào từ đó tới được đích thì chỉ sạc VỪA ĐỦ (đích vẫn còn ≥ RESERVE_PCT theo
+ * trạm sạc nhanh XA NHẤT còn tới được với ước tính bi quan ≥ `reservePct`, sạc lên TARGET_PCT,
+ * lặp lại. Điểm dừng nào từ đó tới được đích thì chỉ sạc VỪA ĐỦ (đích vẫn còn ≥ `reservePct` theo
  * ước tính bi quan) thay vì lên 80% — đỡ ngồi chờ sạc thừa. Ít điểm dừng nhất với ngưỡng an toàn
  * cố định — đủ tốt cho một gợi ý; không tối ưu tổng thời gian (trạm 250 kW xa hơn chút có thể
  * nhanh hơn trạm 60 kW).
  */
-import { RESERVE_PCT, TARGET_PCT, arrivalPct, avgKmh, chargeMinutes, type ArrivalEstimate } from './battery'
+import { TARGET_PCT, arrivalPct, avgKmh, chargeMinutes, type ArrivalEstimate } from './battery'
 import type { AlongRoute } from './routeCorridor'
 import type { StationPower } from './types'
 import type { Vehicle } from './vehicles'
@@ -53,6 +53,8 @@ export function planCharging(
   startPct: number,
   v: Vehicle,
   climate: boolean,
+  /** Pin dự phòng tối thiểu (%) — Settings.reservePct. */
+  reservePct: number,
 ): ChargePlan {
   const totalKm = route.meters / 1000
   const speed = avgKmh(route.meters, route.seconds)
@@ -69,7 +71,7 @@ export function planCharging(
 
   while (stops.length <= MAX_STOPS) {
     const arriveDest = arrivalPct(soc, rejoin + Math.max(0, totalKm - pos), speed, v, climate)
-    if (arriveDest.low >= RESERVE_PCT) {
+    if (arriveDest.low >= reservePct) {
       return { ok: true, stops, arriveDest, chargeMin, totalSeconds: route.seconds + chargeMin * 60 }
     }
 
@@ -78,14 +80,14 @@ export function planCharging(
       if (c.item.atKm < pos + MIN_HOP_KM) continue
       const arrive = arrivalPct(soc, rejoin + c.item.atKm - pos + c.item.offsetKm, speed, v, climate)
       // Xếp theo atKm nên trạm tới được sau cùng là trạm xa nhất.
-      if (arrive.low >= RESERVE_PCT) best = { ...c, arrive }
+      if (arrive.low >= reservePct) best = { ...c, arrive }
     }
     if (!best) return { ok: false, stops, stuckAtKm: pos }
 
     const mid = (best.arrive.low + best.arrive.high) / 2
-    // % cần để từ trạm này tới đích còn RESERVE_PCT (bi quan); quá 80% thì sạc 80% và dừng tiếp.
+    // % cần để từ trạm này tới đích còn reservePct (bi quan); quá 80% thì sạc 80% và dừng tiếp.
     const used = 100 - arrivalPct(100, best.item.offsetKm + totalKm - best.item.atKm, speed, v, climate).low
-    const toPct = Math.max(mid, Math.min(TARGET_PCT, Math.ceil(RESERVE_PCT + used)))
+    const toPct = Math.max(mid, Math.min(TARGET_PCT, Math.ceil(reservePct + used)))
     const minutes = chargeMinutes(mid, { kw: best.kw, dc: true }, v, toPct)
     stops.push({ item: best.item, arrive: best.arrive, kw: best.kw, toPct: Math.round(toPct), chargeMin: minutes })
     chargeMin += minutes ?? 0

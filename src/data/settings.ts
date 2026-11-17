@@ -3,6 +3,7 @@ import { DEFAULT_FILTERS, KW_BANDS, type Filters, type KwBand } from './stations
 import { TRIP_RADII, type TripRadius } from './useTrip'
 import { THEME_PREFS, type ThemePref } from '../lib/theme'
 import { VEHICLE_IDS } from './vehicles'
+import { RESERVE_OPTIONS, RESERVE_PCT } from './battery'
 
 /**
  * Cấu hình hiển thị người dùng tự chọn, nhớ trong localStorage. Đây là giá trị MẶC ĐỊNH lúc mở
@@ -28,6 +29,8 @@ export interface Settings {
   usageOverride: number | null
   /** Bật điều hoà: tiêu thụ +8%. */
   climate: boolean
+  /** Pin dự phòng tối thiểu (%): kế hoạch sạc và "Trạm cuối còn kịp" luôn chừa lại mức này (ước tính bi quan). */
+  reservePct: number
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -41,6 +44,7 @@ export const DEFAULT_SETTINGS: Settings = {
   customKwhPer100: 16,
   usageOverride: null,
   climate: true,
+  reservePct: RESERVE_PCT,
 }
 
 const KEY = 'tramsac.settings'
@@ -80,6 +84,7 @@ export function parseSettings(raw: string | null): Settings {
     customKwhPer100: inRange(o.customKwhPer100, 5, 60) ? o.customKwhPer100 : d.customKwhPer100,
     usageOverride: inRange(o.usageOverride, 5, 60) ? o.usageOverride : d.usageOverride,
     climate: typeof o.climate === 'boolean' ? o.climate : d.climate,
+    reservePct: (RESERVE_OPTIONS as readonly unknown[]).includes(o.reservePct) ? (o.reservePct as number) : d.reservePct,
   }
 }
 

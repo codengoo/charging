@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { ResponsiveSelect } from '@/components/ui/responsive-select'
 import type { Settings } from '../data/settings'
 import { CUSTOM_ID, VEHICLES } from '../data/vehicles'
+import { RESERVE_OPTIONS } from '../data/battery'
 import { LOCALE, pick } from '@/i18n'
 
 const L = pick({
@@ -24,6 +25,8 @@ const L = pick({
     real: 'Tiêu thụ thực tế (kWh/100 km)',
     realHint: (v: string) => `Đọc mức tiêu thụ trung bình trên màn hình xe. Để trống = ước tính ${v} kWh/100 km.`,
     climate: 'Điều hoà',
+    reserve: 'Pin dự phòng tối thiểu',
+    reserveHint: 'Kế hoạch sạc và vạch "Trạm cuối còn kịp" luôn chừa lại ít nhất mức này (theo ước tính bi quan).',
     on: 'Bật',
     off: 'Tắt',
   },
@@ -38,6 +41,8 @@ const L = pick({
     real: 'Real consumption (kWh/100 km)',
     realHint: (v: string) => `Read the average consumption on your car's display. Leave empty to use the ${v} kWh/100 km estimate.`,
     climate: 'Air conditioning',
+    reserve: 'Minimum battery reserve',
+    reserveHint: 'The charging plan and the "last station you can reach" line always keep at least this much (pessimistic estimate).',
     on: 'On',
     off: 'Off',
   },
@@ -155,6 +160,19 @@ export function VehicleSheet({ open, settings, onChange, onClose, nested = false
                   { value: 'off' as const, label: L.off },
                 ]}
               />
+            </section>
+          )}
+
+          {settings.vehicleId && (
+            <section className="flex flex-col gap-1.5">
+              <h3 className="text-sm font-semibold">{L.reserve}</h3>
+              <Segmented
+                label={L.reserve}
+                value={String(settings.reservePct)}
+                onChange={(v) => onChange({ reservePct: Number(v) })}
+                options={RESERVE_OPTIONS.map((p) => ({ value: String(p), label: `${p}%` }))}
+              />
+              <p className="text-xs text-muted-foreground">{L.reserveHint}</p>
             </section>
           )}
         </div>

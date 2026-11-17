@@ -201,9 +201,9 @@ export function App() {
   const chargePlan = useMemo(
     () =>
       planOn && vehicle && trip.route && trip.status === 'ready'
-        ? planCharging(hits.items, power, trip.route, battery.reading?.pct ?? DEFAULT_PCT, vehicle, settings.climate)
+        ? planCharging(hits.items, power, trip.route, battery.reading?.pct ?? DEFAULT_PCT, vehicle, settings.climate, settings.reservePct)
         : null,
-    [planOn, vehicle, trip.route, trip.status, hits, power, battery.reading, settings.climate],
+    [planOn, vehicle, trip.route, trip.status, hits, power, battery.reading, settings.climate, settings.reservePct],
   )
 
   // Lớp tuyến cho bản đồ. Chừa chỗ cho bảng hành trình: điện thoại là dải dưới, màn rộng là thẻ trái.
@@ -352,6 +352,7 @@ export function App() {
           onClose={tripCtl.close}
           vehicle={vehicle}
           climate={settings.climate}
+          reservePct={settings.reservePct}
           battery={battery.reading}
           batteryStale={battery.stale}
           onBattery={battery.set}
