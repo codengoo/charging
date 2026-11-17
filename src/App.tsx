@@ -14,6 +14,8 @@ import { SettingsSheet } from './ui/SettingsSheet'
 import { useDriveDistance, useStableOrigin } from './data/drive'
 import { useLiveStatus } from './data/live'
 import { filtersFrom, useSettings, type Settings } from './data/settings'
+import { useBattery } from './data/battery'
+import { vehicleOf } from './data/vehicles'
 import { useResolvedTheme } from './lib/theme'
 import { ImportDialog, pendingImport, type PendingImport } from './ui/ImportDialog'
 import { IMPORT_HASH, decodeBackup } from './data/backup'
@@ -107,6 +109,12 @@ export function App() {
   const { settings, update: updateSettings } = useSettings()
   const theme = useResolvedTheme(settings.theme)
   const [showSettings, setShowSettings] = useState(false)
+  // Ước tính % pin khi đến: xe trong Cài đặt + % pin người dùng kéo (dùng chung bảng trạm / Dọc đường).
+  const battery = useBattery()
+  const vehicle = useMemo(
+    () => vehicleOf(settings.vehicleId, settings.customKwh, settings.customKwhPer100),
+    [settings.vehicleId, settings.customKwh, settings.customKwhPer100],
+  )
   // Mở app với bộ lọc theo cài đặt; chip đổi tạm trong phiên, không ghi ngược vào cài đặt.
   const [filters, setFilters] = useState<Filters>(() => filtersFrom(settings))
   // Trạm dọc đường theo cùng bộ lọc công suất với bản đồ.
@@ -339,6 +347,12 @@ export function App() {
           detailLoading={detail.loading}
           drive={drive}
           live={live}
+          vehicle={vehicle}
+          climate={settings.climate}
+          battery={battery.reading}
+          batteryStale={battery.stale}
+          onBattery={battery.set}
+          onOpenSettings={() => setShowSettings(true)}
           onOpenGroups={() => setGrouping(true)}
           onShare={() => setSharing(true)}
           onClose={() => {

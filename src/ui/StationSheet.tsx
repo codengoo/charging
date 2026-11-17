@@ -19,6 +19,9 @@ import { fmtDistance } from '@/lib/format'
 import { fmtMinutes, type DriveState } from '../data/drive'
 import type { LiveState } from '../data/live'
 import { HistoryBox, PortsBox } from './LiveSection'
+import { BatteryBox } from './BatteryControl'
+import type { BatteryReading } from '../data/battery'
+import type { Vehicle } from '../data/vehicles'
 import { pick } from '@/i18n'
 
 const L = pick({
@@ -75,6 +78,13 @@ interface Props {
   drive?: DriveState
   /** Số cổng trống + lịch sử 24h từ EVCS (chỉ khi bảng mở). */
   live?: LiveState
+  /** Xe đã chọn trong Cài đặt (null = chưa chọn) + % pin hiện tại, để ước tính pin khi tới. */
+  vehicle: Vehicle | null
+  climate: boolean
+  battery: BatteryReading | null
+  batteryStale: boolean
+  onBattery: (pct: number) => void
+  onOpenSettings: () => void
   onOpenGroups: () => void
   onShare: () => void
   onClose: () => void
@@ -90,7 +100,7 @@ const STATUS_BG = {
   planned: 'bg-[#64748B]',
 } as const
 
-export function StationSheet({ open, station, book, power, powerLoading, detail, detailLoading, drive, live, onOpenGroups, onShare, onClose, children }: Props) {
+export function StationSheet({ open, station, book, power, powerLoading, detail, detailLoading, drive, live, vehicle, climate, battery, batteryStale, onBattery, onOpenSettings, onOpenGroups, onShare, onClose, children }: Props) {
   const gmapsDir = `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}`
   const groups = groupsOf(book, station.entityId)
     .map((id) => group(book, id))
@@ -166,6 +176,18 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
         )}
 
         <PortsBox power={ports} powerLoading={powerLoading || (!ports && detailLoading)} standards={detail?.standards} live={live} />
+
+        <BatteryBox
+          vehicle={vehicle}
+          climate={climate}
+          reading={battery}
+          stale={batteryStale}
+          onBattery={onBattery}
+          drive={drive}
+          power={ports}
+          live={live?.live?.ports ?? null}
+          onOpenSettings={onOpenSettings}
+        />
 
         {live && <HistoryBox live={live} power={ports} />}
 
