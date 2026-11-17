@@ -22,10 +22,10 @@
     // Ghi đánh giá / bình luận / báo cáo (worker/reviews.ts): 5 lần mỗi phút mỗi IP.
     { "name": "REVIEW_LIMIT", "namespace_id": "1002", "simple": { "limit": 5, "period": 60 } }
   ],
-  // D1 đánh giá + bình luận. Tạo: `npx wrangler d1 create tramsac-reviews` rồi thay database_id,
+  // D1 đánh giá + bình luận (tạo 2026-11-17, region APAC). Migration:
   // `npx wrangler d1 migrations apply tramsac-reviews --remote`. Local: `--local`.
   "d1_databases": [
-    { "binding": "REVIEWS", "database_name": "tramsac-reviews", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }
+    { "binding": "REVIEWS", "database_name": "tramsac-reviews", "database_id": "8b1afd41-c8b0-45e3-83b8-97c52cc854cc", "migrations_dir": "migrations" }
   ],
   // R2 chứa base/power/manifest do builder sinh ra.
   "r2_buckets": [{ "binding": "DATA", "bucket_name": "tramsac-data" }],

@@ -105,7 +105,7 @@ Bài có 3 thiết bị báo cáo thì tự ẩn (tác giả vẫn thấy kèm n
 
 ```bash
 # Token CLOUDFLARE_API_TOKEN cần quyền D1:Edit (hoặc `npx wrangler login`).
-npx wrangler d1 create tramsac-reviews          # chép database_id vào wrangler.jsonc (đang là id giả 0000…)
+npx wrangler d1 create tramsac-reviews          # đã tạo 2026-11-17 (id trong wrangler.jsonc)
 npx wrangler d1 migrations apply tramsac-reviews --remote
 npx wrangler secret put REVIEW_PEPPER           # chuỗi ngẫu nhiên dài, ĐỪNG đổi sau này (đổi = mất quyền sửa bài cũ)
 npx wrangler secret put ADMIN_TOKEN
