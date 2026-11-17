@@ -115,8 +115,8 @@ export function App() {
   // Ước tính % pin khi đến: xe trong Cài đặt + % pin người dùng kéo (dùng chung bảng trạm / Dọc đường).
   const battery = useBattery()
   const vehicle = useMemo(
-    () => vehicleOf(settings.vehicleId, settings.customKwh, settings.customKwhPer100),
-    [settings.vehicleId, settings.customKwh, settings.customKwhPer100],
+    () => vehicleOf(settings.vehicleId, settings.customKwh, settings.customKwhPer100, settings.usageOverride),
+    [settings.vehicleId, settings.customKwh, settings.customKwhPer100, settings.usageOverride],
   )
   // Mở app với bộ lọc theo cài đặt; chip đổi tạm trong phiên, không ghi ngược vào cài đặt.
   const [filters, setFilters] = useState<Filters>(() => filtersFrom(settings))

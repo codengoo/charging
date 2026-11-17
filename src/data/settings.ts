@@ -24,6 +24,8 @@ export interface Settings {
   /** Xe tuỳ chỉnh: dung lượng pin (kWh) và tiêu thụ (kWh/100 km). */
   customKwh: number
   customKwhPer100: number
+  /** Tiêu thụ thực tế người dùng đọc trên xe, đè số ước tính của mẫu có sẵn; null = dùng số mẫu. */
+  usageOverride: number | null
   /** Bật điều hoà: tiêu thụ +8%. */
   climate: boolean
 }
@@ -37,6 +39,7 @@ export const DEFAULT_SETTINGS: Settings = {
   vehicleId: null,
   customKwh: 60,
   customKwhPer100: 16,
+  usageOverride: null,
   climate: true,
 }
 
@@ -75,6 +78,7 @@ export function parseSettings(raw: string | null): Settings {
     vehicleId: typeof o.vehicleId === 'string' && VEHICLE_IDS.includes(o.vehicleId) ? o.vehicleId : d.vehicleId,
     customKwh: inRange(o.customKwh, 5, 250) ? o.customKwh : d.customKwh,
     customKwhPer100: inRange(o.customKwhPer100, 5, 60) ? o.customKwhPer100 : d.customKwhPer100,
+    usageOverride: inRange(o.usageOverride, 5, 60) ? o.usageOverride : d.usageOverride,
     climate: typeof o.climate === 'boolean' ? o.climate : d.climate,
   }
 }

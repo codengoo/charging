@@ -40,8 +40,19 @@ export const VEHICLE_IDS = [...VEHICLES.map((v) => v.id), CUSTOM_ID]
 
 const CUSTOM_NAME = pick({ vi: 'Tuỳ chỉnh', en: 'Custom' })
 
-/** Xe đang chọn; null = chưa chọn. Xe tuỳ chỉnh không giới hạn công suất sạc thêm. */
-export function vehicleOf(id: string | null, customKwh: number, customKwhPer100: number): Vehicle | null {
+/**
+ * Xe đang chọn; null = chưa chọn. Xe tuỳ chỉnh không giới hạn công suất sạc thêm. Mẫu có sẵn +
+ * `usageOverride` (số người dùng đọc trên màn hình xe) → giữ pin / công suất sạc của mẫu, chỉ
+ * thay mức tiêu thụ.
+ */
+export function vehicleOf(
+  id: string | null,
+  customKwh: number,
+  customKwhPer100: number,
+  usageOverride: number | null = null,
+): Vehicle | null {
   if (id === CUSTOM_ID) return { id, name: CUSTOM_NAME, kwh: customKwh, kwhPer100: customKwhPer100, dcKw: 150, acKw: 11 }
-  return VEHICLES.find((v) => v.id === id) ?? null
+  const v = VEHICLES.find((x) => x.id === id)
+  if (!v) return null
+  return usageOverride ? { ...v, kwhPer100: usageOverride } : v
 }

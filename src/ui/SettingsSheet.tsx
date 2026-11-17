@@ -198,8 +198,8 @@ export function SettingsSheet({ open, settings, onChange, onClose }: Props) {
 
 /** "Khôi phục mặc định" là cấu hình HIỂN THỊ — xe của người dùng không phải sở thích hiển thị, giữ lại. */
 function resetKeepingCar(s: Settings): Settings {
-  const { vehicleId, customKwh, customKwhPer100, climate } = s
-  return { ...DEFAULT_SETTINGS, vehicleId, customKwh, customKwhPer100, climate }
+  const { vehicleId, customKwh, customKwhPer100, usageOverride, climate } = s
+  return { ...DEFAULT_SETTINGS, vehicleId, customKwh, customKwhPer100, usageOverride, climate }
 }
 
 function Field({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {

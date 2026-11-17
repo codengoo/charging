@@ -20,6 +20,8 @@ const L = pick({
     custom: 'Tuỳ chỉnh…',
     capacity: 'Pin (kWh)',
     usage: 'Tiêu thụ (kWh/100 km)',
+    real: 'Tiêu thụ thực tế (kWh/100 km)',
+    realHint: (v: string) => `Đọc mức tiêu thụ trung bình trên màn hình xe. Để trống = ước tính ${v} kWh/100 km.`,
     climate: 'Điều hoà',
     on: 'Bật',
     off: 'Tắt',
@@ -32,6 +34,8 @@ const L = pick({
     custom: 'Custom…',
     capacity: 'Battery (kWh)',
     usage: 'Consumption (kWh/100 km)',
+    real: 'Real consumption (kWh/100 km)',
+    realHint: (v: string) => `Read the average consumption on your car's display. Leave empty to use the ${v} kWh/100 km estimate.`,
     climate: 'Air conditioning',
     on: 'On',
     off: 'Off',
@@ -59,6 +63,7 @@ interface Props {
 
 /** Drawer riêng chọn xe + điều hoà; đổi là lưu ngay như Cài đặt. */
 export function VehicleSheet({ open, settings, onChange, onClose, nested = false }: Props) {
+  const model = VEHICLES.find((v) => v.id === settings.vehicleId)
   return (
     <ResponsiveDialog nested={nested} open={open} onOpenChange={(o) => !o && onClose()}>
       <ResponsiveDialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
@@ -72,7 +77,8 @@ export function VehicleSheet({ open, settings, onChange, onClose, nested = false
             <h3 className="text-sm font-semibold">{L.model}</h3>
             <select
               value={settings.vehicleId ?? ''}
-              onChange={(e) => onChange({ vehicleId: e.target.value || null })}
+              // Số tiêu thụ đọc trên xe cũ không còn đúng cho mẫu mới.
+              onChange={(e) => onChange({ vehicleId: e.target.value || null, usageOverride: null })}
               aria-label={L.model}
               className="h-10 w-full rounded-xl bg-muted px-2.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-brand/35"
             >
@@ -101,6 +107,29 @@ export function VehicleSheet({ open, settings, onChange, onClose, nested = false
                   onCommit={(customKwhPer100) => onChange({ customKwhPer100 })}
                 />
               </div>
+            )}
+            {model && (
+              <label className="mt-1 flex flex-col gap-1 text-xs text-muted-foreground">
+                {L.real}
+                <Input
+                  // key theo mẫu: đổi mẫu thì ô trống lại (defaultValue chỉ đọc lúc gắn).
+                  key={model.id}
+                  type="number"
+                  inputMode="decimal"
+                  min={5}
+                  max={60}
+                  step="0.1"
+                  placeholder={fmtNum(model.kwhPer100)}
+                  defaultValue={settings.usageOverride ?? ''}
+                  onChange={(e) => {
+                    const v = Number(e.target.value)
+                    if (!e.target.value) onChange({ usageOverride: null })
+                    else if (Number.isFinite(v) && v >= 5 && v <= 60) onChange({ usageOverride: v })
+                  }}
+                  className="text-foreground"
+                />
+                <span>{L.realHint(fmtNum(model.kwhPer100))}</span>
+              </label>
             )}
           </section>
 
