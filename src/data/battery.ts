@@ -67,19 +67,52 @@ const AC_CURVE = 0.9
 /** Bước tích phân đường cong sạc (% pin). */
 const CURVE_STEP = 0.5
 
-/** Công suất DC xe nhận ở `soc`% — nội suy tuyến tính trên `dcCurve`. */
+type Curve = NonNullable<Vehicle['dcCurve']>
+
+/**
+ * Hệ số góc tại từng điểm cho nội suy cubic ĐƠN ĐIỆU (Fritsch–Carlson / PCHIP): đường đi mượt qua
+ * các điểm mà không vọt quá giá trị hai bên (không "lồi" lên trên đỉnh, không âm). Tính một lần
+ * cho mỗi đường cong.
+ */
+const slopesCache = new WeakMap<Curve, number[]>()
+function slopesOf(c: Curve): number[] {
+  const hit = slopesCache.get(c)
+  if (hit) return hit
+  const n = c.length
+  const d = Array.from({ length: n - 1 }, (_, i) => (c[i + 1][1] - c[i][1]) / (c[i + 1][0] - c[i][0]))
+  const m = new Array<number>(n)
+  m[0] = d[0] ?? 0
+  m[n - 1] = d[n - 2] ?? 0
+  for (let i = 1; i < n - 1; i++) {
+    if (d[i - 1] * d[i] <= 0) m[i] = 0 // đỉnh / đáy / đoạn phẳng: tiếp tuyến nằm ngang
+    else {
+      const h0 = c[i][0] - c[i - 1][0]
+      const h1 = c[i + 1][0] - c[i][0]
+      const w0 = 2 * h1 + h0
+      const w1 = h1 + 2 * h0
+      m[i] = (w0 + w1) / (w0 / d[i - 1] + w1 / d[i]) // trung bình điều hoà có trọng số
+    }
+  }
+  slopesCache.set(c, m)
+  return m
+}
+
+/** Công suất DC xe nhận ở `soc`% — nội suy cubic đơn điệu trên `dcCurve` (ngoài đầu mút giữ giá trị mút). */
 export function dcCurveKw(v: Vehicle, soc: number): number {
   const c = v.dcCurve
   if (!c || c.length === 0) return v.dcKw * DC_FLAT
   if (soc <= c[0][0]) return c[0][1]
-  for (let i = 1; i < c.length; i++) {
-    const [s1, k1] = c[i]
-    if (soc <= s1) {
-      const [s0, k0] = c[i - 1]
-      return k0 + ((k1 - k0) * (soc - s0)) / (s1 - s0)
-    }
-  }
-  return c[c.length - 1][1]
+  if (soc >= c[c.length - 1][0]) return c[c.length - 1][1]
+  const m = slopesOf(c)
+  let i = 1
+  while (soc > c[i][0]) i++
+  const [s0, k0] = c[i - 1]
+  const [s1, k1] = c[i]
+  const h = s1 - s0
+  const t = (soc - s0) / h
+  const t2 = t * t
+  const t3 = t2 * t
+  return (2 * t3 - 3 * t2 + 1) * k0 + (t3 - 2 * t2 + t) * h * m[i - 1] + (-2 * t3 + 3 * t2) * k1 + (t3 - t2) * h * m[i]
 }
 
 /**

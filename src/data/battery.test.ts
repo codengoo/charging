@@ -74,17 +74,29 @@ describe('chargeMinutes', () => {
   })
 
   const curved: Vehicle = { ...V, dcCurve: [[0, 50], [50, 100], [100, 20]] }
-  it('đường cong: nội suy tuyến tính, ngoài đầu mút giữ giá trị mút', () => {
-    expect(dcCurveKw(curved, 25)).toBeCloseTo(75, 9)
-    expect(dcCurveKw(curved, 75)).toBeCloseTo(60, 9)
+  it('đường cong: cubic đơn điệu — qua đúng các điểm, không vọt ra ngoài hai đầu đoạn, ngoài đầu mút giữ mút', () => {
+    for (const [soc, kw] of curved.dcCurve!) expect(dcCurveKw(curved, soc)).toBeCloseTo(kw, 9)
+    for (let s = 0; s <= 50; s += 0.5) expect(dcCurveKw(curved, s)).toBeGreaterThanOrEqual(50 - 1e-9)
+    for (let s = 0; s <= 50; s += 0.5) expect(dcCurveKw(curved, s)).toBeLessThanOrEqual(100 + 1e-9)
+    for (let s = 50; s <= 100; s += 0.5) expect(dcCurveKw(curved, s)).toBeGreaterThanOrEqual(20 - 1e-9)
+    for (let s = 50; s <= 100; s += 0.5) expect(dcCurveKw(curved, s)).toBeLessThanOrEqual(100 + 1e-9)
+    // Đỉnh ở 50% có tiếp tuyến nằm ngang: hai bên sát đỉnh gần bằng đỉnh.
+    expect(dcCurveKw(curved, 49)).toBeGreaterThan(99.5)
     expect(dcCurveKw(curved, 120)).toBe(20)
     expect(dcCurveKw(V, 40)).toBeCloseTo(112.5, 9) // không có đường cong → phẳng 75% dcKw
   })
   it('đường cong: tích phân từng bước, công suất bị cổng trạm giới hạn', () => {
     // 50→60%, cổng 40 kW (thấp hơn mọi điểm trên đoạn này) → phẳng 40 kW: 10 kWh / 40 kW.
     expect(chargeMinutes(50, { kw: 40, dc: true }, curved, 60)).toBeCloseTo((10 / 40) * 60, 6)
-    // 0→50%: P = 50 + s (kW); tích phân ∫ 1/(50+s) ds × kWh/100 = ln(100/50) giờ.
-    expect(chargeMinutes(0, { kw: 500, dc: true }, curved, 50)!).toBeCloseTo(Math.log(2) * 60, 1)
+    // 0→50%: so với tích phân số độc lập (Simpson, 1000 đoạn) của kWh/P(s).
+    let h = 0
+    const n = 1000
+    for (let i = 0; i <= n; i++) {
+      const w = i === 0 || i === n ? 1 : i % 2 ? 4 : 2
+      h += w / dcCurveKw(curved, (50 * i) / n)
+    }
+    const hours = ((50 / n / 3) * h * V.kwh) / 100
+    expect(chargeMinutes(0, { kw: 500, dc: true }, curved, 50)! / (hours * 60)).toBeCloseTo(1, 3)
   })
   it('từng mẫu: 10→70% khớp thời gian hãng công bố (±10%)', () => {
     const official: Record<string, number> = { vf3: 36, minio: 30, vf5: 32, vfe34: 27, vf6: 25, limo: 30, vf7eco: 25, vf7plus: 28, vf8: 31, vf9: 35 }

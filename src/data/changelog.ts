@@ -14,9 +14,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: '0.15.1',
     date: '2026-11-17',
     title: 'Đường cong sạc',
-    changes: ["Xem đường cong sạc nhanh của xe trong Xe của bạn."],
+    changes: ["Xem đường cong sạc nhanh của xe trong Xe của bạn, so ở trụ 60 / 120 / 250 kW."],
     titleEn: 'Charging curve',
-    changesEn: ["See your car's fast-charging curve in Your car."],
+    changesEn: ["See your car's fast-charging curve in Your car, compared on 60 / 120 / 250 kW chargers."],
   },
   {
     version: '0.15.0',

@@ -4,7 +4,7 @@ Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app
 
 ## [0.15.1] — 2026-11-17 — Đường cong sạc
 
-- Xem đường cong sạc nhanh của xe trong Xe của bạn.
+- Xem đường cong sạc nhanh của xe trong Xe của bạn, so ở trụ 60 / 120 / 250 kW.
 
 ## [0.15.0] — 2026-11-17 — Địa điểm hay dùng
 
