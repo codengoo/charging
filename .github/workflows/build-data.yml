@@ -11,6 +11,14 @@ concurrency:
   group: build-data
   cancel-in-progress: true
 
+# Chỉ đọc repo; ghi R2 bằng token Cloudflare (secret), không cần quyền GitHub nào khác.
+permissions:
+  contents: read
+
+env:
+  # Cố định bản wrangler — `wrangler@4` trôi theo bản mới nhất có thể đổi cú pháp lệnh r2.
+  WRANGLER: wrangler@4.162.0
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,11 +27,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       # Lõi ETL chỉ dùng Node builtins (fetch/zlib/streams) → không cần npm install.
       - name: Build dữ liệu
         run: node builder/run-local.mjs
+
+      # Snapshot cụt / My Maps lỗi thì dừng ở đây — manifest đang chạy giữ nguyên.
+      - name: Kiểm tra trước khi upload
+        run: node builder/check.mjs
 
       - name: Upload R2
         env:
@@ -31,23 +43,24 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -e
-          GEN=$(node -e "console.log(require('./builder/out/manifest.json').generation)")
+          npx -y $WRANGLER --version
+          m() { node -e "console.log(require('./builder/out/manifest.json').$1)"; }
+          BASE=$(m base)
+          POWER=$(m power)
+          SEO_DIR=$(m seo.dir)
           IMMUTABLE='public, max-age=31536000, immutable'
-          npx -y wrangler@4 r2 object put "tramsac-data/base-$GEN.json" \
-            --file="builder/out/base-$GEN.json" --remote \
-            --content-type=application/json --cache-control="$IMMUTABLE"
-          npx -y wrangler@4 r2 object put "tramsac-data/power-$GEN.json" \
-            --file="builder/out/power-$GEN.json" --remote \
-            --content-type=application/json --cache-control="$IMMUTABLE"
+          put() { # put <key> <file> <cache-control>
+            npx -y $WRANGLER r2 object put "tramsac-data/$1" --file="$2" --remote \
+              --content-type=application/json --cache-control="$3"
+          }
+          # Tên file mang hash nội dung → không bao giờ ghi đè file cũ khác nội dung. File cũ
+          # vẫn còn trên R2 nên client đang mở với manifest cũ tải tiếp được.
+          put "$BASE" "builder/out/$BASE" "$IMMUTABLE"
+          put "$POWER" "builder/out/$POWER" "$IMMUTABLE"
           # Shard tra cứu cho preview link /station/<id> (worker/index.ts) — trước manifest để
-          # manifest mới không bao giờ trỏ tới shard chưa có.
-          SEO_DIR="seo-$GEN"
-          for f in builder/out/$SEO_DIR/*.json; do
-            npx -y wrangler@4 r2 object put "tramsac-data/$SEO_DIR/$(basename "$f")" \
-              --file="$f" --remote \
-              --content-type=application/json --cache-control="$IMMUTABLE"
-          done
+          # manifest mới không bao giờ trỏ tới shard chưa có. Chạy song song 8 lượt.
+          export -f put
+          export WRANGLER IMMUTABLE
+          ls builder/out/$SEO_DIR/*.json | xargs -P 8 -I{} bash -c 'put "'"$SEO_DIR"'/$(basename {})" {} "$IMMUTABLE"'
           # manifest cuối cùng (con trỏ latest) — cache ngắn
-          npx -y wrangler@4 r2 object put "tramsac-data/manifest.json" \
-            --file="builder/out/manifest.json" --remote \
-            --content-type=application/json --cache-control="public, max-age=300"
+          put "manifest.json" "builder/out/manifest.json" "public, max-age=300"

@@ -19,7 +19,14 @@ export interface DataManifest {
   seo?: { dir: string; shards: number }
 }
 
-/** `base-<gen>.json` / `power-<gen>.json`: hàng packed theo `fields`. */
+/**
+ * Khoá phiên bản dữ liệu. Tên file mang generation VÀ hash nội dung (`power-<gen>-<hash8>.json`)
+ * — chỉ My Maps đổi trong ngày thì generation giữ nguyên nhưng tên file đổi. Manifest cũ (chưa có
+ * hash) vẫn so được vì so cả chuỗi tên.
+ */
+export const dataKey = (m: Pick<DataManifest, 'base' | 'power'>): string => `${m.base}|${m.power}`
+
+/** `base-<gen>-<hash>.json` / `power-<gen>-<hash>.json`: hàng packed theo `fields`. */
 export interface DataBundle {
   v: number
   generation: number

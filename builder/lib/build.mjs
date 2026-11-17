@@ -54,6 +54,16 @@ async function toTextStream(byteStream) {
   return bytes.pipeThrough(new TextDecoderStream())
 }
 
+/**
+ * 8 ký tự hex đầu của SHA-256 nội dung — gắn vào tên file `immutable`: nội dung đổi (vd. chỉ My
+ * Maps đổi, generation VinFast giữ nguyên) thì tên đổi, không bao giờ ghi đè file đang cache 1 năm.
+ * @param {unknown} data
+ */
+export async function contentHash(data) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(data)))
+  return [...new Uint8Array(buf).slice(0, 4)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 /** Đọc con trỏ version mới nhất của VinFast. */
 export async function fetchMeta() {
   const res = await fetch(`${CDN}/locators-meta.json`, { headers: { 'User-Agent': UA } })
@@ -179,11 +189,12 @@ export async function buildData(log = () => {}) {
     fields: ['portCount', 'maxKw', 'dcCount', 'groups'],
     rows: powerRows,
   }
+  // builtAt không vào hash: build lại cùng dữ liệu ra cùng tên file (R2 ghi đè y hệt, cache vẫn đúng).
   const manifest = {
     generation,
     builtAt,
-    base: `base-${generation}.json`,
-    power: `power-${generation}.json`,
+    base: `base-${generation}-${await contentHash({ ...base, builtAt: '' })}.json`,
+    power: `power-${generation}-${await contentHash({ ...power, builtAt: '' })}.json`,
     counts: { stations: baseRows.length, enriched: matched },
   }
   return { manifest, base, power }
