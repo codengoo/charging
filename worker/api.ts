@@ -89,21 +89,36 @@ async function passHere(target: URL, ttl: number): Promise<Response> {
   })
 }
 
-/** `stops=lat,lng;lat,lng[;…]` (2..22 điểm; giữa là via). */
+/** Tên tuỳ chọn tránh của app → `avoid[features]` của HERE. Chỉ nhận đúng các tên này. */
+const AVOID_FEATURE: Record<string, string> = { toll: 'tollRoad', highway: 'controlledAccessHighway', ferry: 'ferry' }
+
+/**
+ * `stops=lat,lng;lat,lng!p;…` (2..22 điểm; giữa là via, đuôi `!p` = chỉ đi qua chứ không dừng —
+ * điểm kéo tuyến trên Google), `alt=0..2` (số tuyến khác muốn xin), `avoid=toll,highway,ferry`.
+ */
 async function route(url: URL, env: ApiEnv): Promise<Response> {
-  const stops = (url.searchParams.get('stops') ?? '').split(';').filter(Boolean)
-  if (stops.length < 2 || !stops.every((s) => COORD.test(s))) return fail(400, 'stops không hợp lệ')
-  const key = hereKey(env)
-  if (!key) return fail(503, 'Chưa cấu hình HERE_API_KEY')
+  const stops = (url.searchParams.get('stops') ?? '')
+    .split(';')
+    .filter(Boolean)
+    .map((s) => ({ at: s.replace(/!p$/, ''), pass: s.endsWith('!p') }))
+  if (stops.length < 2 || !stops.every((s) => COORD.test(s.at))) return fail(400, 'stops không hợp lệ')
   const origin = stops[0]
   const destination = stops[stops.length - 1]
+  if (origin.pass || destination.pass) return fail(400, 'stops không hợp lệ')
+  const key = hereKey(env)
+  if (!key) return fail(503, 'Chưa cấu hình HERE_API_KEY')
   const via = stops.slice(1, -1).slice(0, MAX_VIA)
+  // Có điểm giữa = người dùng đã chốt hướng, không xin tuyến khác.
+  const alt = via.length === 0 ? Math.min(Math.max(parseInt(url.searchParams.get('alt') ?? '', 10) || 0, 0), 2) : 0
+  const avoid = [...new Set((url.searchParams.get('avoid') ?? '').split(',').map((s) => AVOID_FEATURE[s]).filter(Boolean))]
 
   const target = new URL('https://router.hereapi.com/v8/routes')
   target.searchParams.set('transportMode', 'car')
-  target.searchParams.set('origin', origin)
-  for (const v of via) target.searchParams.append('via', v)
-  target.searchParams.set('destination', destination)
+  target.searchParams.set('origin', origin.at)
+  for (const v of via) target.searchParams.append('via', v.pass ? `${v.at}!passThrough=true` : v.at)
+  target.searchParams.set('destination', destination.at)
+  if (alt > 0) target.searchParams.set('alternatives', String(alt))
+  if (avoid.length) target.searchParams.set('avoid[features]', avoid.join(','))
   target.searchParams.set('return', 'polyline,summary')
   target.searchParams.set('spans', 'length,functionalClass')
   target.searchParams.set('apiKey', key)

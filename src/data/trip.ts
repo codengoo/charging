@@ -4,7 +4,7 @@
  * MapViewModel.handleSharedText (charge-map-android).
  */
 import { decodeFlexiblePolyline, type GeoPoint } from '../lib/flexiblePolyline'
-import { firstUrl, hasFix, isShortLink, parseMapsUrl, type TripStop } from '../lib/mapsLink'
+import { firstUrl, hasFix, isShortLink, parseMapsUrl, type Avoid, type TripStop } from '../lib/mapsLink'
 import type { RoutePath } from './routeCorridor'
 import { pick } from '../i18n'
 
@@ -14,6 +14,18 @@ export interface TripPoint {
   lat: number
   lng: number
 }
+
+/** Kết quả đọc link: chặng có toạ độ + những gì link ghi thêm (xem ParsedLink). */
+export interface ResolvedTrip {
+  points: TripPoint[]
+  /** vias[i] = điểm kéo tuyến giữa points[i] và points[i+1]; dài bằng `points`. */
+  vias: GeoPoint[][]
+  avoid: Avoid
+  googleRoute: number | null
+}
+
+/** Một điểm gửi HERE; `pass` = chỉ đi qua (điểm kéo tuyến), không tạo chặng dừng. */
+export type Waypoint = GeoPoint & { pass?: boolean }
 
 /** Lỗi có câu tiếng Việt hiện thẳng cho người dùng. */
 export class TripError extends Error {}
@@ -83,10 +95,13 @@ interface HereSpan {
   offset?: number
   functionalClass?: number
 }
+interface HereSection {
+  polyline?: string
+  summary?: { length?: number; duration?: number }
+  spans?: HereSpan[]
+}
 interface HereRoute {
-  routes?: Array<{
-    sections?: Array<{ polyline?: string; summary?: { length?: number; duration?: number }; spans?: HereSpan[] }>
-  }>
+  routes?: Array<{ sections?: HereSection[] }>
 }
 
 /**
@@ -106,10 +121,13 @@ export function limitedFlags(spans: HereSpan[] | undefined, size: number): boole
   return out
 }
 
-/** Body HERE Routing v8 → đường đi. Tách riêng để test được không cần mạng. */
-export function parseHereRoute(body: HereRoute): RoutePath | null {
-  const sections = body.routes?.[0]?.sections
-  if (!sections) return null
+/** Body HERE Routing v8 → mọi tuyến (tuyến 0 là tuyến HERE đề xuất). Tách riêng để test được không cần mạng. */
+export function parseHereRoutes(body: HereRoute): RoutePath[] {
+  return (body.routes ?? []).map((r) => pathOf(r.sections ?? [])).filter((p): p is RoutePath => p !== null)
+}
+
+/** Các section của một tuyến → một đường liền. */
+function pathOf(sections: HereSection[]): RoutePath | null {
   const points: GeoPoint[] = []
   const limited: boolean[] = []
   let meters = 0
@@ -131,11 +149,30 @@ export function parseHereRoute(body: HereRoute): RoutePath | null {
   return points.length >= 2 ? { points, limited, meters, seconds } : null
 }
 
-export async function fetchRoute(stops: GeoPoint[], signal: AbortSignal): Promise<RoutePath | null> {
-  if (stops.length < 2) return null
-  const q = stops.map((p) => `${p.lat},${p.lng}`).join(';')
-  const body = await api<HereRoute>(`/api/route?stops=${q}`, signal)
-  return body ? parseHereRoute(body) : null
+/** Chặng xen kẽ điểm kéo tuyến, đúng thứ tự đi. */
+export function waypointsOf(stops: GeoPoint[], vias: GeoPoint[][]): Waypoint[] {
+  return stops.flatMap((p, i): Waypoint[] => [
+    { lat: p.lat, lng: p.lng },
+    ...(i < stops.length - 1 ? (vias[i] ?? []).map((v) => ({ lat: v.lat, lng: v.lng, pass: true })) : []),
+  ])
+}
+
+/** `alt` = số tuyến khác muốn xin thêm (Worker bỏ qua khi có điểm giữa). Rỗng = không tìm được. */
+export async function fetchRoutes(
+  waypoints: Waypoint[],
+  opts: { alt: number; avoid: Avoid },
+  signal: AbortSignal,
+): Promise<RoutePath[]> {
+  if (waypoints.length < 2) return []
+  const params = new URLSearchParams({ stops: waypoints.map((p) => `${p.lat},${p.lng}${p.pass ? '!p' : ''}`).join(';') })
+  if (opts.alt > 0) params.set('alt', String(opts.alt))
+  const avoid = (['toll', 'highway', 'ferry'] as const).filter((k) => opts.avoid[k])
+  if (avoid.length) params.set('avoid', avoid.join(','))
+  const body = await api<HereRoute>(`/api/route?${params}`, signal)
+  const routes = body ? parseHereRoutes(body) : []
+  // Phòng HERE từ chối `alternatives` với tổ hợp nào đó: xin lại đúng một tuyến.
+  if (routes.length === 0 && opts.alt > 0) return fetchRoutes(waypoints, { ...opts, alt: 0 }, signal)
+  return routes
 }
 
 /**
@@ -161,7 +198,7 @@ export async function resolveTrip(
   text: string,
   here: () => Promise<GeoPoint | null>,
   signal: AbortSignal,
-): Promise<TripPoint[]> {
+): Promise<ResolvedTrip> {
   const raw = firstUrl(text)
   if (!raw) throw new TripError(MSG.badLink)
   const full = isShortLink(raw) ? await expandLink(raw, signal) : raw
@@ -175,9 +212,11 @@ export async function resolveTrip(
   if (resolved.some((p) => p === null)) throw new TripError(MSG.badStop)
   const points = resolved as TripPoint[]
 
+  const vias = parsed.vias
   if (needGps) {
     if (!me) throw new TripError(MSG.noGps)
     points.unshift({ label: MSG.myLocation, lat: me.lat, lng: me.lng })
+    vias.unshift([])
   }
-  return points
+  return { points, vias, avoid: parsed.avoid, googleRoute: parsed.googleRoute }
 }
