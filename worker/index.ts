@@ -85,23 +85,85 @@ async function serveData(url: URL, env: Env): Promise<Response> {
   return new Response(obj.body, { headers })
 }
 
-/** Meta trang chủ theo ngôn ngữ. Bản tiếng Việt nằm sẵn trong index.html; giữ hai bên khớp. */
+/**
+ * Meta + khối chữ tĩnh + JSON-LD trang chủ theo ngôn ngữ. Bản tiếng Việt nằm sẵn trong index.html
+ * (title, description, #seo-shell, script#ld-app); GIỮ HAI BÊN KHỚP.
+ */
 const HOME = {
   vi: {
     title: 'Bản đồ trạm sạc ô tô VinFast — tìm trạm gần bạn',
     description:
-      'Bản đồ trạm sạc ô tô VinFast trên toàn quốc, cập nhật hằng ngày. Tìm trạm gần bạn, lưu trạm theo nhóm, chia sẻ bằng mã QR và chỉ đường nhanh.',
+      'Bản đồ trạm sạc ô tô VinFast toàn quốc, cập nhật hằng ngày: cổng trống thời gian thực, trạm dọc đường từ link Google Maps, tự lên kế hoạch dừng sạc theo xe và chỉ đường.',
     siteName: 'Bản đồ trạm sạc VinFast',
     locale: 'vi_VN',
+    h1: 'Bản đồ trạm sạc ô tô VinFast',
+    features: [
+      'Hơn 25.000 trạm sạc VinFast trên toàn quốc, cập nhật hằng ngày.',
+      'Số cổng trống theo thời gian thực và biểu đồ độ đông 24 giờ.',
+      'Dán link chỉ đường Google Maps để thấy trạm dọc đường.',
+      'Tự lên kế hoạch dừng sạc theo mẫu xe và % pin.',
+      'Lưu Nhà, Công ty, trạm yêu thích; dùng được khi mất sóng.',
+    ],
+    appFeatures: [
+      'Bản đồ hơn 25.000 trạm sạc ô tô VinFast trên toàn quốc',
+      'Số cổng trống theo thời gian thực',
+      'Trạm sạc dọc đường từ link chỉ đường Google Maps',
+      'Tự lên kế hoạch dừng sạc theo mẫu xe',
+      'Lưu Nhà, Công ty và trạm yêu thích',
+      'Dùng được khi mất sóng',
+    ],
   },
   en: {
     title: 'VinFast EV Charging Station Map — find stations near you',
     description:
-      'Map of VinFast EV charging stations across Vietnam, updated daily. Find stations near you, see free ports in real time, plan stops along your route and get directions.',
+      'Map of VinFast EV charging stations across Vietnam, updated daily: real-time free ports, stations along a Google Maps route, automatic charging stops for your car, and directions.',
     siteName: 'VinFast Charging Map',
     locale: 'en_US',
+    h1: 'VinFast EV charging station map',
+    features: [
+      'Over 25,000 VinFast charging stations across Vietnam, updated daily.',
+      'Real-time free ports and a 24-hour busyness chart.',
+      'Paste a Google Maps directions link to see stations along the way.',
+      'Automatic charging stops for your car model and battery level.',
+      'Save Home, Work and favourite stations; works without signal.',
+    ],
+    appFeatures: [
+      'Map of over 25,000 VinFast EV charging stations in Vietnam',
+      'Real-time free charging ports',
+      'Charging stations along a Google Maps route',
+      'Automatic charging stop planning by car model',
+      'Save Home, Work and favourite stations',
+      'Works offline',
+    ],
   },
 }
+
+/** JSON-LD (schema.org WebSite + WebApplication) cho trang chủ một ngôn ngữ. */
+function appJsonLd(lang: Lang): string {
+  const h = HOME[lang]
+  const url = SITE_URL + withLang('/', lang)
+  return JSON.stringify({
+    '@context': 'https://schema.org',
+    '@graph': [
+      { '@type': 'WebSite', '@id': `${SITE_URL}/#website`, url, name: h.siteName, inLanguage: lang },
+      {
+        '@type': 'WebApplication',
+        '@id': `${SITE_URL}/#app`,
+        name: h.siteName,
+        url,
+        description: h.description,
+        applicationCategory: 'TravelApplication',
+        operatingSystem: 'Web, iOS, Android',
+        inLanguage: lang,
+        isAccessibleForFree: true,
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'VND' },
+        featureList: h.appFeatures,
+      },
+    ],
+  }).replace(/</g, '\\u003c') // không để chuỗi dữ liệu đóng thẻ <script>
+}
+
+const escHtml = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 interface PageMeta {
   lang: Lang
@@ -110,6 +172,10 @@ interface PageMeta {
   /** Đường dẫn gốc (dạng tiếng Việt, không tiền tố) — dựng canonical + hreflang cho cả hai bản. */
   basePath: string
   noindex?: boolean
+  /** Khối chữ tĩnh (#seo-shell): tiêu đề h1 + đoạn mở đầu; `features` null = bỏ danh sách (trang trạm). */
+  h1: string
+  lead: string
+  features: string[] | null
 }
 
 /**
@@ -143,6 +209,14 @@ function localize(res: Response, m: PageMeta): Response {
     .on('meta[name="twitter:title"]', set('content', m.title))
     .on('meta[name="twitter:description"]', set('content', m.description))
     .on('head', { element: (el) => void el.append(links, { html: true }) })
+    // Khối chữ tĩnh cho bot không chạy JS + dữ liệu cấu trúc theo ngôn ngữ.
+    .on('#seo-h1', { element: (el) => void el.setInnerContent(m.h1) })
+    .on('#seo-lead', { element: (el) => void el.setInnerContent(m.lead) })
+    .on('#seo-features', {
+      element: (el) =>
+        m.features ? void el.setInnerContent(m.features.map((f) => `<li>${escHtml(f)}</li>`).join(''), { html: true }) : void el.remove(),
+    })
+    .on('script#ld-app', { element: (el) => void el.setInnerContent(appJsonLd(m.lang), { html: true }) })
     .transform(res)
 }
 
@@ -173,6 +247,9 @@ async function serveShell(url: URL, env: Env, lang: Lang): Promise<Response> {
     title: home.title,
     description: home.description,
     basePath: isHome ? '/' : basePath,
+    h1: home.h1,
+    lead: home.description,
+    features: home.features,
     noindex: !isHome,
   })
   return htmlResponse(res, 200, !isHome)
@@ -218,6 +295,9 @@ async function serveStation(url: URL, env: Env, lang: Lang): Promise<Response> {
     description: t.description,
     basePath: stationPath({ entityId: id, name }, 'vi'),
     noindex: true,
+    h1: name,
+    lead: t.description,
+    features: null,
   })
   return htmlResponse(res, 200, true)
 }

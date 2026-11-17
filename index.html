@@ -22,7 +22,7 @@
     <title>Bản đồ trạm sạc ô tô VinFast — tìm trạm gần bạn</title>
     <meta
       name="description"
-      content="Bản đồ trạm sạc ô tô VinFast trên toàn quốc, cập nhật hằng ngày. Tìm trạm gần bạn, lưu trạm theo nhóm, chia sẻ bằng mã QR và chỉ đường nhanh."
+      content="Bản đồ trạm sạc ô tô VinFast toàn quốc, cập nhật hằng ngày: cổng trống thời gian thực, trạm dọc đường từ link Google Maps, tự lên kế hoạch dừng sạc theo xe và chỉ đường."
     />
     <meta name="keywords" content="trạm sạc, VinFast, bản đồ trạm sạc, sạc ô tô điện, charging station, EV charging Việt Nam" />
     <link rel="canonical" href="https://charging.cangao.asia/" />
@@ -43,7 +43,7 @@
     <meta property="og:title" content="Bản đồ trạm sạc ô tô VinFast — tìm trạm gần bạn" />
     <meta
       property="og:description"
-      content="Trạm sạc ô tô VinFast trên toàn quốc, cập nhật hằng ngày. Tìm trạm gần bạn, lọc, lưu yêu thích và chỉ đường nhanh."
+      content="Bản đồ trạm sạc ô tô VinFast toàn quốc, cập nhật hằng ngày: cổng trống thời gian thực, trạm dọc đường từ link Google Maps, tự lên kế hoạch dừng sạc theo xe và chỉ đường."
     />
     <meta property="og:url" content="https://charging.cangao.asia/" />
     <meta property="og:image" content="https://charging.cangao.asia/og-image.png" />
@@ -56,12 +56,67 @@
     <meta name="twitter:title" content="Bản đồ trạm sạc ô tô VinFast" />
     <meta
       name="twitter:description"
-      content="Trạm sạc ô tô VinFast toàn quốc — tìm trạm gần bạn, lọc, lưu yêu thích, chỉ đường."
+      content="Bản đồ trạm sạc ô tô VinFast toàn quốc, cập nhật hằng ngày: cổng trống thời gian thực, trạm dọc đường từ link Google Maps, tự lên kế hoạch dừng sạc theo xe và chỉ đường."
     />
     <meta name="twitter:image" content="https://charging.cangao.asia/og-image.png" />
+
+    <!-- Dữ liệu cấu trúc (schema.org). Worker thay nội dung cho bản tiếng Anh (worker/index.ts HOME). -->
+    <script type="application/ld+json" id="ld-app">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://charging.cangao.asia/#website",
+            "url": "https://charging.cangao.asia/",
+            "name": "Bản đồ trạm sạc VinFast",
+            "inLanguage": "vi"
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://charging.cangao.asia/#app",
+            "name": "Bản đồ trạm sạc VinFast",
+            "url": "https://charging.cangao.asia/",
+            "description": "Bản đồ trạm sạc ô tô VinFast toàn quốc, cập nhật hằng ngày: cổng trống thời gian thực, trạm dọc đường từ link Google Maps, tự lên kế hoạch dừng sạc theo xe và chỉ đường.",
+            "applicationCategory": "TravelApplication",
+            "operatingSystem": "Web, iOS, Android",
+            "inLanguage": "vi",
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "VND" },
+            "featureList": [
+              "Bản đồ hơn 25.000 trạm sạc ô tô VinFast trên toàn quốc",
+              "Số cổng trống theo thời gian thực",
+              "Trạm sạc dọc đường từ link chỉ đường Google Maps",
+              "Tự lên kế hoạch dừng sạc theo mẫu xe",
+              "Lưu Nhà, Công ty và trạm yêu thích",
+              "Dùng được khi mất sóng"
+            ]
+          }
+        ]
+      }
+    </script>
+    <!-- Khối chữ tĩnh dưới đây chỉ hiện thoáng qua lúc app chưa chạy (React thay #root) — cho bot không chạy JS. -->
+    <style>
+      .seo-shell { max-width: 36rem; margin: 18vh auto 0; padding: 0 1.25rem; font-family: system-ui, sans-serif; color: #6b7280; line-height: 1.5; }
+      .seo-shell h1 { font-size: 1.25rem; color: #111827; margin: 0 0 0.5rem; }
+      .seo-shell ul { margin: 0.75rem 0 0; padding-left: 1.1rem; font-size: 0.875rem; }
+      .dark .seo-shell h1 { color: #f3f4f6; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="seo-shell" id="seo-shell">
+        <h1 id="seo-h1">Bản đồ trạm sạc ô tô VinFast</h1>
+        <p id="seo-lead">Bản đồ trạm sạc ô tô VinFast toàn quốc, cập nhật hằng ngày: cổng trống thời gian thực, trạm dọc đường từ link Google Maps, tự lên kế hoạch dừng sạc theo xe và chỉ đường.</p>
+        <ul id="seo-features">
+          <li>Hơn 25.000 trạm sạc VinFast trên toàn quốc, cập nhật hằng ngày.</li>
+          <li>Số cổng trống theo thời gian thực và biểu đồ độ đông 24 giờ.</li>
+          <li>Dán link chỉ đường Google Maps để thấy trạm dọc đường.</li>
+          <li>Tự lên kế hoạch dừng sạc theo mẫu xe và % pin.</li>
+          <li>Lưu Nhà, Công ty, trạm yêu thích; dùng được khi mất sóng.</li>
+        </ul>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
