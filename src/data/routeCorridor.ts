@@ -29,6 +29,12 @@ export interface AlongRoute {
   atKm: number
   /** Trạm cách tim đường bao nhiêu km. */
   offsetKm: number
+  /**
+   * Trạm sát CAO TỐC nhưng không phải trạm dừng nghỉ cùng chiều: muốn vào phải ra nút giao rồi
+   * quay lại, quãng vòng thật lớn hơn nhiều so với `offsetKm`. Vẫn hiện trong danh sách, kế hoạch
+   * sạc không chọn.
+   */
+  viaExit: boolean
 }
 
 /** `items` là phần hiện được, `total` là tổng trạm thật sự nằm trong hành lang. */
@@ -60,6 +66,13 @@ const MIN_STEP_KM = 0.25
  * cư cạnh đường — chỗ đó vào bằng nút giao, không liên quan gì tới chiều xe chạy.
  */
 const OPPOSITE_SIDE_KM = 0.3
+/**
+ * Trạm bên PHẢI cao tốc trong chừng này = trạm dừng nghỉ cùng chiều, rẽ vào thẳng từ cao tốc.
+ * Xa hơn (bên nào cũng vậy) là trạm trong làng / khu đô thị cạnh cao tốc — phải ra nút giao.
+ * Đo trên tuyến Hà Nội – Ninh Bình (2026-11-17): 119 trạm trong 1,5 km quanh đoạn cao tốc, gần
+ * như không trạm nào nằm trên cao tốc.
+ */
+const REST_STOP_KM = 0.15
 const CELL_SIZE = 0.1
 /** Trần số trạm hiện trong danh sách (giống ALONG_ROUTE_LIMIT bên Android). */
 export const ALONG_ROUTE_LIMIT = 400
@@ -186,7 +199,9 @@ export function pickAlongRoute(route: ThinRoute, stations: Station[], radiusKm: 
     const d = Math.sqrt(best)
     if (d > radiusKm) continue
     if (isOppositeCarriageway(route, bestSeg, d, bestCross)) continue
-    out.push({ station: s, atKm: bestAt, offsetKm: d })
+    const onHighway = route.limited[bestSeg] ?? false
+    const viaExit = onHighway && !(bestCross <= 0 && d <= REST_STOP_KM)
+    out.push({ station: s, atKm: bestAt, offsetKm: d, viaExit })
   }
   return out.sort((a, b) => a.atKm - b.atKm)
 }

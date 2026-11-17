@@ -60,7 +60,8 @@ export function planCharging(
   const speed = avgKmh(route.meters, route.seconds)
   const candidates = items
     .map((item) => ({ item, kw: dcMax(power?.get(item.station.entityId)) }))
-    .filter((c) => c.kw >= PLAN_MIN_DC_KW)
+    // Trạm phải ra cao tốc mới tới: quãng vòng thật không biết được — không đưa vào kế hoạch.
+    .filter((c) => c.kw >= PLAN_MIN_DC_KW && !c.item.viaExit)
 
   const stops: PlanStop[] = []
   let pos = 0

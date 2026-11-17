@@ -32,6 +32,7 @@ const L = pick({
     power: 'Công suất',
     listAria: 'Trạm theo thứ tự trên đường',
     offRoute: (d: string) => `cách tuyến ${d}`,
+    viaExit: 'phải ra cao tốc',
     maxKw: (kw: string) => ` · tối đa ${kw} kW`,
     resolving: 'Đang đọc liên kết…',
     routing: 'Đang tính đường và tìm trạm…',
@@ -56,7 +57,7 @@ const L = pick({
       `${n} điểm dừng · sạc ~${charge} · tới nơi sau ~${total}, còn ${arrive}.`,
     planFail: (km: number) =>
       `Không đủ trạm sạc nhanh (DC ≥ ${PLAN_MIN_DC_KW} kW) sau km ${km} — thử mở rộng hành lang, bỏ lọc công suất hoặc xuất phát với nhiều pin hơn.`,
-    planNote: (r: number) => `Ước tính: ghé trạm xa nhất còn ≥ ${r}% pin, sạc lên 80% (điểm cuối sạc vừa đủ tới nơi). Đổi mức dự phòng trong Xe của bạn.`,
+    planNote: (r: number) => `Ước tính: ghé trạm xa nhất còn ≥ ${r}% pin, sạc lên 80% (điểm cuối sạc vừa đủ tới nơi). Không chọn trạm phải ra cao tốc mới tới. Đổi mức dự phòng trong Xe của bạn.`,
     routes: 'Tuyến đường',
     routeCard: (km: number, n: number) => `${km} km · ${n} trạm`,
     googleHint: (n: number) => `Trên Google bạn chọn tuyến thứ ${n} — chạm tuyến khớp bên dưới hoặc trên bản đồ.`,
@@ -84,6 +85,7 @@ const L = pick({
     power: 'Power',
     listAria: 'Stations in order along the route',
     offRoute: (d: string) => `${d} from route`,
+    viaExit: 'exit the highway',
     maxKw: (kw: string) => ` · up to ${kw} kW`,
     resolving: 'Reading link…',
     routing: 'Calculating route and finding stations…',
@@ -108,7 +110,7 @@ const L = pick({
       `${n} ${n === 1 ? 'stop' : 'stops'} · ~${charge} charging · arrive in ~${total} with ${arrive}.`,
     planFail: (km: number) =>
       `Not enough fast chargers (DC ≥ ${PLAN_MIN_DC_KW} kW) after km ${km} — try a wider corridor, fewer power filters or more starting battery.`,
-    planNote: (r: number) => `Estimate: stop at the farthest station with ≥ ${r}% left, charge to 80% (just enough at the last stop). Change the reserve in Your car.`,
+    planNote: (r: number) => `Estimate: stop at the farthest station with ≥ ${r}% left, charge to 80% (just enough at the last stop). Skips stations you'd have to exit the highway for. Change the reserve in Your car.`,
     routes: 'Routes',
     routeCard: (km: number, n: number) => `${km} km · ${n} ${n === 1 ? 'station' : 'stations'}`,
     googleHint: (n: number) => `In Google Maps you picked route ${n} — tap the matching one below or on the map.`,
@@ -255,7 +257,8 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
 
       {expanded && (
         // Cả thân bảng cuộn chung: hộp cấu hình + thẻ tuyến đã cao, để riêng danh sách cuộn thì nó bị ép về 0.
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain px-4 pb-3 [&>*]:shrink-0">
+        // overflow-x-hidden: overflow-y-auto kéo theo cuộn ngang, phần lề âm -mx-4 sẽ kéo lệch được.
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-3 [&>*]:shrink-0">
           <form onSubmit={submit} className="flex gap-2">
             <Input
               value={text}
@@ -360,12 +363,17 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
           {!(planOn && plan) && hits.items.length > 0 && (
             <ul className="-mx-4 px-4" aria-label={L.listAria}>
               {estimates && lastOk === -1 && <ReachDivider text={L.noneReachable(startPct, reservePct)} />}
-              {hits.items.map(({ station, atKm, offsetKm }, i) => {
+              {hits.items.map(({ station, atKm, offsetKm, viaExit }, i) => {
                 const p = power?.get(station.entityId)
                 const est = estimates?.[i]
                 return (
                   <Fragment key={station.entityId}>
-                    <li className="border-b border-border/60 last:border-b-0">
+                    <li
+                      className={`border-b border-border/60 last:border-b-0 ${
+                        // Vùng không chắc tới được: nền vàng tràn hết bề ngang, nối liền với vạch răng cưa.
+                        estimates && i > lastOk ? `-mx-4 px-4 ${WARN_BG}` : ''
+                      }`}
+                    >
                       <button
                         type="button"
                         onClick={() => onPick(station)}
@@ -382,7 +390,7 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
                               style={{ background: TIER_COLORS[tierOf(p)] }}
                               aria-hidden
                             />
-                            {L.offRoute(fmtDistance(offsetKm))}
+                            {viaExit ? L.viaExit : L.offRoute(fmtDistance(offsetKm))}
                             {p ? L.maxKw(fmtKw(p.maxKw)) : ''}
                           </span>
                         </span>
@@ -520,10 +528,23 @@ function ArrivalPct({ est }: { est: ArrivalEstimate }) {
 }
 
 /** Vạch ngăn giữa trạm còn kịp và trạm có thể không tới được. */
+/** Nền vùng "không chắc tới được" — vạch răng cưa và các trạm phía sau dùng chung. */
+const WARN_BG = 'bg-[#F0A500]/12'
+/** Mép răng cưa: mask SVG (răng nhọn lên) trên nền WARN_BG, nên màu ăn theo giao diện sáng/tối. */
+const ZIGZAG_MASK = `url("data:image/svg+xml,${encodeURIComponent(
+  "<svg xmlns='http://www.w3.org/2000/svg' width='14' height='7' viewBox='0 0 14 7'><path d='M0 7 7 0 14 7Z'/></svg>",
+)}")`
+
+/** Ranh giới trạm còn kịp / không chắc kịp: từ đây trở xuống nền vàng, mép trên răng cưa. */
 function ReachDivider({ text }: { text: string }) {
   return (
-    <li role="separator" className="flex items-center gap-2 border-y-2 border-[#F0A500]/60 bg-[#F0A500]/10 px-2 py-1.5 text-xs font-medium text-[#B45309] dark:text-[#F0A500]">
-      {text}
+    <li role="separator" className="-mx-4 mt-1">
+      <div
+        aria-hidden
+        className={`h-[7px] ${WARN_BG}`}
+        style={{ maskImage: ZIGZAG_MASK, WebkitMaskImage: ZIGZAG_MASK, maskSize: '14px 7px', WebkitMaskSize: '14px 7px', maskRepeat: 'repeat-x', WebkitMaskRepeat: 'repeat-x' }}
+      />
+      <div className={`px-4 pt-1.5 pb-1 text-xs font-medium text-[#B45309] dark:text-[#F0A500] ${WARN_BG}`}>{text}</div>
     </li>
   )
 }
