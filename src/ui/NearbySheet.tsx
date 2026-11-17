@@ -1,4 +1,6 @@
-import { useMemo } from 'react'
+import { useState, useMemo } from 'react'
+import { Loader2, LocateFixed } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -25,6 +27,9 @@ const L = pick({
     count: (n: number, f: string) => `${n} trạm đang hoạt động${f ? ` ${f}` : ''} gần nhất`,
     gpsHint: ' · ~ là đường chim bay, mở trạm để xem quãng đường lái xe.',
     noGpsHint: ' · Bật định vị để xếp theo chỗ bạn đứng.',
+    useGps: 'Dùng vị trí của tôi',
+    gpsDenied: 'Trình duyệt đang chặn vị trí. Bật lại quyền Vị trí cho trang này trong cài đặt trình duyệt / điện thoại rồi thử lại.',
+    gpsFailed: 'Chưa lấy được vị trí — kiểm tra định vị của máy rồi thử lại.',
   },
   en: {
     driving: 'Driving distance',
@@ -37,6 +42,9 @@ const L = pick({
       `${n} nearest operating ${n === 1 ? 'station' : 'stations'}${f ? ` ${f}` : ''}`,
     gpsHint: ' · ~ is straight-line; open a station to see driving distance.',
     noGpsHint: ' · Turn on location to sort by where you are.',
+    useGps: 'Use my location',
+    gpsDenied: 'Location is blocked for this site. Allow Location in your browser / phone settings, then try again.',
+    gpsFailed: "Couldn't get your location — check your device's location services and try again.",
   },
 })
 
@@ -74,12 +82,27 @@ interface Props {
   fromGps: boolean
   /** Điểm gốc của quãng đường lái (useStableOrigin) — để mượn kết quả cache của trạm đã mở. */
   driveOrigin: LatLng | null
+  /** Xin vị trí (chỉ hiện nút khi chưa có GPS). Thành công thì App đổi `origin` + `fromGps`. */
+  onRequestGps: () => Promise<GpsResult>
   onPick: (st: Station) => void
   onClose: () => void
 }
 
+export type GpsResult = 'ok' | 'denied' | 'failed'
+
 /** Các trạm đang hoạt động gần nhất, theo đúng bộ lọc công suất đang bật trên bản đồ. */
-export function NearbySheet({ open, index, power, filters, origin, fromGps, driveOrigin, onPick, onClose }: Props) {
+export function NearbySheet({ open, index, power, filters, origin, fromGps, driveOrigin, onRequestGps, onPick, onClose }: Props) {
+  const [locating, setLocating] = useState(false)
+  const [gpsError, setGpsError] = useState<GpsResult | null>(null)
+
+  async function requestGps() {
+    setLocating(true)
+    setGpsError(null)
+    const r = await onRequestGps()
+    setLocating(false)
+    if (r !== 'ok') setGpsError(r)
+  }
+
   const items = useMemo(() => {
     // "Đã lưu" bỏ qua ở đây (đã có bảng Danh sách); trạm không hoạt động luôn bỏ — đang cần sạc.
     const f: Filters = { ...filters, favoritesOnly: false, activeOnly: true }
@@ -100,6 +123,20 @@ export function NearbySheet({ open, index, power, filters, origin, fromGps, driv
             {fromGps ? L.gpsHint : L.noGpsHint}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
+
+        {!fromGps && (
+          <div className="mt-2 flex flex-col gap-1.5">
+            <Button variant="brand" size="sm" className="self-start" disabled={locating} onClick={requestGps}>
+              {locating ? <Loader2 className="animate-spin" /> : <LocateFixed />}
+              {L.useGps}
+            </Button>
+            {gpsError && (
+              <p role="alert" className="text-xs text-destructive">
+                {gpsError === 'denied' ? L.gpsDenied : L.gpsFailed}
+              </p>
+            )}
+          </div>
+        )}
 
         <ul className="mt-2 flex flex-col">
           {items.map((st) => {
