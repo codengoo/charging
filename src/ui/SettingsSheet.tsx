@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { SwitchRow } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Segmented } from '@/components/ui/segmented'
 import { DEFAULT_SETTINGS, type Settings } from '../data/settings'
@@ -21,13 +22,10 @@ const L = pick({
     themeNames: { system: 'Theo máy', light: 'Sáng', dark: 'Tối' } as Record<ThemePref, string>,
     power: 'Công suất ưu tiên',
     powerHint: 'Theo cổng mạnh nhất của trạm. Bỏ chọn bớt mức thì trạm chưa có dữ liệu công suất bị ẩn.',
-    status: 'Trạng thái trạm',
-    active: 'Đang hoạt động',
-    all: 'Tất cả',
+    activeOnly: 'Chỉ trạm đang hoạt động',
+    activeHint: 'Ẩn trạm bảo trì, ngừng hoạt động, sắp khai trương.',
     corridor: 'Bề rộng hành lang dọc đường',
     legend: 'Chú giải màu ghim',
-    show: 'Hiện',
-    hide: 'Ẩn',
     reset: 'Khôi phục mặc định',
     vehicle: 'Xe của bạn',
     places: 'Địa điểm của tôi',
@@ -43,13 +41,10 @@ const L = pick({
     themeNames: { system: 'System', light: 'Light', dark: 'Dark' } as Record<ThemePref, string>,
     power: 'Preferred power',
     powerHint: "By the station's fastest port. Unticking a level hides stations without power data.",
-    status: 'Station status',
-    active: 'Operating',
-    all: 'All',
+    activeOnly: 'Operating stations only',
+    activeHint: 'Hide stations under maintenance, closed or opening soon.',
     corridor: 'Distance from route',
     legend: 'Pin colour legend',
-    show: 'Show',
-    hide: 'Hide',
     reset: 'Reset to defaults',
     vehicle: 'Your car',
     places: 'My places',
@@ -75,11 +70,6 @@ interface Props {
   placesSummary: string | null
   onOpenPlaces: () => void
 }
-
-const onOff = (on: string, off: string) => [
-  { value: 'on' as const, label: on },
-  { value: 'off' as const, label: off },
-]
 
 /** Cấu hình hiển thị: đổi là lưu và áp dụng ngay, không có nút "Lưu". */
 export function SettingsSheet({ open, settings, onChange, onClose, placesSummary, onOpenPlaces }: Props) {
@@ -172,14 +162,7 @@ export function SettingsSheet({ open, settings, onChange, onClose, placesSummary
           </div>
         </Field>
 
-        <Field title={L.status}>
-          <Segmented
-            label={L.status}
-            value={settings.activeOnly ? 'on' : 'off'}
-            onChange={(v) => onChange({ activeOnly: v === 'on' })}
-            options={onOff(L.active, L.all)}
-          />
-        </Field>
+        <SwitchRow title={L.activeOnly} hint={L.activeHint} checked={settings.activeOnly} onCheckedChange={(activeOnly) => onChange({ activeOnly })} />
 
         <Field title={L.corridor}>
           <Segmented
@@ -190,14 +173,7 @@ export function SettingsSheet({ open, settings, onChange, onClose, placesSummary
           />
         </Field>
 
-        <Field title={L.legend}>
-          <Segmented
-            label={L.legend}
-            value={settings.showLegend ? 'on' : 'off'}
-            onChange={(v) => onChange({ showLegend: v === 'on' })}
-            options={onOff(L.show, L.hide)}
-          />
-        </Field>
+        <SwitchRow title={L.legend} checked={settings.showLegend} onCheckedChange={(showLegend) => onChange({ showLegend })} />
 
         <Button variant="ghost" size="sm" className="self-start text-muted-foreground" onClick={() => onChange(resetKeepingCar(settings))}>
           {L.reset}
