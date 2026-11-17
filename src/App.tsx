@@ -110,12 +110,11 @@ export function App() {
   const { trip, hits } = tripCtl
   // Giữ lần nhập cuối để hộp xác nhận còn nội dung lúc trôi xuống.
   const [pending, setPending] = useState<PendingImport | null>(null)
-  // Bảng địa điểm: mở thường (danh sách) hoặc với điểm có sẵn (chạm giữ bản đồ). Mở từ Cài đặt thì
-  // đóng Cài đặt — hai bảng không chồng lên nhau.
+  // Bảng địa điểm: mở thường (danh sách) hoặc với điểm có sẵn (chạm giữ bản đồ). Từ Cài đặt thì mở
+  // CHỒNG lên Cài đặt (bản `settingsPlaces`, nested) — bảng cha lùi ra sau.
   const [placeDraft, setPlaceDraft] = useState<PlaceDraft | null>(null)
   function openPlaces(draft: PlaceDraft | null) {
     setPlaceDraft(draft)
-    sheets.close('settings')
     sheets.open('places')
   }
 
@@ -440,8 +439,22 @@ export function App() {
         onChange={changeSettings}
         onClose={() => sheets.close('settings')}
         placesSummary={places.places.length ? places.places.map(placeName).join(' · ') : null}
-        onOpenPlaces={() => openPlaces(null)}
-      />
+        onOpenPlaces={() => {
+          setPlaceDraft(null)
+          sheets.open('settingsPlaces')
+        }}
+      >
+        <PlacesSheet
+          nested
+          open={sheets.is('settingsPlaces')}
+          onClose={() => sheets.close('settingsPlaces')}
+          places={places.places}
+          onSave={places.save}
+          onRemove={places.remove}
+          near={userPos ?? mapCenter.current}
+          draft={null}
+        />
+      </SettingsSheet>
 
       <PlacesSheet
         open={sheets.is('places')}

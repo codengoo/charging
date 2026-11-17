@@ -141,8 +141,9 @@ export function NearbySheet({ open, index, power, filters, origin, fromGps, orig
     >
       {places.length > 0 && onOrigin && (
         <div className="-mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 py-1 no-scrollbar" role="group" aria-label={L.originAria}>
-          <Chip size="sm" variant="outline" selected={!originLabel} onClick={() => onOrigin(null)} className="shrink-0">
-            <LocateFixed />
+          {/* "Vị trí của tôi" xin GPS luôn (gộp với nút "Dùng vị trí của tôi" — không hiện hai nút trùng). */}
+          <Chip size="sm" variant="outline" selected={!originLabel && fromGps} disabled={locating} onClick={requestGps} className="shrink-0">
+            {locating ? <Loader2 className="animate-spin" /> : <LocateFixed />}
             {L.me}
           </Chip>
           {places.map((p) => {
@@ -157,12 +158,15 @@ export function NearbySheet({ open, index, power, filters, origin, fromGps, orig
         </div>
       )}
 
-      {!fromGps && !originLabel && (
+      {((!fromGps && !originLabel) || gpsError) && (
         <div className="mt-2 flex flex-col gap-1.5">
-          <Button variant="brand" size="sm" className="self-start" disabled={locating} onClick={requestGps}>
-            {locating ? <Loader2 className="animate-spin" /> : <LocateFixed />}
-            {L.useGps}
-          </Button>
+          {/* Có hàng chip địa điểm thì chip "Vị trí của tôi" đã làm việc này. */}
+          {!(places.length > 0 && onOrigin) && !fromGps && !originLabel && (
+            <Button variant="brand" size="sm" className="self-start" disabled={locating} onClick={requestGps}>
+              {locating ? <Loader2 className="animate-spin" /> : <LocateFixed />}
+              {L.useGps}
+            </Button>
+          )}
           {gpsError && (
             <p role="alert" className="text-xs text-destructive">
               {gpsError === 'denied' ? L.gpsDenied : L.gpsFailed}

@@ -10,6 +10,7 @@ import {
 import {
   Drawer,
   DrawerContent,
+  DrawerNestedRoot,
   DrawerDescription,
   DrawerFooter,
   DrawerHeader,
@@ -25,6 +26,9 @@ interface ResponsiveDialogContextValue {
   setLong: (long: boolean) => void
   /** Đang ở mốc snap cao nhất — chỉ khi đó khung nội dung mới được cuộn. */
   atTop: boolean
+  /** Có bảng con (nested) đang mở chồng lên bảng này — màn rộng thu nhỏ bảng cha lùi ra sau. */
+  stacked: boolean
+  registerChild: (delta: 1 | -1) => void
 }
 
 const ResponsiveDialogContext = React.createContext<ResponsiveDialogContextValue>({
@@ -32,6 +36,8 @@ const ResponsiveDialogContext = React.createContext<ResponsiveDialogContextValue
   long: false,
   setLong: () => {},
   atTop: false,
+  stacked: false,
+  registerChild: () => {},
 })
 
 /**
@@ -63,14 +69,29 @@ export function ResponsiveDialog({
   ...props
 }: ResponsiveDialogProps) {
   const isMobile = useIsMobile()
+  const parent = React.useContext(ResponsiveDialogContext)
   const [long, setLong] = React.useState(false)
+  const [childCount, setChildCount] = React.useState(0)
+  const registerChild = React.useCallback((d: 1 | -1) => setChildCount((n) => Math.max(0, n + d)), [])
+  // Bảng con mở chồng: báo bảng cha để nó lùi ra sau (màn rộng); điện thoại do vaul NestedRoot lo.
+  const nested = props.nested
+  const registerInParent = parent.registerChild
+  React.useEffect(() => {
+    if (!nested || !open) return
+    registerInParent(1)
+    return () => registerInParent(-1)
+  }, [nested, open, registerInParent])
   const [snap, setSnap] = React.useState<number | string | null>(SNAP_COMPACT)
   // Mỗi lần mở lại bắt đầu ở mốc thấp.
   React.useEffect(() => {
     if (open) setSnap(SNAP_COMPACT)
   }, [open])
   const atTop = snap === SNAP_POINTS[SNAP_POINTS.length - 1]
-  const ctx = React.useMemo(() => ({ isMobile, long, setLong, atTop }), [isMobile, long, atTop])
+  const stacked = childCount > 0
+  const ctx = React.useMemo(
+    () => ({ isMobile, long, setLong, atTop, stacked, registerChild }),
+    [isMobile, long, atTop, stacked, registerChild],
+  )
   // DialogProps của vaul là union (có/không fadeFromIndex) — props snap có điều kiện phải ép kiểu.
   const drawerProps = {
     open,
@@ -82,9 +103,12 @@ export function ResponsiveDialog({
   return (
     <ResponsiveDialogContext.Provider value={ctx}>
       {isMobile ? (
-        <Drawer {...drawerProps}>
-          {children}
-        </Drawer>
+        nested ? (
+          // vaul NestedRoot: bảng cha tự thu nhỏ, lùi ra sau khi bảng con mở (như Chia Tiền).
+          <DrawerNestedRoot {...drawerProps}>{children}</DrawerNestedRoot>
+        ) : (
+          <Drawer {...drawerProps}>{children}</Drawer>
+        )
       ) : (
         <Dialog open={open} onOpenChange={onOpenChange} {...props}>
           {children}
@@ -107,7 +131,7 @@ export function ResponsiveDialogContent({
   showHandle = true,
   ...props
 }: ResponsiveDialogContentProps) {
-  const { isMobile, long, setLong, atTop } = React.useContext(ResponsiveDialogContext)
+  const { isMobile, long, setLong, atTop, stacked } = React.useContext(ResponsiveDialogContext)
   // Callback ref (state): component này dựng sẵn khi drawer còn đóng, lớp đo chỉ xuất hiện lúc mở.
   const [measureEl, measureRef] = React.useState<HTMLDivElement | null>(null)
 
@@ -135,6 +159,7 @@ export function ResponsiveDialogContent({
         {...props}
         // Snap: drawer cao cố định (mốc 1 = hiện trọn), vaul dịch xuống cho mốc 60%.
         style={long ? { ...props.style, height: SHEET_FULL, maxHeight: 'none' } : props.style}
+        data-stacked={stacked || undefined}
       >
         <div
           // Không snap thì nội dung không kéo drawer (như cũ); snap thì để vaul chia cử chỉ.
@@ -152,7 +177,7 @@ export function ResponsiveDialogContent({
   }
 
   return (
-    <DialogContent className={className} showCloseButton={showCloseButton} {...props}>
+    <DialogContent className={className} showCloseButton={showCloseButton} data-stacked={stacked || undefined} {...props}>
       {children}
     </DialogContent>
   )

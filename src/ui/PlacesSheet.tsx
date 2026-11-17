@@ -8,6 +8,7 @@ import { firstUrl } from '../lib/mapsLink'
 import { getPosition, type GeoPoint } from '../lib/geo'
 import { pick } from '../i18n'
 import { AppSheet } from './AppSheet'
+import { SwipeToDelete } from './SwipeToDelete'
 
 const L = pick({
   vi: {
@@ -80,13 +81,15 @@ interface Props {
   /** Ưu tiên gợi ý địa chỉ gần đây (vị trí người dùng / tâm bản đồ). */
   near: GeoPoint | null
   draft: PlaceDraft | null
+  /** Mở chồng trên bảng khác (Cài đặt). */
+  nested?: boolean
 }
 
 const ICON: Record<PlaceKind, typeof House> = { home: House, work: BriefcaseBusiness, custom: MapPin }
 export const placeIcon = (kind: PlaceKind) => ICON[kind]
 
 /** Bảng "Địa điểm của tôi": danh sách Nhà / Công ty / tự đặt, và màn đặt địa điểm. */
-export function PlacesSheet({ open, onClose, places, onSave, onRemove, near, draft }: Props) {
+export function PlacesSheet({ open, onClose, places, onSave, onRemove, near, draft, nested }: Props) {
   const [editing, setEditing] = useState<Editing | null>(null)
 
   // Mở bằng `draft` (chạm giữ bản đồ) → vào thẳng màn đặt với điểm đó; mở thường → danh sách.
@@ -115,7 +118,7 @@ export function PlacesSheet({ open, onClose, places, onSave, onRemove, near, dra
     : L.title
 
   return (
-    <AppSheet open={open} onClose={onClose} title={title} description={editing ? undefined : L.hint} autoFocus={false}>
+    <AppSheet open={open} onClose={onClose} nested={nested} title={title} description={editing ? undefined : L.hint} autoFocus={false}>
       {editing ? (
         <PlaceEditor
           key={editing.id}
@@ -154,7 +157,7 @@ export function PlacesSheet({ open, onClose, places, onSave, onRemove, near, dra
 function PlaceRow({ kind, place, onEdit, onRemove }: { kind: PlaceKind; place?: Place; onEdit: () => void; onRemove: () => void }) {
   const Icon = ICON[kind]
   const name = place ? placeName(place) : placeName({ kind, name: '' })
-  return (
+  const row = (
     <div className="flex items-center gap-1 rounded-xl bg-muted pr-1">
       <button type="button" onClick={onEdit} className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-left outline-none">
         <Icon className="size-5 shrink-0 text-brand" aria-hidden />
@@ -170,6 +173,8 @@ function PlaceRow({ kind, place, onEdit, onRemove }: { kind: PlaceKind; place?: 
       )}
     </div>
   )
+  // Đã đặt thì vuốt phải → trái để xoá (nút thùng rác vẫn giữ cho màn rộng / bàn phím).
+  return place ? <SwipeToDelete onDelete={onRemove}>{row}</SwipeToDelete> : row
 }
 
 function PlaceEditor({
@@ -256,14 +261,14 @@ function PlaceEditor({
       )}
       <div className="flex gap-2">
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={L.search} aria-label={L.search} className="min-w-0" />
-        <Button type="button" variant="outline" size="icon" aria-label={L.paste} onClick={paste}>
+        <Button type="button" variant="outline" size="icon" aria-label={L.paste} title={L.paste} onClick={paste}>
           <ClipboardPaste />
         </Button>
+        {/* Vị trí hiện tại: nút icon cạnh nút dán. */}
+        <Button type="button" variant="outline" size="icon" aria-label={L.here} title={L.here} onClick={useHere} disabled={busy}>
+          <LocateFixed className="text-brand" />
+        </Button>
       </div>
-      <Button type="button" variant="outline" className="justify-start gap-2" onClick={useHere} disabled={busy}>
-        <LocateFixed className="text-brand" />
-        {L.here}
-      </Button>
 
       {busy && (
         <p className="flex items-center gap-2 text-xs text-muted-foreground">

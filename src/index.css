@@ -205,3 +205,30 @@
 .maplibregl-ctrl-bottom-left {
   margin-bottom: env(safe-area-inset-bottom);
 }
+
+/* Hộp thoại màn rộng xếp chồng (như Chia Tiền): có bảng con mở đè thì bảng cha thu nhỏ, lùi lên một chút
+   và tối đi — điện thoại do vaul NestedRoot làm. `scale` / `top` riêng, không đụng `translate` của Tailwind. */
+[data-slot='dialog-content'] {
+  transition:
+    scale 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    top 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 320ms ease-out;
+}
+[data-slot='dialog-content'][data-stacked] {
+  scale: 0.94;
+  top: calc(50% - 18px);
+  filter: brightness(0.96);
+}
+
+/* Drawer điện thoại xếp chồng: vaul NestedRoot không thu nhỏ drawer cha khi cha dùng snap points —
+   tự làm bằng `scale` riêng (không đụng `transform` vaul ghi cho vị trí snap). */
+[data-vaul-drawer] {
+  transform-origin: 50% 0;
+  transition-property: transform, scale, filter;
+  transition-duration: 0.5s, 320ms, 320ms;
+  transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1), cubic-bezier(0.22, 1, 0.36, 1), ease-out;
+}
+[data-vaul-drawer][data-stacked] {
+  scale: 0.94;
+  filter: brightness(0.92);
+}

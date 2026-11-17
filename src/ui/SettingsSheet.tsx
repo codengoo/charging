@@ -69,10 +69,12 @@ interface Props {
   /** "Nhà · Công ty · Quê" — null khi chưa đặt địa điểm nào. */
   placesSummary: string | null
   onOpenPlaces: () => void
+  /** Bảng con mở chồng (vd. Địa điểm của tôi). */
+  children?: ReactNode
 }
 
 /** Cấu hình hiển thị: đổi là lưu và áp dụng ngay, không có nút "Lưu". */
-export function SettingsSheet({ open, settings, onChange, onClose, placesSummary, onOpenPlaces }: Props) {
+export function SettingsSheet({ open, settings, onChange, onClose, placesSummary, onOpenPlaces, children }: Props) {
   const [vehicleOpen, setVehicleOpen] = useState(false)
   const car = vehicleSummary(settings)
   return (
@@ -180,6 +182,7 @@ export function SettingsSheet({ open, settings, onChange, onClose, placesSummary
         </Button>
       </div>
       <VehicleSheet nested open={vehicleOpen} settings={settings} onChange={onChange} onClose={() => setVehicleOpen(false)} />
+      {children}
     </AppSheet>
   )
 }

@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 
 /** Các bảng / hộp thoại App giữ cờ mở (bảng trạm mở theo `selected`, không nằm ở đây). */
-export type SheetName = 'groups' | 'share' | 'car' | 'saved' | 'backup' | 'import' | 'nearby' | 'settings' | 'changelog' | 'scan' | 'places' | 'point'
+export type SheetName = 'groups' | 'share' | 'car' | 'saved' | 'backup' | 'import' | 'nearby' | 'settings' | 'changelog' | 'scan' | 'places' | 'point' | 'settingsPlaces'
 
 /**
  * Bảng con mở chồng trong cây hộp thoại của bảng cha: đóng cha thì đóng luôn con, không thì con
@@ -9,6 +9,7 @@ export type SheetName = 'groups' | 'share' | 'car' | 'saved' | 'backup' | 'impor
  */
 const CHILDREN: Partial<Record<SheetName, SheetName[]>> = {
   saved: ['backup'],
+  settings: ['settingsPlaces'],
 }
 
 const STATION_CHILDREN: SheetName[] = ['groups', 'share', 'car']
