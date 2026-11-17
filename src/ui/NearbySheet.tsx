@@ -11,7 +11,7 @@ import {
 import { kwActive, kwLabel, nearestStations, passesFilters, tierOf, type Filters, type StationIndex } from '../data/stations'
 import type { Station, StationPower } from '../data/types'
 import { TIER_COLORS } from '../map/pins'
-import { PinPreview } from './groupIcons'
+import { ChargerDot } from './ChargerDot'
 import { fmtDistance, fmtKw } from '@/lib/format'
 import { cachedDrive, type DriveInfo, type LatLng } from '../data/drive'
 import { pick } from '../i18n'
@@ -148,11 +148,7 @@ export function NearbySheet({ open, index, power, filters, origin, fromGps, driv
                   className="flex w-full min-w-0 items-center gap-3 py-2.5 text-left"
                   onClick={() => onPick(st)}
                 >
-                  <PinPreview
-                    group={{ iconKey: 'charger', colorHex: TIER_COLORS[tierOf(p)] }}
-                    width={32}
-                    className="shrink-0"
-                  />
+                  <ChargerDot color={TIER_COLORS[tierOf(p)]} className="size-8" />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="line-clamp-2 text-[15px] leading-snug">{st.name}</span>
                     <span className="truncate text-xs text-muted-foreground">{st.address}</span>

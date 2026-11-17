@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { CHARGER_GLYPH, TIER_COLORS, darkenHex, tintHex } from '../map/pins'
+import { TIER_COLORS } from '../map/pins'
+import { ChargerDot } from './ChargerDot'
 import { FAST_KW } from '../data/stations'
 import { pick } from '../i18n'
 
@@ -25,16 +26,6 @@ const ROWS = [
   { color: TIER_COLORS[1], label: `DC < ${FAST_KW} kW` },
   { color: TIER_COLORS[2], label: `DC ≥ ${FAST_KW} kW` },
 ]
-
-/** Đĩa màu + phích cắm y như lòng ghim trên bản đồ, bỏ vỏ ghim trắng bên ngoài. */
-function ChargerDot({ color, className }: { color: string; className?: string }) {
-  return (
-    <svg aria-hidden viewBox="-3.5 -3.5 31 31" className={`size-5 shrink-0 ${className ?? ''}`}>
-      <circle cx="12" cy="12" r="15.5" fill={tintHex(color)} />
-      <path d={CHARGER_GLYPH} fill={darkenHex(color)} fillRule="evenodd" />
-    </svg>
-  )
-}
 
 function readOpen(): boolean {
   try {
@@ -78,7 +69,7 @@ export function PowerLegend() {
             </span>
           ))}
           <span className="flex items-center gap-2 text-muted-foreground">
-            <ChargerDot color={TIER_COLORS[0]} className="opacity-45" />
+            <ChargerDot color={TIER_COLORS[0]} className="size-5 opacity-45" />
             {L.inactive}
           </span>
         </span>
