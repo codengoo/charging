@@ -6,6 +6,7 @@ import {
   readTripLink,
   shareOrigin,
   slugify,
+  stationIdFromQr,
   stationPath,
   tripPath,
 } from '@/lib/stationUrl'
@@ -65,5 +66,20 @@ describe('stationPath / tripPath / readTripLink', () => {
   it('googleMapsUrl, shareOrigin khi không có location (Worker / node)', () => {
     expect(googleMapsUrl({ lat: 21.1, lng: 105.5 })).toBe('https://www.google.com/maps/search/?api=1&query=21.1,105.5')
     expect(shareOrigin()).toBe(SITE_URL)
+  })
+})
+
+describe('stationIdFromQr', () => {
+  it('nhận link trạm của app, cả bản /en và mã /tram cũ đã in', () => {
+    expect(stationIdFromQr(`${SITE_URL}/station/123-ten-tram`)).toBe('123')
+    expect(stationIdFromQr(`${SITE_URL}/en/station/123`)).toBe('123')
+    expect(stationIdFromQr(`${SITE_URL}/tram/456-cu`)).toBe('456')
+    expect(stationIdFromQr(`  ${SITE_URL}/station/789/  `)).toBe('789')
+  })
+  it('bỏ link nơi khác, link không phải trạm và chữ thường', () => {
+    expect(stationIdFromQr('https://evil.com/station/1')).toBeNull()
+    expect(stationIdFromQr('https://www.google.com/maps/search/?api=1&query=21,105')).toBeNull()
+    expect(stationIdFromQr(`${SITE_URL}/trip?link=x`)).toBeNull()
+    expect(stationIdFromQr('xin chào')).toBeNull()
   })
 })

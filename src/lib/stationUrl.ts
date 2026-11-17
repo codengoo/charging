@@ -40,6 +40,24 @@ export function parseStationId(pathname: string): string | null {
   return m ? m[1] : null
 }
 
+/**
+ * Nội dung một mã QR → id trạm, hoặc null nếu không phải mã trạm của app. Nhận QR "Link trạm" app
+ * tạo (`/station/<id>-<slug>`, cả bản `/en/…`) và mã cũ đã in (`/tram/<id>-…`). Chỉ host của app
+ * (hoặc host đang chạy — bản dev / preview) để không mở nhầm link của nơi khác.
+ */
+export function stationIdFromQr(text: string): string | null {
+  let u: URL
+  try {
+    u = new URL(text.trim())
+  } catch {
+    return null
+  }
+  const here = (globalThis as { location?: { host: string } }).location?.host
+  if (u.host !== new URL(SITE_URL).host && u.host !== here) return null
+  const m = /^\/(?:station|tram)\/(\d{1,12})(?:-[^/]*)?\/?$/.exec(stripLang(u.pathname))
+  return m ? m[1] : null
+}
+
 /** Origin để đưa vào link chia sẻ / QR. */
 export function shareOrigin(): string {
   // File này cũng được Worker import (không có `location`) — đọc qua globalThis, không cần lib DOM.

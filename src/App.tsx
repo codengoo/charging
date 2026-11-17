@@ -8,6 +8,7 @@ import { ShareSheet } from './ui/ShareSheet'
 import { ChangelogModal } from './ui/ChangelogModal'
 import { PowerLegend } from './ui/PowerLegend'
 import { NearbySheet } from './ui/NearbySheet'
+import { QrScanSheet } from './ui/QrScanSheet'
 import { getPosition, type GpsResult } from './lib/geo'
 import { BackupSheet } from './ui/BackupSheet'
 import { SettingsSheet } from './ui/SettingsSheet'
@@ -203,7 +204,7 @@ export function App() {
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] flex flex-col gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         {/* relative z-10: danh sách kết quả tìm kiếm phải đè lên hàng chip phía dưới. */}
         <div className="pointer-events-auto relative z-10">
-          <SearchBar index={index} onPick={pick} onSettings={() => sheets.open('settings')} />
+          <SearchBar index={index} onPick={pick} onSettings={() => sheets.open('settings')} onScan={() => sheets.open('scan')} />
         </div>
         <MapChips
           onNearby={() => {
@@ -340,6 +341,16 @@ export function App() {
           onClose={() => sheets.close('backup')}
         />
       </SavedSheet>
+
+      <QrScanSheet
+        open={sheets.is('scan')}
+        index={index}
+        onFound={(st) => {
+          sheets.close('scan')
+          pick(st)
+        }}
+        onClose={() => sheets.close('scan')}
+      />
 
       <ImportDialog
         open={sheets.is('import')}

@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, Settings2, X } from 'lucide-react'
+import { ScanQrCode, Search, Settings2, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import type { Station } from '../data/types'
 import { searchStations, type StationIndex } from '../data/stations'
 import { pick } from '../i18n'
 
 const L = pick({
-  vi: { placeholder: 'Tìm trạm theo tên hoặc địa chỉ…', clear: 'Xoá', settings: 'Cài đặt' },
-  en: { placeholder: 'Search stations by name or address…', clear: 'Clear', settings: 'Settings' },
+  vi: { placeholder: 'Tìm trạm theo tên hoặc địa chỉ…', clear: 'Xoá', settings: 'Cài đặt', scan: 'Quét mã QR trạm' },
+  en: { placeholder: 'Search stations by name or address…', clear: 'Clear', settings: 'Settings', scan: 'Scan station QR code' },
 })
 
 interface Props {
@@ -15,9 +15,11 @@ interface Props {
   onPick: (st: Station) => void
   /** Nút ⚙ ở cuối ô tìm kiếm. */
   onSettings: () => void
+  /** Nút quét QR mở trạm, cạnh ⚙. */
+  onScan: () => void
 }
 
-export function SearchBar({ index, onPick, onSettings }: Props) {
+export function SearchBar({ index, onPick, onSettings, onScan }: Props) {
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
@@ -48,7 +50,7 @@ export function SearchBar({ index, onPick, onSettings }: Props) {
       <Input
         value={q}
         placeholder={L.placeholder}
-        className={`h-12 bg-card pl-9 text-[15px] shadow-lg shadow-black/5 ring-1 ring-black/5 ${q ? 'pr-20' : 'pr-12'}`}
+        className={`h-12 bg-card pl-9 text-[15px] shadow-lg shadow-black/5 ring-1 ring-black/5 ${q ? 'pr-28' : 'pr-20'}`}
         onChange={(e) => {
           setQ(e.target.value)
           setOpen(true)
@@ -61,7 +63,7 @@ export function SearchBar({ index, onPick, onSettings }: Props) {
         aria-controls="search-results"
         aria-autocomplete="list"
       />
-      {/* Cuối ô: nút xoá (khi đang gõ) rồi nút ⚙ Cài đặt. */}
+      {/* Cuối ô: nút xoá (khi đang gõ), nút quét QR rồi nút ⚙ Cài đặt. */}
       <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-0.5">
         {q && (
           <button
@@ -76,6 +78,15 @@ export function SearchBar({ index, onPick, onSettings }: Props) {
             <X className="size-4" />
           </button>
         )}
+        <button
+          type="button"
+          className="flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+          aria-label={L.scan}
+          title={L.scan}
+          onClick={onScan}
+        >
+          <ScanQrCode className="size-5" />
+        </button>
         <button
           type="button"
           className="flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
