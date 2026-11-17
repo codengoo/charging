@@ -8,14 +8,15 @@
 
 - **Ghi đè tiêu thụ:** VehicleSheet có ô "Tiêu thụ thực tế (kWh/100 km)" cho mẫu xe đang chọn (đọc trên màn hình xe); để trống = số ước tính của mẫu. Giữ nguyên giới hạn sạc DC/AC của mẫu.
 - **Kế hoạch sạc:** bảng Dọc đường có nút "Lên kế hoạch sạc" → chọn điểm dừng tự động, tóm tắt "2 điểm dừng · sạc ~55 phút · tới nơi ~4 giờ 50 phút, còn ~35%". Điểm dừng gắn nhãn "Dừng 1/2" trong danh sách; bật kế hoạch thì bản đồ chỉ vẽ ghim các điểm dừng.
-- **Tiện ích gần trạm:** mở trạm thấy cà phê / ăn uống / WC / tạp hoá / cây xăng trong 400 m, từ OpenStreetMap (Overpass) qua `/api/amenities`, Worker cache 7 ngày. Ghi "© OpenStreetMap".
+- ~~**Tiện ích gần trạm:**~~ (đã bỏ, xem §2) mở trạm thấy cà phê / ăn uống / WC / tạp hoá / cây xăng trong 400 m, từ OpenStreetMap (Overpass) qua `/api/amenities`, Worker cache 7 ngày. Ghi "© OpenStreetMap".
 - **Ghi chú cá nhân:** ô ghi chú trong bảng trạm, lưu localStorage, đi kèm sao lưu / chuyển máy.
 - **Đánh giá & bình luận:** mỗi thiết bị một đánh giá (1–5 sao + bình luận tuỳ chọn + biệt danh) mỗi trạm, sửa/xoá được bài của mình; điểm trung bình + phân bố sao + danh sách mới nhất; nút Báo cáo, đủ 3 thiết bị báo cáo thì tự ẩn. D1 + Turnstile (tuỳ chọn) + giới hạn tần suất; endpoint admin có secret.
 
-## 2. Quyết định đã chốt (Q&A 2 vòng)
+## 2. Quyết định đã chốt (Q&A 3 vòng)
 
 | Câu hỏi | Lựa chọn |
 |---|---|
+| Tiện ích quanh trạm | **Bỏ** (vòng 3): Overpass trả 406 cho client không phải trình duyệt, 502 kèm thông báo chỉ dành cho công cụ do người thao tác, rồi timeout ở cả 3 máy chủ. Các phương án khác (tính sẵn từ Geofabrik, HERE Browse) người dùng chưa muốn làm. |
 | Tự học tiêu thụ | **Bỏ.** Chỉ ghi đè tay `usageOverride` cho mẫu đang chọn. |
 | Ghi đè lưu ở đâu | `Settings.usageOverride: number \| null` (5–60). Đổi mẫu xe → xoá ghi đè (số của xe cũ không còn đúng). Xe Tuỳ chỉnh vẫn dùng `customKwhPer100`. |
 | Ứng viên điểm dừng | Trạm trong danh sách Dọc đường hiện tại (đã qua bộ lọc công suất của người dùng) **có cổng DC ≥ 50 kW** (`power`). |
@@ -101,7 +102,7 @@ interface Amenity { kind: 'cafe' | 'food' | 'toilets' | 'shop' | 'fuel'; name: s
 |---|---|---|---|
 | 01 | phase-01-usage-override.md | Ghi đè tiêu thụ cho mẫu xe | — |
 | 02 | phase-02-charge-plan.md | Kế hoạch dừng sạc trong Dọc đường + bản đồ | 01 |
-| 03 | phase-03-amenities.md | `/api/amenities` (Overpass, cache) + hộp tiện ích trong bảng trạm | — |
+| 03 | ~~phase-03-amenities.md~~ | **Bỏ** — Overpass công cộng chặn client tự động (406) và chập chờn khi thử; người dùng chọn bỏ | — |
 | 04 | phase-04-notes.md | Ghi chú cá nhân local + sao lưu | — |
 | 05 | phase-05-reviews-api.md | D1 + migration + Worker API đánh giá/báo cáo/admin | — |
 | 06 | phase-06-reviews-ui.md | Hộp đánh giá & bình luận trong bảng trạm | 05 |
