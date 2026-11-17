@@ -20,10 +20,10 @@ Props thêm:
 ```
 - Chuỗi mới (vi / en):
   - `routes: 'Tuyến đường'` / `'Routes'`
-  - `routeCard: (km, time, n) => \`${km} · ${time} · ${n} trạm\`` / `… ${n} stations`
+  - `routeCard: (km, n) => \`${km} km · ${n} trạm\`` / `… ${n} stations` (thời gian hiện đậm ở dòng trên của thẻ)
   - `googleHint: (n) => \`Trên Google bạn chọn tuyến thứ ${n} — chạm tuyến khớp bên dưới.\`` / `In Google Maps you picked route ${n} — tap the matching one below.`
   - `avoid: 'Tránh'` / `'Avoid'`, `toll: 'Thu phí'` / `'Tolls'`, `highway: 'Cao tốc'` / `'Highways'`, `ferry: 'Phà'` / `'Ferries'`
-- `RoutePicker` đặt ngay sau `<form>`, chỉ hiện khi `trip.routes.length > 1`: hàng nút cuộn ngang (`role="radiogroup"`, mỗi nút `role="radio"` + `aria-checked`), nút chọn viền `border-brand` nền `bg-brand/10`; nội dung `routeCard(fmtDistance(meters/1000), fmtDuration(seconds), routeTotals[i])`. Gợi ý `googleHint(googleRoute + 1)` hiện phía trên khi `googleRoute > 0`.
+- `RoutePicker` đặt ngay sau `<form>`, chỉ hiện khi `trip.routes.length > 1`: hàng nút cuộn ngang (`role="radiogroup"`, mỗi nút `role="radio"` + `aria-checked`), nút chọn viền `border-brand` nền `bg-brand/10`; nội dung `fmtDuration(seconds)` (đậm) + `routeCard(km, routeTotals[i])`. Gợi ý `googleHint(googleRoute + 1)` hiện phía trên khi `googleRoute > 0`.
 - Chip Tránh: thêm một nhóm trong hộp cấu hình nền xám (cùng kiểu nhóm "Cách tuyến" / "Công suất" người dùng vừa làm), `variant="outline"`; bấm → `onAvoid({ ...trip.avoid, [k]: !trip.avoid[k] })`. Tắt khi `busy`.
 - `fmtDuration` đã có trong file — dùng lại.
 

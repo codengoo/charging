@@ -211,14 +211,16 @@ export function App() {
     if (!trip.route) return null
     return {
       path: trip.route.points,
+      alts: trip.routes.map((r, idx) => ({ idx, path: r.points })).filter((a) => a.idx !== trip.routeIdx),
       // Đang bật kế hoạch sạc: chỉ vẽ ghim các điểm dừng.
       stationIds: new Set((chargePlan ? chargePlan.stops.map((s) => s.item) : hits.items).map((h) => h.station.entityId)),
-      bounds: routeBounds(trip.route.points),
+      // Gộp mọi tuyến: chọn tuyến khác thì khung nhìn đứng yên.
+      bounds: routeBounds(trip.routes.flatMap((r) => r.points)),
       padding: isMobile
         ? { top: 130, bottom: Math.round(window.innerHeight * 0.55), left: 30, right: 30 }
         : { top: 130, bottom: 60, left: 420, right: 60 },
     }
-  }, [trip.route, hits, chargePlan, isMobile])
+  }, [trip.route, trip.routes, trip.routeIdx, hits, chargePlan, isMobile])
 
   // Generation mới (dữ liệu làm mới hằng ngày): trạm đang mở trỏ sang bản ghi mới cùng id.
   useEffect(() => {
@@ -286,6 +288,7 @@ export function App() {
           mapCenter.current = { lat: v.lat, lng: v.lng }
         }}
         trip={tripLayer}
+        onPickRoute={tripCtl.selectRoute}
       />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] flex flex-col gap-2 p-3">
@@ -340,6 +343,9 @@ export function App() {
           stationOpen={selected !== null}
           onOpen={tripCtl.open}
           onRadius={tripCtl.setRadius}
+          routeTotals={tripCtl.routeTotals}
+          onSelectRoute={tripCtl.selectRoute}
+          onAvoid={tripCtl.setAvoid}
           kwBands={filters.kw}
           onKwBands={(kwBands) => changeSettings({ kwBands })}
           onPick={pick}

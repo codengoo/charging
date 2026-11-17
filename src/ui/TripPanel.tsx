@@ -15,6 +15,7 @@ import type { Vehicle } from '../data/vehicles'
 import { BatteryControl, fmtRange, pctOf, pctTone } from './BatteryControl'
 import { PLAN_MIN_DC_KW, type ChargePlan } from '../data/chargePlan'
 import { fmtMinutes } from '../data/drive'
+import type { Avoid } from '../lib/mapsLink'
 
 const L = pick({
   vi: {
@@ -56,6 +57,11 @@ const L = pick({
     planFail: (km: number) =>
       `Không đủ trạm sạc nhanh (DC ≥ ${PLAN_MIN_DC_KW} kW) sau km ${km} — thử mở rộng hành lang, bỏ lọc công suất hoặc xuất phát với nhiều pin hơn.`,
     planNote: 'Ước tính: ghé trạm xa nhất còn ≥ 10% pin, sạc lên 80% (điểm cuối sạc vừa đủ tới nơi).',
+    routes: 'Tuyến đường',
+    routeCard: (km: number, n: number) => `${km} km · ${n} trạm`,
+    googleHint: (n: number) => `Trên Google bạn chọn tuyến thứ ${n} — chạm tuyến khớp bên dưới hoặc trên bản đồ.`,
+    avoid: 'Tránh',
+    avoidOpt: { toll: 'Thu phí', highway: 'Cao tốc', ferry: 'Phà' },
   },
   en: {
     title: 'Along route',
@@ -96,6 +102,11 @@ const L = pick({
     planFail: (km: number) =>
       `Not enough fast chargers (DC ≥ ${PLAN_MIN_DC_KW} kW) after km ${km} — try a wider corridor, fewer power filters or more starting battery.`,
     planNote: 'Estimate: stop at the farthest station with ≥ 10% left, charge to 80% (just enough at the last stop).',
+    routes: 'Routes',
+    routeCard: (km: number, n: number) => `${km} km · ${n} ${n === 1 ? 'station' : 'stations'}`,
+    googleHint: (n: number) => `In Google Maps you picked route ${n} — tap the matching one below or on the map.`,
+    avoid: 'Avoid',
+    avoidOpt: { toll: 'Tolls', highway: 'Highways', ferry: 'Ferries' },
   },
 })
 
@@ -107,6 +118,10 @@ interface Props {
   stationOpen: boolean
   onOpen: (text: string) => void
   onRadius: (km: TripRadius) => void
+  /** Số trạm của từng tuyến (rỗng khi chỉ có một tuyến). */
+  routeTotals: number[]
+  onSelectRoute: (i: number) => void
+  onAvoid: (avoid: Avoid) => void
   /** Mức công suất đang lọc (rỗng = tất cả). Đổi ở đây là đổi luôn Cài đặt hiển thị. */
   kwBands: KwBand[]
   onKwBands: (bands: KwBand[]) => void
@@ -129,7 +144,7 @@ interface Props {
  * tuyến, và bảng chi tiết trạm mở đè lên được. Điện thoại: dải dưới đáy, bấm tay cầm để thu/mở.
  * Màn rộng: thẻ nổi góc trái.
  */
-export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, kwBands, onKwBands, onPick, onClose, vehicle, climate, battery, batteryStale, onBattery, planOn, plan, onTogglePlan }: Props) {
+export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, routeTotals, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, onClose, vehicle, climate, battery, batteryStale, onBattery, planOn, plan, onTogglePlan }: Props) {
   const [text, setText] = useState(trip.link ?? '')
   const [expanded, setExpanded] = useState(true)
   // Link đổi từ ngoài (mở /trip?link=…, share target) → ô nhập theo.
@@ -233,6 +248,10 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, kw
             </Button>
           </form>
 
+          {trip.routes.length > 1 && (
+            <RoutePicker trip={trip} totals={routeTotals} onSelect={onSelectRoute} />
+          )}
+
           {/* Cấu hình tìm trạm: hộp riêng, cách hẳn ô link. Chip nền trắng để nổi trên nền xám. */}
           <div className="mt-2 flex flex-col gap-3 rounded-xl bg-muted/70 p-3">
             <div className="flex flex-col gap-1.5">
@@ -241,6 +260,25 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, kw
                 {TRIP_RADII.map((km) => (
                   <Chip key={km} size="sm" variant="outline" selected={trip.radiusKm === km} onClick={() => onRadius(km)}>
                     {km} km
+                  </Chip>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs text-muted-foreground">{L.avoid}</span>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label={L.avoid}>
+                {AVOID_KEYS.map((k) => (
+                  <Chip
+                    key={k}
+                    size="sm"
+                    variant="outline"
+                    selected={trip.avoid[k]}
+                    disabled={busy}
+                    aria-pressed={trip.avoid[k]}
+                    onClick={() => onAvoid({ ...trip.avoid, [k]: !trip.avoid[k] })}
+                  >
+                    {L.avoidOpt[k]}
                   </Chip>
                 ))}
               </div>
@@ -311,6 +349,42 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, kw
         </div>
       )}
     </section>
+  )
+}
+
+const AVOID_KEYS = ['toll', 'highway', 'ferry'] as const
+
+/**
+ * Các tuyến HERE gợi ý (khi đi thẳng 2 điểm). Thứ tự khác Google nên chỉ gợi ý bằng chữ
+ * khi người dùng đã chọn tuyến khác tuyến đầu trên Google (`!5iN`).
+ */
+function RoutePicker({ trip, totals, onSelect }: { trip: TripState; totals: number[]; onSelect: (i: number) => void }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      {trip.googleRoute !== null && trip.googleRoute > 0 && (
+        <p className="text-xs text-muted-foreground">{L.googleHint(trip.googleRoute + 1)}</p>
+      )}
+      <div role="radiogroup" aria-label={L.routes} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 no-scrollbar">
+        {trip.routes.map((r, i) => {
+          const on = i === trip.routeIdx
+          return (
+            <button
+              key={i}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => onSelect(i)}
+              className={`shrink-0 rounded-xl border px-3 py-2 text-left text-xs tabular-nums transition-colors ${
+                on ? 'border-brand bg-brand/10 text-foreground' : 'border-border bg-card text-muted-foreground hover:bg-muted'
+              }`}
+            >
+              <span className={`block text-sm font-semibold ${on ? 'text-brand' : 'text-foreground'}`}>{fmtDuration(r.seconds)}</span>
+              {L.routeCard(Math.round(r.meters / 1000), totals[i] ?? 0)}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

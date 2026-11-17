@@ -22,13 +22,18 @@ const SRC_SELECTED = 'station-selected'
 /** Chế độ hành trình: tuyến + chỉ trạm dọc tuyến, KHÔNG gom cụm (≤ 400 điểm, gom sẽ giấu trạm). */
 const SRC_TRIP = 'stations-trip'
 const SRC_ROUTE = 'trip-route'
+/** Tuyến phụ (HERE gợi ý thêm): xám, nằm dưới tuyến chính, chạm để chọn. */
+const SRC_ALT = 'trip-alt'
 /** Các lớp của bản đồ thường, ẩn đi khi đang có tuyến. */
 const NORMAL_LAYERS = ['clusters', 'cluster-count', 'point']
 const ROUTE_COLOR = '#009966'
+const ALT_COLOR = '#8a94a6'
 
 /** Tuyến đang mở: đường vẽ, id trạm dọc tuyến, khung bay camera. */
 export interface TripLayer {
   path: GeoPoint[]
+  /** Tuyến phụ; `idx` = vị trí trong danh sách tuyến, trả lại qua `onPickRoute`. */
+  alts: Array<{ idx: number; path: GeoPoint[] }>
   stationIds: Set<string>
   bounds: [[number, number], [number, number]] | null
   /** Chừa chỗ cho bảng hành trình khi fitBounds (px). */
@@ -104,6 +109,19 @@ function routeGeoJSON(path: GeoPoint[]): GeoJSON.FeatureCollection {
   }
 }
 
+function altGeoJSON(alts: TripLayer['alts']): GeoJSON.FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: alts
+      .filter((a) => a.path.length > 1)
+      .map((a) => ({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: a.path.map((p) => [p.lng, p.lat]) },
+        properties: { idx: a.idx },
+      })),
+  }
+}
+
 /** Bật/tắt chế độ hành trình: đổi dữ liệu nguồn tuyến + ẩn/hiện lớp thường. */
 function applyTrip(
   map: maplibregl.Map,
@@ -114,6 +132,7 @@ function applyTrip(
 ) {
   const on = !!trip && trip.path.length > 1
   ;(map.getSource(SRC_ROUTE) as maplibregl.GeoJSONSource | undefined)?.setData(routeGeoJSON(on ? trip.path : []))
+  ;(map.getSource(SRC_ALT) as maplibregl.GeoJSONSource | undefined)?.setData(altGeoJSON(on ? trip.alts : []))
   ;(map.getSource(SRC_TRIP) as maplibregl.GeoJSONSource | undefined)?.setData(
     on ? tripGeoJSON(index, trip.stationIds, book, power) : { type: 'FeatureCollection', features: [] },
   )
@@ -191,20 +210,22 @@ interface Props {
   onMoveEnd?: (view: { lat: number; lng: number; zoom: number }) => void
   /** Hành trình đang mở (null = bản đồ thường). */
   trip?: TripLayer | null
+  /** Chạm vào tuyến phụ trên bản đồ. */
+  onPickRoute?: (idx: number) => void
   /** Nền bản đồ theo giao diện sáng / tối. */
   theme?: 'light' | 'dark'
 }
 
 /** Nguồn của app (không thuộc style nền) — mang sang khi đổi nền sáng/tối. */
-const OWN_SOURCES = new Set([SRC, SRC_SELECTED, SRC_TRIP, SRC_ROUTE])
+const OWN_SOURCES = new Set([SRC, SRC_SELECTED, SRC_TRIP, SRC_ROUTE, SRC_ALT])
 
-export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate, onMoveEnd, trip = null, theme = 'light' }: Props) {
+export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate, onMoveEnd, trip = null, onPickRoute, theme = 'light' }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const loadedRef = useRef(false)
   // Giá trị mới nhất cho các handler đăng ký một lần trong lúc khởi tạo.
-  const latest = useRef({ index, filters, book, power, selected, onSelect, onLocate, onMoveEnd, trip })
-  latest.current = { index, filters, book, power, selected, onSelect, onLocate, onMoveEnd, trip }
+  const latest = useRef({ index, filters, book, power, selected, onSelect, onLocate, onMoveEnd, trip, onPickRoute })
+  latest.current = { index, filters, book, power, selected, onSelect, onLocate, onMoveEnd, trip, onPickRoute }
 
   // Khởi tạo map một lần.
   useEffect(() => {
@@ -250,6 +271,30 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
       map.addSource(SRC_SELECTED, { type: 'geojson', data: selectedGeoJSON(sel) })
       map.addSource(SRC_TRIP, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addSource(SRC_ROUTE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+      map.addSource(SRC_ALT, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+
+      // Tuyến phụ: xám, dưới tuyến chính. Lớp `trip-alt-hit` trong suốt và rộng để chạm trúng trên điện thoại.
+      map.addLayer({
+        id: 'trip-alt-casing',
+        type: 'line',
+        source: SRC_ALT,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#ffffff', 'line-width': 7, 'line-opacity': 0.9 },
+      })
+      map.addLayer({
+        id: 'trip-alt-line',
+        type: 'line',
+        source: SRC_ALT,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': ALT_COLOR, 'line-width': 4, 'line-opacity': 0.9 },
+      })
+      map.addLayer({
+        id: 'trip-alt-hit',
+        type: 'line',
+        source: SRC_ALT,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#000000', 'line-width': 24, 'line-opacity': 0 },
+      })
 
       // Tuyến hành trình: viền trắng + lõi màu brand, nằm DƯỚI mọi ghim.
       map.addLayer({
@@ -338,7 +383,13 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
           if (st) latest.current.onSelect(st)
         })
       }
-      for (const layer of ['clusters', 'point', 'trip-point']) {
+      map.on('click', 'trip-alt-hit', (e) => {
+        // Chạm vào ghim trạm nằm trên đường xám là mở trạm, không đổi tuyến.
+        if (map.queryRenderedFeatures(e.point, { layers: ['trip-point', 'point-selected'] }).length) return
+        const idx = Number(e.features?.[0]?.properties?.idx)
+        if (Number.isInteger(idx)) latest.current.onPickRoute?.(idx)
+      })
+      for (const layer of ['clusters', 'point', 'trip-point', 'trip-alt-hit']) {
         map.on('mouseenter', layer, () => (map.getCanvas().style.cursor = 'pointer'))
         map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''))
       }
