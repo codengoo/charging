@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { DEFAULT_FILTERS, KW_BANDS, type Filters, type KwBand } from './stations'
 import { TRIP_RADII, type TripRadius } from './useTrip'
 import { THEME_PREFS, type ThemePref } from '../lib/theme'
+import { VEHICLE_IDS } from './vehicles'
 
 /**
  * Cấu hình hiển thị người dùng tự chọn, nhớ trong localStorage. Đây là giá trị MẶC ĐỊNH lúc mở
@@ -18,6 +19,13 @@ export interface Settings {
   showLegend: boolean
   /** Sáng / tối / theo máy. index.html đọc trường này trước khi app nạp. */
   theme: ThemePref
+  /** Mẫu xe (id trong VEHICLES hoặc 'custom') để ước tính % pin khi đến; null = chưa chọn. */
+  vehicleId: string | null
+  /** Xe tuỳ chỉnh: dung lượng pin (kWh) và tiêu thụ (kWh/100 km). */
+  customKwh: number
+  customKwhPer100: number
+  /** Bật điều hoà: tiêu thụ +8%. */
+  climate: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -26,6 +34,10 @@ export const DEFAULT_SETTINGS: Settings = {
   tripRadiusKm: 2,
   showLegend: true,
   theme: 'system',
+  vehicleId: null,
+  customKwh: 60,
+  customKwhPer100: 16,
+  climate: true,
 }
 
 const KEY = 'tramsac.settings'
@@ -40,6 +52,9 @@ function readBands(o: Record<string, unknown>): KwBand[] {
   if (o.power === 'dc') return ['hi', 'mid']
   return KW_BANDS
 }
+
+const inRange = (v: unknown, min: number, max: number): v is number =>
+  typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max
 
 /** Đọc từng trường, sai kiểu thì về mặc định — bản lưu cũ / bị sửa tay không làm hỏng app. */
 export function parseSettings(raw: string | null): Settings {
@@ -57,6 +72,10 @@ export function parseSettings(raw: string | null): Settings {
     tripRadiusKm: TRIP_RADII.includes(o.tripRadiusKm as TripRadius) ? (o.tripRadiusKm as TripRadius) : d.tripRadiusKm,
     showLegend: typeof o.showLegend === 'boolean' ? o.showLegend : d.showLegend,
     theme: THEME_PREFS.includes(o.theme as ThemePref) ? (o.theme as ThemePref) : d.theme,
+    vehicleId: typeof o.vehicleId === 'string' && VEHICLE_IDS.includes(o.vehicleId) ? o.vehicleId : d.vehicleId,
+    customKwh: inRange(o.customKwh, 5, 250) ? o.customKwh : d.customKwh,
+    customKwhPer100: inRange(o.customKwhPer100, 5, 60) ? o.customKwhPer100 : d.customKwhPer100,
+    climate: typeof o.climate === 'boolean' ? o.climate : d.climate,
   }
 }
 
