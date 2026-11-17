@@ -21,6 +21,7 @@ import { vehicleOf } from './data/vehicles'
 import { useResolvedTheme } from './lib/theme'
 import { ImportDialog, pendingImport, type PendingImport } from './ui/ImportDialog'
 import { IMPORT_HASH, decodeBackup } from './data/backup'
+import { useNotes } from './data/notes'
 import { TripPanel } from './ui/TripPanel'
 import { useTrip } from './data/useTrip'
 import { routeBounds } from './data/routeCorridor'
@@ -104,6 +105,7 @@ export function App() {
   // Giữ lần mở cuối để bảng còn nội dung lúc trôi xuống (giống sheetStation).
   const [nearby, setNearby] = useState<Nearby | null>(null)
   const groups = useGroupBook()
+  const notes = useNotes()
   const { book } = groups
   const isMobile = useIsMobile()
   // Trang hành trình /trip?link=… (hoặc ?text=/?url= từ Web Share Target): đọc NGAY lúc khởi tạo.
@@ -134,8 +136,8 @@ export function App() {
   const [showImport, setShowImport] = useState(false)
   // Giữ lần nhập cuối để hộp xác nhận còn nội dung lúc trôi xuống.
   const [pending, setPending] = useState<PendingImport | null>(null)
-  function askImport(incoming: Parameters<typeof pendingImport>[1]) {
-    setPending(pendingImport(book, incoming))
+  function askImport(incoming: Parameters<typeof pendingImport>[2]) {
+    setPending(pendingImport(book, notes.notes, incoming))
     setShowImport(true)
   }
   const savedCount = allSaved(book).size
@@ -379,6 +381,8 @@ export function App() {
           batteryStale={battery.stale}
           onBattery={battery.set}
           onPickCar={() => setPickingCar(true)}
+          note={notes.notes[sheetStation.entityId]}
+          onNote={(text) => notes.set(sheetStation.entityId, text)}
           onOpenGroups={() => setGrouping(true)}
           onShare={() => setSharing(true)}
           onClose={() => {
@@ -415,6 +419,7 @@ export function App() {
         open={showSaved}
         index={index}
         book={book}
+        notes={notes.notes}
         now={groups.now}
         userPos={userPos}
         onPick={(st) => {
@@ -431,6 +436,7 @@ export function App() {
         <BackupSheet
           open={showBackup}
           book={book}
+          notes={notes.notes}
           onImportFile={(incoming) => {
             setShowBackup(false)
             setShowSaved(false)
@@ -444,7 +450,8 @@ export function App() {
         open={showImport}
         pending={pending}
         onConfirm={(incoming) => {
-          groups.merge(incoming)
+          groups.merge(incoming.book)
+          notes.merge(incoming.notes)
           setShowImport(false)
           setShowSaved(true) // cho thấy ngay các trạm vừa gộp
         }}

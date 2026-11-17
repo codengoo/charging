@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { ArrowLeftRight, X } from 'lucide-react'
+import { ArrowLeftRight, NotebookPen, X } from 'lucide-react'
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -21,6 +21,7 @@ import {
 } from '../data/groups'
 import { distanceKm, type StationIndex } from '../data/stations'
 import type { Station } from '../data/types'
+import type { NoteMap } from '../data/notes'
 import { GroupGlyph, PinPreview } from './groupIcons'
 import { tintHex } from '../map/pins'
 import { fmtDistance } from '@/lib/format'
@@ -54,6 +55,8 @@ interface Props {
   open: boolean
   index: StationIndex
   book: GroupBook
+  /** Ghi chú cá nhân — trạm có ghi chú hiện một dòng thay cho địa chỉ. */
+  notes: NoteMap
   now: number
   userPos: { lat: number; lng: number } | null
   onPick: (st: Station) => void
@@ -67,7 +70,7 @@ interface Props {
 const DEFAULT_PIN = { iconKey: 'charger', colorHex: '#12B76A' } as const
 
 /** Danh sách mọi trạm đã lưu, lọc theo nhóm. Port FavoritesTab (PlacesSheet.kt). */
-export function SavedSheet({ open, index, book, now, userPos, onPick, onUnsave, onBackup, onClose, children }: Props) {
+export function SavedSheet({ open, index, book, notes, now, userPos, onPick, onUnsave, onBackup, onClose, children }: Props) {
   // Rỗng = xem tất cả. Chọn NHIỀU nhóm là phép HOẶC: chọn "Sao" và "Sẽ đến" là muốn
   // thấy cả hai, không phải trạm nằm trong cả hai.
   const [filter, setFilter] = useState<Set<string>>(new Set())
@@ -158,7 +161,14 @@ export function SavedSheet({ open, index, book, now, userPos, onPick, onUnsave, 
                   <PinPreview group={pin ?? DEFAULT_PIN} width={32} className="shrink-0" />
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="line-clamp-2 text-[15px] leading-snug">{st.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">{st.address}</span>
+                    {notes[st.entityId] ? (
+                      <span className="flex items-center gap-1 text-xs text-[#B45309] dark:text-[#F0A500]">
+                        <NotebookPen className="size-3 shrink-0" aria-hidden />
+                        <span className="truncate">{notes[st.entityId].text}</span>
+                      </span>
+                    ) : (
+                      <span className="truncate text-xs text-muted-foreground">{st.address}</span>
+                    )}
                   </span>
                   <span className="flex shrink-0 flex-col items-end gap-0.5">
                     {!Number.isNaN(km) && <span className="text-sm font-semibold">{fmtDistance(km)}</span>}

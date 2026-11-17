@@ -13,7 +13,8 @@ import { useIsMobile } from '@/hooks/use-media-query'
 import { downloadBlob, drawQr } from '@/lib/qrCard'
 import { shareOrigin } from '@/lib/stationUrl'
 import { allSaved, type GroupBook } from '../data/groups'
-import { QR_MAX, backupUrl, readBackupFile, toBackup } from '../data/backup'
+import { QR_MAX, backupUrl, readBackupFile, toBackup, type Backup } from '../data/backup'
+import type { NoteMap } from '../data/notes'
 import { pick } from '../i18n'
 
 const L = pick({
@@ -21,8 +22,8 @@ const L = pick({
     shareTitle: 'Trạm sạc đã lưu',
     shareText: 'Mở link để chép các trạm đã lưu sang máy này',
     title: 'Sao lưu / chuyển máy',
-    summary: (stations: number, groups: number) =>
-      `${stations} trạm${groups ? `, ${groups} nhóm tự tạo` : ''}. Mở link hoặc quét mã trên máy kia để gộp vào — trạm đã lưu sẵn ở máy đó giữ nguyên.`,
+    summary: (stations: number, groups: number, notes: number) =>
+      `${stations} trạm${groups ? `, ${groups} nhóm tự tạo` : ''}${notes ? `, ${notes} ghi chú` : ''}. Mở link hoặc quét mã trên máy kia để gộp vào — trạm đã lưu sẵn ở máy đó giữ nguyên.`,
     qrAria: 'Mã QR sao lưu trạm đã lưu',
     tooMany: 'Nhiều trạm quá nên mã QR sẽ khó quét — gửi link hoặc file thay vào đó.',
     linkAria: 'Link sao lưu',
@@ -36,8 +37,8 @@ const L = pick({
     shareTitle: 'Saved charging stations',
     shareText: 'Open the link to copy the saved stations to this device',
     title: 'Backup / move to another device',
-    summary: (stations: number, groups: number) =>
-      `${stations} ${stations === 1 ? 'station' : 'stations'}${groups ? `, ${groups} custom ${groups === 1 ? 'group' : 'groups'}` : ''}. Open the link or scan the code on the other device to merge — stations already saved there are kept.`,
+    summary: (stations: number, groups: number, notes: number) =>
+      `${stations} ${stations === 1 ? 'station' : 'stations'}${groups ? `, ${groups} custom ${groups === 1 ? 'group' : 'groups'}` : ''}${notes ? `, ${notes} ${notes === 1 ? 'note' : 'notes'}` : ''}. Open the link or scan the code on the other device to merge — stations already saved there are kept.`,
     qrAria: 'Backup QR code for saved stations',
     tooMany: 'Too many stations for an easily scannable QR code — send the link or file instead.',
     linkAria: 'Backup link',
@@ -53,13 +54,14 @@ interface Props {
   /** Giữ component gắn và chỉ đổi `open` — gỡ hẳn khi đóng thì mất hiệu ứng trôi xuống. */
   open: boolean
   book: GroupBook
+  notes: NoteMap
   /** Đã đọc được file sao lưu — App mở hộp xác nhận gộp. null = file không đọc được. */
-  onImportFile: (incoming: GroupBook | null) => void
+  onImportFile: (incoming: Backup | null) => void
   onClose: () => void
 }
 
 /** Sao lưu / chuyển sổ nhóm: QR + link `#import=`, tải file .json, nhập từ file. */
-export function BackupSheet({ open, book, onImportFile, onClose }: Props) {
+export function BackupSheet({ open, book, notes, onImportFile, onClose }: Props) {
   const isMobile = useIsMobile()
   const qrDisplaySize = isMobile ? 168 : 208
   const [link, setLink] = useState<string | null>(null)
@@ -75,11 +77,11 @@ export function BackupSheet({ open, book, onImportFile, onClose }: Props) {
     if (!open) return
     let alive = true
     setCopied(false)
-    void backupUrl(shareOrigin(), book).then((u) => alive && setLink(u))
+    void backupUrl(shareOrigin(), book, notes).then((u) => alive && setLink(u))
     return () => {
       alive = false
     }
-  }, [open, book])
+  }, [open, book, notes])
 
   const showQr = link !== null && link.length <= QR_MAX
   useEffect(() => {
@@ -110,7 +112,7 @@ export function BackupSheet({ open, book, onImportFile, onClose }: Props) {
   }
 
   function downloadFile() {
-    const blob = new Blob([JSON.stringify(toBackup(book), null, 1)], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify(toBackup(book, notes), null, 1)], { type: 'application/json' })
     const d = new Date()
     const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
     downloadBlob(blob, `tramsac-nhom-${ymd}.json`)
@@ -128,7 +130,7 @@ export function BackupSheet({ open, book, onImportFile, onClose }: Props) {
         <ResponsiveDialogHeader className="gap-1 pr-6 text-left">
           <ResponsiveDialogTitle className="text-base font-bold sm:text-lg">{L.title}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription className="text-xs sm:text-sm">
-            {L.summary(stations, customGroups)}
+            {L.summary(stations, customGroups, Object.keys(notes).length)}
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
 
