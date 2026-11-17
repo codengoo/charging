@@ -111,7 +111,7 @@ npx wrangler secret put REVIEW_PEPPER           # chuỗi ngẫu nhiên dài, Đ
 npx wrangler secret put ADMIN_TOKEN
 # Turnstile (khuyên bật): dashboard Cloudflare → Turnstile → Add widget, hostname charging.cangao.asia.
 npx wrangler secret put TURNSTILE_SECRET        # Secret key
-VITE_TURNSTILE_SITEKEY=<Site key> npm run deploy  # site key nhúng lúc build
+npm run deploy                                  # site key nằm trong .env.production (công khai)
 ```
 
 Chưa có `TURNSTILE_SECRET` thì Worker không bắt token (chỉ còn rate limit + lọc nội dung). Có secret mà build thiếu
