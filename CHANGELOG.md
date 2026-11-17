@@ -2,6 +2,14 @@
 
 Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app).
 
+## [0.9.0] — 2026-11-17 — % pin khi đến trạm
+
+- Chọn xe của bạn trong ⚙ Cài đặt (10 mẫu VinFast hoặc tự nhập dung lượng pin và mức tiêu thụ), kèm công tắc điều hoà.
+- Mở trạm: kéo thanh "Pin hiện tại" để thấy còn khoảng bao nhiêu % pin khi tới (theo quãng đường lái thật), cảnh báo cam / đỏ khi pin thấp.
+- Ước tính thời gian sạc lên 80% ở cổng mạnh nhất đang trống.
+- Trạm dọc đường: mỗi trạm ghi % pin khi ngang qua, kèm vạch "Trạm cuối còn kịp" (còn ≥ 10% pin).
+- % pin được nhớ trên máy; nhập quá 2 giờ thì app nhắc cập nhật.
+
 ## [0.8.0] — 2026-11-17 — Cổng trống thời gian thực & cài đặt hiển thị
 
 - Mở trạm thấy ngay số cổng đang trống theo từng mức kW, số xe đang sạc và cổng bảo trì (nguồn EVCS, gần như tức thời).

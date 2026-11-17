@@ -41,6 +41,14 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   (`src/lib/flexiblePolyline.ts`), lọc hành lang 2/5/10 km (`src/data/routeCorridor.ts`: đo phẳng,
   bỏ trạm bên kia dải phân cách cao tốc, trần 400 trạm theo độ lệch), xếp theo km gặp trên đường.
   URL `/trip?link=…` mở lại hành trình. Cần secret `HERE_API_KEY` (xem "API proxy HERE").
+- **% pin khi đến trạm** (`src/data/battery.ts`, `src/data/vehicles.ts`, `src/ui/BatteryControl.tsx`): chọn xe
+  trong Cài đặt (10 mẫu VinFast hoặc Tuỳ chỉnh, công tắc điều hoà ×1,08), kéo % pin hiện tại (localStorage
+  `tramsac.battery`, cũ sau 2 giờ). Bảng trạm hiện "Còn ~X–Y% khi tới" theo quãng đường lái (`/api/drive`; đường
+  chim bay × 1,3 khi lỗi) và thời gian sạc lên 80% ở cổng mạnh nhất còn trống; Dọc đường hiện % tại từng trạm
+  (`atKm + 2 × offsetKm`) và vạch "Trạm cuối còn kịp" (ước tính bi quan ≥ 10%). Tính hoàn toàn ở client, không
+  gọi thêm HERE/EVCS. Mô hình: tiêu thụ thực tế ước tính của xe × hệ số tốc độ trung bình (< 40 km/h 0,95 … ≥ 90
+  km/h 1,25), hiện khoảng ±8%, chưa tính độ dốc. Thông số xe tra 2026-11-17, `kwhPer100` là ước tính (≈ dung
+  lượng ÷ NEDC × 0,8), không phải số hãng công bố.
 - **Sao lưu / chuyển máy** (`src/data/backup.ts`, `src/ui/BackupSheet.tsx`): sổ nhóm nén
   `deflate-raw` + base64url trong hash `/#import=…` (không tới server), QR khi link ≤ 2.000 ký
   tự, tải / nhập file `.json`. Nhập luôn **gộp**, hỏi xác nhận trước.

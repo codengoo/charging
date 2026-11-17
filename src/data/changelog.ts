@@ -11,6 +11,26 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.9.0',
+    date: '2026-11-17',
+    title: '% pin khi đến trạm',
+    changes: [
+      'Chọn xe của bạn trong ⚙ Cài đặt (10 mẫu VinFast hoặc tự nhập dung lượng pin và mức tiêu thụ), kèm công tắc điều hoà.',
+      'Mở trạm: kéo thanh "Pin hiện tại" để thấy còn khoảng bao nhiêu % pin khi tới (theo quãng đường lái thật), cảnh báo cam / đỏ khi pin thấp.',
+      'Ước tính thời gian sạc lên 80% ở cổng mạnh nhất đang trống.',
+      'Trạm dọc đường: mỗi trạm ghi % pin khi ngang qua, kèm vạch "Trạm cuối còn kịp" (còn ≥ 10% pin).',
+      '% pin được nhớ trên máy; nhập quá 2 giờ thì app nhắc cập nhật.',
+    ],
+    titleEn: 'Battery on arrival',
+    changesEn: [
+      'Pick your car in ⚙ Settings (10 VinFast models, or enter battery size and consumption yourself), with an air-conditioning toggle.',
+      "Open a station and drag \"Current battery\" to see roughly how much battery you'll have on arrival (by real driving distance), with orange / red warnings when low.",
+      'Estimated time to charge to 80% at the fastest free port.',
+      'Along route: each station shows your battery when you pass it, plus a "Last station you can reach" marker (≥ 10% left).',
+      'Battery level is remembered on this device; after 2 hours the app asks you to update it.',
+    ],
+  },
+  {
     version: '0.8.0',
     date: '2026-11-17',
     title: 'Cổng trống thời gian thực & cài đặt hiển thị',
