@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Chip } from '@/components/ui/chip'
+import { placeName, type Place } from '../data/places'
+import { placeIcon } from './PlacesSheet'
 import { Loader2, LocateFixed } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { kwActive, kwLabel, nearestStations, passesFilters, tierOf, type Filters, type StationIndex } from '../data/stations'
@@ -20,6 +23,8 @@ const L = pick({
     nearCenter: 'Trạm gần tâm bản đồ',
     nearPlace: (n: string) => `Trạm gần ${n}`,
     straightHint: ' · khoảng cách theo đường chim bay.',
+    me: 'Vị trí của tôi',
+    originAria: 'Tìm trạm gần',
     power: (label: string) => `công suất ${label}`,
     none: (f: string) => `Không có trạm đang hoạt động${f ? ` ${f}` : ''} trong khoảng 110 km.`,
     count: (n: number, f: string) => `${n} trạm đang hoạt động${f ? ` ${f}` : ''} gần nhất`,
@@ -36,6 +41,8 @@ const L = pick({
     nearCenter: 'Stations near map center',
     nearPlace: (n: string) => `Stations near ${n}`,
     straightHint: ' · straight-line distances.',
+    me: 'My location',
+    originAria: 'Find stations near',
     power: (label: string) => `at ${label}`,
     none: (f: string) => `No operating stations${f ? ` ${f}` : ''} within about 110 km.`,
     count: (n: number, f: string) =>
@@ -82,6 +89,10 @@ interface Props {
   fromGps: boolean
   /** Gốc là một địa điểm / điểm chạm giữ ("Nhà", tên chỗ) — thay tiêu đề, không mời bật GPS. */
   originLabel?: string | null
+  /** Địa điểm hay dùng — hàng chip đổi gốc (Vị trí của tôi / Nhà / Công ty…). */
+  places?: Place[]
+  /** null = vị trí của tôi. */
+  onOrigin?: (place: Place | null) => void
   /** Điểm gốc của quãng đường lái (useStableOrigin) — để mượn kết quả cache của trạm đã mở. */
   driveOrigin: GeoPoint | null
   /** Xin vị trí (chỉ hiện nút khi chưa có GPS). Thành công thì App đổi `origin` + `fromGps`. */
@@ -92,7 +103,7 @@ interface Props {
 
 
 /** Các trạm đang hoạt động gần nhất, theo đúng bộ lọc công suất đang bật trên bản đồ. */
-export function NearbySheet({ open, index, power, filters, origin, fromGps, originLabel, driveOrigin, onRequestGps, onPick, onClose }: Props) {
+export function NearbySheet({ open, index, power, filters, origin, fromGps, originLabel, places = [], onOrigin, driveOrigin, onRequestGps, onPick, onClose }: Props) {
   const [locating, setLocating] = useState(false)
   const [gpsError, setGpsError] = useState<GpsResult | null>(null)
   // Sheet giữ gắn khi đóng — mở lại thì bỏ lỗi GPS của lần trước.
@@ -128,6 +139,24 @@ export function NearbySheet({ open, index, power, filters, origin, fromGps, orig
         </>
       }
     >
+      {places.length > 0 && onOrigin && (
+        <div className="-mx-1 mt-2 flex gap-1.5 overflow-x-auto px-1 py-1 no-scrollbar" role="group" aria-label={L.originAria}>
+          <Chip size="sm" variant="outline" selected={!originLabel} onClick={() => onOrigin(null)} className="shrink-0">
+            <LocateFixed />
+            {L.me}
+          </Chip>
+          {places.map((p) => {
+            const Icon = placeIcon(p.kind)
+            return (
+              <Chip key={p.id} size="sm" variant="outline" selected={originLabel === placeName(p)} onClick={() => onOrigin(p)} className="shrink-0">
+                <Icon />
+                {placeName(p)}
+              </Chip>
+            )
+          })}
+        </div>
+      )}
+
       {!fromGps && !originLabel && (
         <div className="mt-2 flex flex-col gap-1.5">
           <Button variant="brand" size="sm" className="self-start" disabled={locating} onClick={requestGps}>

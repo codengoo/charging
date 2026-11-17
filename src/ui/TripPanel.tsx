@@ -18,6 +18,8 @@ import { BatteryControl, DANGER_PCT, fmtRange, pctOf, pctTone } from './BatteryC
 import { PLAN_MIN_DC_KW, passByKm, type ChargePlan } from '../data/chargePlan'
 import type { Avoid } from '../lib/mapsLink'
 import { useIsMobile } from '@/hooks/use-media-query'
+import type { Place } from '../data/places'
+import { PlaceChips, stopLabel } from './PlaceChips'
 import { readStr, writeStr } from '@/lib/storage'
 
 const L = pick({
@@ -143,6 +145,10 @@ interface Props {
   kwBands: KwBand[]
   onKwBands: (bands: KwBand[]) => void
   onPick: (st: Station) => void
+  /** Địa điểm hay dùng: chip Từ / Tới khi chưa có tuyến, và tên chặng trùng địa điểm. */
+  places: Place[]
+  onRouteTo: (to: Place, from: Place | null) => void
+  onManagePlaces: () => void
   onClose: () => void
   /** Xe đã chọn (null = không ước tính pin) + % pin lúc xuất phát. */
   vehicle: Vehicle | null
@@ -163,7 +169,7 @@ interface Props {
  * tuyến, và bảng chi tiết trạm mở đè lên được. Điện thoại: dải dưới đáy, bấm tay cầm để thu/mở.
  * Màn rộng: thẻ nổi góc trái.
  */
-export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, stationOpen, onOpen, onRadius, routeTotals, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, onClose, vehicle, climate, reservePct, battery, batteryStale, onBattery, planOn, plan, onTogglePlan }: Props) {
+export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, stationOpen, onOpen, onRadius, routeTotals, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, places, onRouteTo, onManagePlaces, onClose, vehicle, climate, reservePct, battery, batteryStale, onBattery, planOn, plan, onTogglePlan }: Props) {
   // Đóng xong App xoá hành trình ngay; giữ bản lúc còn mở để bảng không chớp sang trạng thái trống
   // trong lúc trượt xuống.
   const last = useRef({ trip: tripNow, hits: hitsNow })
@@ -255,7 +261,7 @@ export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, statio
       <header className="flex items-center gap-2 px-4 pt-1 sm:pt-3">
         <Route className="size-5 shrink-0 text-brand" aria-hidden />
         <h2 className="min-w-0 flex-1 truncate text-base font-bold">
-          {trip.stops.length > 1 ? trip.stops.map((s) => s.label).join(' → ') : L.title}
+          {trip.stops.length > 1 ? trip.stops.map((s) => stopLabel(s, places)).join(' → ') : L.title}
         </h2>
         {!open && (
           <Button variant="ghost" size="icon-sm" aria-label={L.openPanel} onClick={() => setOpen(true)}>
@@ -299,6 +305,11 @@ export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, statio
               {L.find}
             </Button>
           </form>
+
+          {/* Chưa có tuyến: chọn nhanh Từ / Tới địa điểm đã lưu. */}
+          {(trip.status === 'idle' || trip.status === 'error') && (
+            <PlaceChips places={places} onRoute={onRouteTo} onManage={onManagePlaces} />
+          )}
 
           {trip.routes.length > 1 && (
             <RoutePicker trip={trip} totals={routeTotals} onSelect={onSelectRoute} />

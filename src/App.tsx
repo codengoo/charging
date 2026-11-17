@@ -276,6 +276,9 @@ export function App() {
           kwBands={filters.kw}
           onKwBands={(kwBands) => changeSettings({ kwBands })}
           onPick={pick}
+          places={places.places}
+          onRouteTo={(to, from) => tripCtl.open(directionsLink(to, from))}
+          onManagePlaces={() => openPlaces(null)}
           onClose={tripCtl.close}
           vehicle={vehicle}
           climate={settings.climate}
@@ -411,6 +414,16 @@ export function App() {
           origin={nearby.origin}
           fromGps={nearby.fromGps}
           originLabel={nearby.label}
+          places={places.places}
+          onOrigin={(pl) =>
+            setNearby(
+              pl
+                ? { origin: { lat: pl.lat, lng: pl.lng }, fromGps: false, label: placeName(pl) }
+                : userPos
+                  ? { origin: userPos, fromGps: true }
+                  : { origin: mapCenter.current, fromGps: false },
+            )
+          }
           driveOrigin={driveOrigin}
           onRequestGps={requestGps}
           onPick={(st) => {
