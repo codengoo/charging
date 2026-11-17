@@ -92,7 +92,7 @@ export function ReviewsSection({ reviews, theme }: { reviews: Reviews; theme: 'l
         <span className="font-semibold">{L.title}</span>
         {page && page.count > 0 && page.avg !== null && (
           <span className="flex items-center gap-1 text-muted-foreground">
-            <Star className="size-3.5 fill-[#F0A500] text-[#F0A500]" aria-hidden />
+            <Star className="size-3.5 fill-gold text-gold" aria-hidden />
             <span className="font-semibold text-foreground tabular-nums">{fmtAvg(page.avg)}</span>· {L.summary(page.count)}
           </span>
         )}
@@ -154,7 +154,7 @@ function Stars({ value, className }: { value: number; className?: string }) {
   return (
     <span className={cn('flex shrink-0 gap-px', className)} role="img" aria-label={L.star(value)}>
       {[1, 2, 3, 4, 5].map((i) => (
-        <Star key={i} className={cn('size-3.5', i <= value ? 'fill-[#F0A500] text-[#F0A500]' : 'text-muted-foreground/40')} aria-hidden />
+        <Star key={i} className={cn('size-3.5', i <= value ? 'fill-gold text-gold' : 'text-muted-foreground/40')} aria-hidden />
       ))}
     </span>
   )
@@ -167,7 +167,7 @@ function Distribution({ dist, count }: { dist: number[]; count: number }) {
         <div key={s} className="flex items-center gap-2 text-[11px] text-muted-foreground tabular-nums">
           <span className="w-2 text-right">{s}</span>
           <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-background">
-            <span className="block h-full rounded-full bg-[#F0A500]" style={{ width: `${(dist[s - 1] / count) * 100}%` }} />
+            <span className="block h-full rounded-full bg-gold" style={{ width: `${(dist[s - 1] / count) * 100}%` }} />
           </span>
           <span className="w-6 text-right">{dist[s - 1]}</span>
         </div>
@@ -186,7 +186,7 @@ function MyReview({ review, onEdit, onRemove }: { review: Review; onEdit: () => 
         <Stars value={review.rating} />
       </div>
       {review.hidden && (
-        <p className="flex items-center gap-1 text-xs text-[#B45309] dark:text-[#F0A500]">
+        <p className="flex items-center gap-1 text-xs text-warn">
           <EyeOff className="size-3.5" aria-hidden />
           {L.hiddenMine}
         </p>
@@ -276,7 +276,7 @@ function ReviewForm({
             onClick={() => setRating(i)}
             className="rounded-md p-0.5 outline-none focus-visible:ring-3 focus-visible:ring-brand/35"
           >
-            <Star className={cn('size-7', i <= rating ? 'fill-[#F0A500] text-[#F0A500]' : 'text-muted-foreground/40')} />
+            <Star className={cn('size-7', i <= rating ? 'fill-gold text-gold' : 'text-muted-foreground/40')} />
           </button>
         ))}
       </div>

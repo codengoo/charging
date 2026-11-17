@@ -1,16 +1,12 @@
 import {
-  ResponsiveDialog,
-  ResponsiveDialogContent,
-  ResponsiveDialogDescription,
   ResponsiveDialogFooter,
-  ResponsiveDialogHeader,
-  ResponsiveDialogTitle,
 } from '@/components/ui/responsive-dialog'
 import { Button } from '@/components/ui/button'
 import type { GroupBook } from '../data/groups'
 import type { NoteMap } from '../data/notes'
 import { diffCount, type Backup } from '../data/backup'
 import { pick } from '../i18n'
+import { AppSheet } from './AppSheet'
 
 const L = pick({
   vi: {
@@ -84,29 +80,29 @@ export function ImportDialog({ open, pending, onConfirm, onClose }: Props) {
   }
 
   return (
-    <ResponsiveDialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <ResponsiveDialogContent className="sm:max-w-sm">
-        <ResponsiveDialogHeader>
-          <ResponsiveDialogTitle className="text-lg">{title}</ResponsiveDialogTitle>
-          <ResponsiveDialogDescription className="text-sm">{text}</ResponsiveDialogDescription>
-        </ResponsiveDialogHeader>
-        <ResponsiveDialogFooter className="mt-4 flex-row justify-end">
-          {incoming && !nothing ? (
-            <>
-              <Button variant="outline" className="flex-1 sm:flex-none" onClick={onClose}>
-                {L.cancel}
-              </Button>
-              <Button variant="brand" className="flex-1 sm:flex-none" onClick={() => onConfirm(incoming)}>
-                {L.confirm}
-              </Button>
-            </>
-          ) : (
+    <AppSheet
+      open={open}
+      onClose={onClose}
+      className="sm:max-w-sm"
+      title={title}
+      description={text}
+    >
+      <ResponsiveDialogFooter className="mt-4 flex-row justify-end">
+        {incoming && !nothing ? (
+          <>
             <Button variant="outline" className="flex-1 sm:flex-none" onClick={onClose}>
-              {L.close}
+              {L.cancel}
             </Button>
-          )}
-        </ResponsiveDialogFooter>
-      </ResponsiveDialogContent>
-    </ResponsiveDialog>
+            <Button variant="brand" className="flex-1 sm:flex-none" onClick={() => onConfirm(incoming)}>
+              {L.confirm}
+            </Button>
+          </>
+        ) : (
+          <Button variant="outline" className="flex-1 sm:flex-none" onClick={onClose}>
+            {L.close}
+          </Button>
+        )}
+      </ResponsiveDialogFooter>
+    </AppSheet>
   )
 }

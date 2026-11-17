@@ -36,6 +36,9 @@
     --font-mono: ui-monospace, monospace;
     --color-brand: var(--brand);
     --color-brand-foreground: var(--brand-foreground);
+    --color-warn: var(--warn);
+    --color-gold: var(--gold);
+    --color-full: var(--full);
     --color-ring: var(--ring);
     --color-input: var(--input);
     --color-border: var(--border);
@@ -85,6 +88,12 @@
     /* Tông chủ đạo xanh (emerald) — cùng hệ màu với chiatien. */
     --brand: oklch(0.596 0.145 163.225);
     --brand-foreground: oklch(0.985 0 0);
+    /* Chữ cảnh báo nhẹ (pin thấp, số liệu cũ, bài đang ẩn) — hổ phách đậm cho đủ tương phản. */
+    --warn: #b45309;
+    /* Vàng sao đánh giá / nền ghi chú / "đang bận". */
+    --gold: #f0a500;
+    /* Đỏ "hết cổng" / bảo trì / ngừng / tim đã lưu. */
+    --full: #e53935;
     --radius: 0.875rem;
 }
 
@@ -109,6 +118,7 @@
     --ring: #f5f5f7;
     --brand: oklch(0.696 0.17 162.48);
     --brand-foreground: oklch(0.21 0.05 165);
+    --warn: #f0a500;
 }
 
 @layer base {

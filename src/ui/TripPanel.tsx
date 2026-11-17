@@ -589,7 +589,7 @@ function ArrivalPct({ est }: { est: ArrivalEstimate }) {
 
 /** Vạch ngăn giữa trạm còn kịp và trạm có thể không tới được. */
 /** Nền vùng "không chắc tới được" (vàng) và "dễ hết pin" (đỏ) — mép răng cưa và các trạm phía sau dùng chung. */
-const ZONE_BG = { warn: 'bg-[#F0A500]/12', danger: 'bg-destructive/10' } as const
+const ZONE_BG = { warn: 'bg-gold/12', danger: 'bg-destructive/10' } as const
 /** Mép răng cưa: mask SVG (răng nhọn lên) trên nền của vùng, nên màu ăn theo giao diện sáng/tối. */
 const ZIGZAG_MASK = `url("data:image/svg+xml,${encodeURIComponent(
   "<svg xmlns='http://www.w3.org/2000/svg' width='14' height='7' viewBox='0 0 14 7'><path d='M0 7 7 0 14 7Z'/></svg>",
@@ -609,7 +609,7 @@ function ZoneEdge({ tone, text, under }: { tone: keyof typeof ZONE_BG; text?: st
         style={{ maskImage: ZIGZAG_MASK, WebkitMaskImage: ZIGZAG_MASK, maskSize: '14px 7px', WebkitMaskSize: '14px 7px', maskRepeat: 'repeat-x', WebkitMaskRepeat: 'repeat-x' }}
       />
       {text && (
-        <div className={`px-4 pt-1.5 pb-1 text-xs font-medium text-[#B45309] dark:text-[#F0A500] ${ZONE_BG[tone]}`}>{text}</div>
+        <div className={`px-4 pt-1.5 pb-1 text-xs font-medium text-warn ${ZONE_BG[tone]}`}>{text}</div>
       )}
     </li>
   )

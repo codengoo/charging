@@ -91,9 +91,9 @@ export function NoteBox({ note, onSave }: { note?: Note; onSave: (text: string) 
       type="button"
       onClick={start}
       aria-label={L.edit}
-      className="mt-2 flex w-full items-start gap-2 rounded-xl bg-[#F0A500]/12 px-3 py-2 text-left text-sm"
+      className="mt-2 flex w-full items-start gap-2 rounded-xl bg-gold/12 px-3 py-2 text-left text-sm"
     >
-      <NotebookPen className="mt-0.5 size-4 shrink-0 text-[#B45309] dark:text-[#F0A500]" aria-hidden />
+      <NotebookPen className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
       <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{note.text}</span>
     </button>
   )

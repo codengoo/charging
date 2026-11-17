@@ -57,7 +57,7 @@ export const DANGER_PCT = 5
 /** Màu chữ theo % pin bi quan khi đến: dưới DANGER_PCT đỏ, dưới 15% cam. */
 export function pctTone(low: number): string {
   if (low < DANGER_PCT) return 'text-destructive'
-  if (low < 15) return 'text-[#B45309] dark:text-[#F0A500]'
+  if (low < 15) return 'text-warn'
   return 'text-foreground'
 }
 
@@ -106,7 +106,7 @@ export function BatteryControl({
         </span>
       </div>
       {hint && (
-        <span className={`pl-6 text-xs ${stale ? 'text-[#B45309] dark:text-[#F0A500]' : 'text-muted-foreground'}`}>{hint}</span>
+        <span className={`pl-6 text-xs ${stale ? 'text-warn' : 'text-muted-foreground'}`}>{hint}</span>
       )}
     </div>
   )

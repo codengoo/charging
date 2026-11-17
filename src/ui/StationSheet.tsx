@@ -104,9 +104,9 @@ interface Props {
 
 /** Nền chip trạng thái: chưa mở là xám (chờ), hết cổng là vàng (tạm thời), còn lại đỏ. */
 const STATUS_BG = {
-  busy: 'bg-[#F0A500]',
-  maintaining: 'bg-[#E53935]',
-  out: 'bg-[#E53935]',
+  busy: 'bg-gold',
+  maintaining: 'bg-full',
+  out: 'bg-full',
   planned: 'bg-[#64748B]',
 } as const
 
@@ -223,7 +223,7 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
             onClick={onOpenGroups}
             aria-label={saved ? L.changeGroups : L.saveToGroup}
           >
-            <Heart className={saved ? 'fill-[#E53935] text-[#E53935]' : ''} />
+            <Heart className={saved ? 'fill-full text-full' : ''} />
             {saved ? L.saved : L.save}
           </Button>
           <Button variant="outline" size="icon" className="shrink-0" aria-label={L.share} onClick={onShare}>

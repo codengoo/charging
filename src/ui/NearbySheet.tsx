@@ -1,13 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2, LocateFixed } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  ResponsiveDialog,
-  ResponsiveDialogContent,
-  ResponsiveDialogDescription,
-  ResponsiveDialogHeader,
-  ResponsiveDialogTitle,
-} from '@/components/ui/responsive-dialog'
 import { kwActive, kwLabel, nearestStations, passesFilters, tierOf, type Filters, type StationIndex } from '../data/stations'
 import type { Station, StationPower } from '../data/types'
 import { TIER_COLORS } from '../map/pins'
@@ -16,6 +9,8 @@ import { fmtDistance, fmtKw } from '@/lib/format'
 import { cachedDrive, type DriveInfo } from '../data/drive'
 import type { GeoPoint, GpsResult } from '../lib/geo'
 import { pick } from '../i18n'
+import { AppSheet } from './AppSheet'
+import { StationRow } from './StationRow'
 
 const L = pick({
   vi: {
@@ -116,57 +111,51 @@ export function NearbySheet({ open, index, power, filters, origin, fromGps, driv
   const filterLabel = kwActive(filters.kw) ? L.power(kwLabel(filters.kw)) : ''
 
   return (
-    <ResponsiveDialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <ResponsiveDialogContent className="sm:max-w-md">
-        <ResponsiveDialogHeader>
-          <ResponsiveDialogTitle className="text-lg">
-            {fromGps ? L.nearYou : L.nearCenter}
-          </ResponsiveDialogTitle>
-          <ResponsiveDialogDescription className="text-sm">
-            {items.length === 0 ? L.none(filterLabel) : L.count(items.length, filterLabel)}
-            {fromGps ? L.gpsHint : L.noGpsHint}
-          </ResponsiveDialogDescription>
-        </ResponsiveDialogHeader>
+    <AppSheet
+      open={open}
+      onClose={onClose}
+      title={fromGps ? L.nearYou : L.nearCenter}
+      description={
+        <>
+          {items.length === 0 ? L.none(filterLabel) : L.count(items.length, filterLabel)}
+          {fromGps ? L.gpsHint : L.noGpsHint}
+        </>
+      }
+    >
+      {!fromGps && (
+        <div className="mt-2 flex flex-col gap-1.5">
+          <Button variant="brand" size="sm" className="self-start" disabled={locating} onClick={requestGps}>
+            {locating ? <Loader2 className="animate-spin" /> : <LocateFixed />}
+            {L.useGps}
+          </Button>
+          {gpsError && (
+            <p role="alert" className="text-xs text-destructive">
+              {gpsError === 'denied' ? L.gpsDenied : L.gpsFailed}
+            </p>
+          )}
+        </div>
+      )}
 
-        {!fromGps && (
-          <div className="mt-2 flex flex-col gap-1.5">
-            <Button variant="brand" size="sm" className="self-start" disabled={locating} onClick={requestGps}>
-              {locating ? <Loader2 className="animate-spin" /> : <LocateFixed />}
-              {L.useGps}
-            </Button>
-            {gpsError && (
-              <p role="alert" className="text-xs text-destructive">
-                {gpsError === 'denied' ? L.gpsDenied : L.gpsFailed}
-              </p>
-            )}
-          </div>
-        )}
-
-        <ul className="mt-2 flex flex-col">
-          {items.map((st) => {
-            const p = power?.get(st.entityId)
-            return (
-              <li key={st.entityId} className="border-b border-border/60 last:border-b-0">
-                <button
-                  type="button"
-                  className="flex w-full min-w-0 items-center gap-3 py-2.5 text-left"
-                  onClick={() => onPick(st)}
-                >
-                  <ChargerDot color={TIER_COLORS[tierOf(p)]} className="size-8" />
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="line-clamp-2 text-[15px] leading-snug">{st.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">{st.address}</span>
-                  </span>
-                  <span className="flex shrink-0 flex-col items-end gap-0.5">
-                    <Distance drive={fromGps ? cachedDrive(driveOrigin, st) : undefined} straightKm={st.distanceKm} />
-                    {p && <span className="text-xs text-muted-foreground">{fmtKw(p.maxKw)} kW</span>}
-                  </span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      </ResponsiveDialogContent>
-    </ResponsiveDialog>
+      <ul className="mt-2 flex flex-col">
+        {items.map((st) => {
+          const p = power?.get(st.entityId)
+          return (
+            <StationRow
+              key={st.entityId}
+              leading={<ChargerDot color={TIER_COLORS[tierOf(p)]} className="size-8" />}
+              title={st.name}
+              subtitle={st.address}
+              trailing={
+                <>
+                  <Distance drive={fromGps ? cachedDrive(driveOrigin, st) : undefined} straightKm={st.distanceKm} />
+                  {p && <span className="text-xs text-muted-foreground">{fmtKw(p.maxKw)} kW</span>}
+                </>
+              }
+              onClick={() => onPick(st)}
+            />
+          )
+        })}
+      </ul>
+    </AppSheet>
   )
 }

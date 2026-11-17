@@ -1,11 +1,4 @@
 import { useState } from 'react'
-import {
-  ResponsiveDialog,
-  ResponsiveDialogContent,
-  ResponsiveDialogDescription,
-  ResponsiveDialogHeader,
-  ResponsiveDialogTitle,
-} from '@/components/ui/responsive-dialog'
 import { Segmented } from '@/components/ui/segmented'
 import { Input } from '@/components/ui/input'
 import { ResponsiveSelect } from '@/components/ui/responsive-select'
@@ -13,6 +6,7 @@ import type { Settings } from '../data/settings'
 import { CUSTOM_ID, VEHICLES } from '../data/vehicles'
 import { RESERVE_MAX, RESERVE_MIN, RESERVE_OPTIONS } from '../data/battery'
 import { LOCALE, pick } from '@/i18n'
+import { AppSheet } from './AppSheet'
 
 const L = pick({
   vi: {
@@ -93,91 +87,91 @@ interface Props {
 export function VehicleSheet({ open, settings, onChange, onClose, nested = false }: Props) {
   const model = VEHICLES.find((v) => v.id === settings.vehicleId)
   return (
-    <ResponsiveDialog nested={nested} open={open} onOpenChange={(o) => !o && onClose()}>
-      <ResponsiveDialogContent className="sm:max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
-        <ResponsiveDialogHeader className="gap-1 pr-6 text-left">
-          <ResponsiveDialogTitle className="text-base font-bold sm:text-lg">{L.title}</ResponsiveDialogTitle>
-          <ResponsiveDialogDescription className="text-xs sm:text-sm">{L.hint}</ResponsiveDialogDescription>
-        </ResponsiveDialogHeader>
-
-        <div className="mt-3 flex flex-col gap-4 pb-2 sm:mt-0">
-          <section className="flex flex-col gap-1.5">
-            <h3 className="text-sm font-semibold">{L.model}</h3>
-            <ResponsiveSelect
-              title={L.model}
-              value={settings.vehicleId ?? NONE}
-              // Số tiêu thụ đọc trên xe cũ không còn đúng cho mẫu mới.
-              onChange={(v) => onChange({ vehicleId: v === NONE ? null : v, usageOverride: null })}
-              options={MODEL_OPTIONS}
-            />
-            {settings.vehicleId === CUSTOM_ID && (
-              <div className="flex gap-2">
-                <NumberField
-                  label={L.capacity}
-                  value={settings.customKwh}
-                  min={5}
-                  max={250}
-                  onCommit={(customKwh) => onChange({ customKwh })}
-                />
-                <NumberField
-                  label={L.usage}
-                  value={settings.customKwhPer100}
-                  min={5}
-                  max={60}
-                  onCommit={(customKwhPer100) => onChange({ customKwhPer100 })}
-                />
-              </div>
-            )}
-            {model && (
-              <label className="mt-1 flex flex-col gap-1 text-xs text-muted-foreground">
-                {L.real}
-                <Input
-                  // key theo mẫu: đổi mẫu thì ô trống lại (defaultValue chỉ đọc lúc gắn).
-                  key={model.id}
-                  type="number"
-                  inputMode="decimal"
-                  min={5}
-                  max={60}
-                  step="0.1"
-                  placeholder={fmtNum(model.kwhPer100)}
-                  defaultValue={settings.usageOverride ?? ''}
-                  onChange={(e) => {
-                    const v = Number(e.target.value)
-                    if (!e.target.value) onChange({ usageOverride: null })
-                    else if (Number.isFinite(v) && v >= 5 && v <= 60) onChange({ usageOverride: v })
-                  }}
-                  className="text-foreground"
-                />
-                <span>{L.realHint(fmtNum(model.kwhPer100))}</span>
-              </label>
-            )}
-          </section>
-
-          {settings.vehicleId && (
-            <section className="flex flex-col gap-1.5">
-              <h3 className="text-sm font-semibold">{L.climate}</h3>
-              <Segmented
-                label={L.climate}
-                value={settings.climate ? 'on' : 'off'}
-                onChange={(v) => onChange({ climate: v === 'on' })}
-                options={[
-                  { value: 'on' as const, label: L.on },
-                  { value: 'off' as const, label: L.off },
-                ]}
+    <AppSheet
+      nested={nested}
+      open={open}
+      onClose={onClose}
+      autoFocus={false}
+      title={L.title}
+      description={L.hint}
+    >
+      <div className="mt-3 flex flex-col gap-4 pb-2 sm:mt-0">
+        <section className="flex flex-col gap-1.5">
+          <h3 className="text-sm font-semibold">{L.model}</h3>
+          <ResponsiveSelect
+            title={L.model}
+            value={settings.vehicleId ?? NONE}
+            // Số tiêu thụ đọc trên xe cũ không còn đúng cho mẫu mới.
+            onChange={(v) => onChange({ vehicleId: v === NONE ? null : v, usageOverride: null })}
+            options={MODEL_OPTIONS}
+          />
+          {settings.vehicleId === CUSTOM_ID && (
+            <div className="flex gap-2">
+              <NumberField
+                label={L.capacity}
+                value={settings.customKwh}
+                min={5}
+                max={250}
+                onCommit={(customKwh) => onChange({ customKwh })}
               />
-            </section>
+              <NumberField
+                label={L.usage}
+                value={settings.customKwhPer100}
+                min={5}
+                max={60}
+                onCommit={(customKwhPer100) => onChange({ customKwhPer100 })}
+              />
+            </div>
           )}
+          {model && (
+            <label className="mt-1 flex flex-col gap-1 text-xs text-muted-foreground">
+              {L.real}
+              <Input
+                // key theo mẫu: đổi mẫu thì ô trống lại (defaultValue chỉ đọc lúc gắn).
+                key={model.id}
+                type="number"
+                inputMode="decimal"
+                min={5}
+                max={60}
+                step="0.1"
+                placeholder={fmtNum(model.kwhPer100)}
+                defaultValue={settings.usageOverride ?? ''}
+                onChange={(e) => {
+                  const v = Number(e.target.value)
+                  if (!e.target.value) onChange({ usageOverride: null })
+                  else if (Number.isFinite(v) && v >= 5 && v <= 60) onChange({ usageOverride: v })
+                }}
+                className="text-foreground"
+              />
+              <span>{L.realHint(fmtNum(model.kwhPer100))}</span>
+            </label>
+          )}
+        </section>
 
-          {settings.vehicleId && (
-            <section className="flex flex-col gap-1.5">
-              <h3 className="text-sm font-semibold">{L.reserve}</h3>
-              <ReservePicker value={settings.reservePct} onChange={(reservePct) => onChange({ reservePct })} />
-              <p className="text-xs text-muted-foreground">{L.reserveHint}</p>
-            </section>
-          )}
-        </div>
-      </ResponsiveDialogContent>
-    </ResponsiveDialog>
+        {settings.vehicleId && (
+          <section className="flex flex-col gap-1.5">
+            <h3 className="text-sm font-semibold">{L.climate}</h3>
+            <Segmented
+              label={L.climate}
+              value={settings.climate ? 'on' : 'off'}
+              onChange={(v) => onChange({ climate: v === 'on' })}
+              options={[
+                { value: 'on' as const, label: L.on },
+                { value: 'off' as const, label: L.off },
+              ]}
+            />
+          </section>
+        )}
+
+        {settings.vehicleId && (
+          <section className="flex flex-col gap-1.5">
+            <h3 className="text-sm font-semibold">{L.reserve}</h3>
+            <ReservePicker value={settings.reservePct} onChange={(reservePct) => onChange({ reservePct })} />
+            <p className="text-xs text-muted-foreground">{L.reserveHint}</p>
+          </section>
+        )}
+      </div>
+    </AppSheet>
   )
 }
 

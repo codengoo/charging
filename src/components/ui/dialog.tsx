@@ -6,6 +6,10 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
+import { pick } from '@/i18n'
+
+/** Nhãn nút đóng (trang tiếng Việt từng đọc 'Close' cho trình đọc màn hình). */
+const CLOSE = pick({ vi: 'Đóng', en: 'Close' })
 
 function Dialog({
   ...props
@@ -77,7 +81,7 @@ function DialogContent({
             >
               <XIcon
               />
-              <span className="sr-only">Close</span>
+              <span className="sr-only">{CLOSE}</span>
             </Button>
           </DialogPrimitive.Close>
         )}
@@ -116,7 +120,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          <Button variant="outline">Close</Button>
+          <Button variant="outline">{CLOSE}</Button>
         </DialogPrimitive.Close>
       )}
     </div>
