@@ -11,6 +11,24 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.15.0',
+    date: '2026-11-17',
+    title: 'Địa điểm hay dùng',
+    changes: [
+      "Lưu Nhà, Công ty và địa điểm hay đi — bấm là tìm đường kèm trạm dọc đường.",
+      "Chạm giữ bản đồ để lưu địa điểm, tìm đường hoặc xem trạm gần đó.",
+      "Xem trạm gần Nhà, Công ty ngay trong Gần tôi.",
+      "Quét QR mở toàn màn hình trên điện thoại.",
+    ],
+    titleEn: 'Saved places',
+    changesEn: [
+      "Save Home, Work and favourite places — one tap for a route with stations along the way.",
+      "Long-press the map to save a place, get directions or see stations nearby.",
+      "See stations near Home or Work right in Near me.",
+      "QR scanning opens full screen on phones.",
+    ],
+  },
+  {
     version: '0.14.0',
     date: '2026-11-17',
     title: 'Quét QR, kế hoạch sạc thông minh hơn, dùng khi mất sóng',

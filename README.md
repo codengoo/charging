@@ -64,7 +64,12 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
 - **Đường cong sạc** (`src/data/vehicles.ts` `dcCurve`, `src/data/battery.ts` `chargeMinutes`): mỗi mẫu một đường
   [% pin, kW], hình dạng suy luận theo loại pin, co cho 10→70% khớp thời gian hãng công bố; thời gian sạc tích phân
   bước 0,5%, mỗi bước min(đường cong, cổng trạm).
-- **Quét QR** (`src/ui/QrScanSheet.tsx`, nút cạnh ⚙): `qr-scanner` nạp lười, nhận link `/station/<id>` và `/tram/<id>`
+- **Địa điểm hay dùng** (`src/data/places.ts`, `src/ui/PlacesSheet.tsx`, `PlaceChips.tsx`, `PointSheet.tsx`,
+  `src/map/placeMarkers.tsx`): Nhà, Công ty + ≤ 8 tự đặt, localStorage `tramsac.places`, đi kèm sao lưu (`places`).
+  Đặt bằng gõ địa chỉ (`/api/geocode?limit=5`), vị trí hiện tại, dán link Google Maps, hoặc chạm giữ bản đồ (tự đo
+  550 ms trên touch — iOS không phát `contextmenu`). Dùng: chip Từ / Tới trong Dọc đường (`directionsLink` → link
+  `dir/?api=1` mở như link dán), gốc của Gần tôi, ghim trên bản đồ; tên chặng trùng địa điểm (≤ 100 m) hiện "Nhà".
+- **Quét QR** (`src/ui/QrScanSheet.tsx`, nút cạnh ⚙; điện thoại: hộp thoại toàn màn hình): `qr-scanner` nạp lười, nhận link `/station/<id>` và `/tram/<id>`
   cũ của đúng host app (`stationIdFromQr`).
 - **Offline** (`vite.config.ts`, vite-plugin-pwa): precache app shell; `/data/base|power-*` CacheFirst,
   `manifest.json` NetworkFirst; ô bản đồ OpenFreeMap StaleWhileRevalidate (4000 mục, 30 ngày); `/api/route|maps-link|

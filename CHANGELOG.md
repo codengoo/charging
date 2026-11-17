@@ -2,6 +2,13 @@
 
 Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app).
 
+## [0.15.0] — 2026-11-17 — Địa điểm hay dùng
+
+- Lưu Nhà, Công ty và địa điểm hay đi — bấm là tìm đường kèm trạm dọc đường.
+- Chạm giữ bản đồ để lưu địa điểm, tìm đường hoặc xem trạm gần đó.
+- Xem trạm gần Nhà, Công ty ngay trong Gần tôi.
+- Quét QR mở toàn màn hình trên điện thoại.
+
 ## [0.14.0] — 2026-11-17 — Quét QR, kế hoạch sạc thông minh hơn, dùng khi mất sóng
 
 - Quét mã QR trên thẻ trạm để mở trạm ngay.
