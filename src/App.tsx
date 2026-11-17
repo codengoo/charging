@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { List, LocateFixed, Route, Settings2 } from 'lucide-react'
+import { List, LocateFixed, Route } from 'lucide-react'
 import { MapView, type TripLayer } from './map/MapView'
 import { SearchBar } from './ui/SearchBar'
 import { StationSheet } from './ui/StationSheet'
@@ -48,9 +48,7 @@ const T = tr({
     nearMe: 'Gần tôi',
     alongRoute: 'Dọc đường',
     saved: (n: number) => `Đã lưu${n ? ` (${n})` : ''}`,
-    active: 'Đang hoạt động',
     list: 'Danh sách',
-    settings: 'Cài đặt hiển thị',
     whatsNew: 'Có gì mới',
   },
   en: {
@@ -60,9 +58,7 @@ const T = tr({
     nearMe: 'Near me',
     alongRoute: 'Along route',
     saved: (n: number) => `Saved${n ? ` (${n})` : ''}`,
-    active: 'Operating',
     list: 'List',
-    settings: 'Display settings',
     whatsNew: "What's new",
   },
 })
@@ -312,8 +308,9 @@ export function App() {
           Cao đúng bằng vùng tai thỏ, ngoài PWA thì bằng 0 nên không hiện. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] h-[env(safe-area-inset-top)] bg-gradient-to-b from-black/45 to-black/10" />
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] flex flex-col gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <div className="pointer-events-auto">
-          <SearchBar index={index} onPick={pick} />
+        {/* relative z-10: danh sách kết quả tìm kiếm phải đè lên hàng chip phía dưới. */}
+        <div className="pointer-events-auto relative z-10">
+          <SearchBar index={index} onPick={pick} onSettings={() => setShowSettings(true)} />
         </div>
         {/* Một hàng vuốt ngang: nhiều chip quá thì không xuống dòng che bản đồ. py/-my chừa chỗ
             cho bóng chip khỏi bị overflow cắt. */}
@@ -338,17 +335,9 @@ export function App() {
             onClick={() => setFilters((f) => ({ ...f, favoritesOnly: !f.favoritesOnly }))}
           />
           <FilterChip label={kwLabel(settings.kwBands)} on={kwActive(filters.kw)} onClick={toggleKw} />
-          <FilterChip
-            label={T.active}
-            on={filters.activeOnly}
-            onClick={() => setFilters((f) => ({ ...f, activeOnly: !f.activeOnly }))}
-          />
           <Chip variant="floating" onClick={() => setShowSaved(true)}>
             <List />
             {T.list}
-          </Chip>
-          <Chip variant="floating" aria-label={T.settings} title={T.settings} onClick={() => setShowSettings(true)}>
-            <Settings2 />
           </Chip>
         </div>
       </div>
