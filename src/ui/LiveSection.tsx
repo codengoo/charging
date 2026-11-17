@@ -157,7 +157,7 @@ export function PortsBox({
       </div>
 
       {rows.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
+        <div className="mt-2 flex flex-col gap-1.5">
           {rows.map((r) => (
             <PortChip key={r.kw} row={r} approx={approx} />
           ))}
@@ -272,13 +272,14 @@ function PortChip({ row: r, approx }: { row: Row; approx: boolean }) {
         <span className="text-foreground/80">× {r.count}</span>
       )}
       {r.dc !== null && (
-        <span className="font-semibold" style={{ color: onSolid ? '#fff' : ink }}>
+        <span className="ml-auto font-semibold" style={{ color: onSolid ? '#fff' : ink }}>
           {r.dc ? 'DC' : 'AC'}
         </span>
       )}
     </>
   )
-  const box = 'inline-flex h-8 items-center gap-2 pr-3.5 pl-3 text-xs whitespace-nowrap'
+  // Thanh kéo hết bề ngang hộp (mỗi mức kW một dòng); lớp tô đè dùng đúng bố cục này để chữ trùng khít.
+  const box = 'flex w-full h-8 items-center gap-2 pr-3.5 pl-3 text-xs whitespace-nowrap'
   return (
     <span
       className={`relative shrink-0 overflow-hidden rounded-full ${box}`}
