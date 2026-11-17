@@ -11,6 +11,24 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.11.0',
+    date: '2026-11-17',
+    title: 'Chọn tuyến đường',
+    changes: [
+      "Đi thẳng hai điểm: xem tối đa 3 tuyến, mỗi tuyến ghi thời gian, km và số trạm; chạm thẻ hoặc đường xám trên bản đồ để chọn — danh sách trạm, % pin và kế hoạch sạc theo tuyến đã chọn.",
+      "Link có kéo tuyến trên Google Maps (máy tính): app đi đúng qua các điểm đã kéo.",
+      "Tuỳ chọn tránh thu phí / cao tốc / phà trong link được giữ nguyên, và bật/tắt được ngay trong bảng.",
+      "Sửa: link có kéo tuyến từng làm sai vị trí điểm đến; link chia sẻ từ Google Maps trên iPhone không mở được.",
+    ],
+    titleEn: 'Pick your route',
+    changesEn: [
+      "Two-point trips: see up to 3 routes, each with time, distance and station count; tap a card or a grey line on the map to pick one — the station list, battery estimates and charging plan follow the chosen route.",
+      "Links where the route was dragged in Google Maps (desktop): the app goes through the dragged points.",
+      "Avoid tolls / highways / ferries settings in the link are kept, and can be toggled right in the panel.",
+      "Fixed: dragged-route links put the destination in the wrong place; links shared from Google Maps on iPhone didn't open.",
+    ],
+  },
+  {
     version: '0.10.0',
     date: '2026-11-17',
     title: 'Kế hoạch sạc, ghi chú & đánh giá trạm',

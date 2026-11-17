@@ -2,6 +2,13 @@
 
 Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app).
 
+## [0.11.0] — 2026-11-17 — Chọn tuyến đường
+
+- Đi thẳng hai điểm: xem tối đa 3 tuyến, mỗi tuyến ghi thời gian, km và số trạm; chạm thẻ hoặc đường xám trên bản đồ để chọn — danh sách trạm, % pin và kế hoạch sạc theo tuyến đã chọn.
+- Link có kéo tuyến trên Google Maps (máy tính): app đi đúng qua các điểm đã kéo.
+- Tuỳ chọn tránh thu phí / cao tốc / phà trong link được giữ nguyên, và bật/tắt được ngay trong bảng.
+- Sửa: link có kéo tuyến từng làm sai vị trí điểm đến; link chia sẻ từ Google Maps trên iPhone không mở được.
+
 ## [0.10.0] — 2026-11-17 — Kế hoạch sạc, ghi chú & đánh giá trạm
 
 - Tự lên kế hoạch dừng sạc: trong "Dọc đường", bấm "Lên kế hoạch sạc" để app chọn các trạm sạc nhanh cần ghé, ước tính thời gian sạc, giờ tới nơi và pin còn lại. Bản đồ chỉ hiện các điểm dừng.

@@ -37,7 +37,11 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
 - **Trạm dọc đường** (`src/ui/TripPanel.tsx`, `src/data/useTrip.ts`, port từ `charge-map-android`):
   dán link chỉ đường Google Maps (hoặc chia sẻ từ Google Maps vào PWA đã cài trên Android — Web
   Share Target `action: /trip`). Link rút gọn mở qua `/api/maps-link`; chặng chỉ có tên đoán toạ
-  độ bằng HERE; tuyến tính bằng HERE Routing (`/api/route`). Client giải mã flexible polyline
+  độ bằng HERE; tuyến tính bằng HERE Routing (`/api/route`). Đi thẳng 2 điểm thì xin tối đa 3 tuyến
+  (thẻ trong bảng + đường xám chạm được trên bản đồ, không ghi vào URL). Khối `data=` của link đọc theo
+  cây (`src/lib/mapsLink.ts`): toạ độ chặng `!2m2!1d<lng>!2d<lat>`, điểm kéo tuyến `!3m…!1m2!1d!2d` (gửi
+  HERE dạng via `passThrough`), tránh `!2m…!1b1` cao tốc / `!2b1` thu phí / `!3b1` phà, tuyến đang chọn
+  `!5iN` (chỉ để gợi ý). Link iOS `maps.google.com/?saddr=…&daddr=…&geocode=…` cũng đọc được. Client giải mã flexible polyline
   (`src/lib/flexiblePolyline.ts`), lọc hành lang 2/5/10 km (`src/data/routeCorridor.ts`: đo phẳng,
   bỏ trạm bên kia dải phân cách cao tốc, trần 400 trạm theo độ lệch), xếp theo km gặp trên đường.
   URL `/trip?link=…` mở lại hành trình. Cần secret `HERE_API_KEY` (xem "API proxy HERE").
@@ -174,10 +178,10 @@ Trạm dọc đường cần tính tuyến (HERE Routing v8) và đoán toạ đ
 
 | Endpoint | Việc |
 |---|---|
-| `GET /api/route?stops=lat,lng;lat,lng[;…]` | HERE Routing v8 (`polyline,summary` + spans `length,functionalClass`), 2–22 điểm |
+| `GET /api/route?stops=lat,lng;lat,lng[!p][;…]&alt=0..2&avoid=toll,highway,ferry` | HERE Routing v8 (`polyline,summary` + spans `length,functionalClass`), 2–22 điểm; `!p` = via `passThrough`; `alt` (tuyến khác) chỉ khi không có điểm giữa |
 | `GET /api/geocode?q=…[&at=lat,lng]` | HERE discover (có `at`) / geocode trong VN |
 | `GET /api/revgeocode?at=lat,lng` | Tên điểm từ toạ độ |
-| `GET /api/maps-link?url=<maps.app.goo.gl/…>` | Mở link rút gọn, trả `{ url }` thuộc `google.*/maps` |
+| `GET /api/maps-link?url=<maps.app.goo.gl/…>` | Mở link rút gọn, trả `{ url }` thuộc `google.*/maps` hoặc `maps.google.*/` |
 | `GET /api/drive?from=lat,lng&to=lat,lng` | Quãng đường lái xe thật tới trạm đang mở (`return=summary`), 1 lượt Routing Car |
 
 ## Số cổng trống thời gian thực (`worker/evcs.ts`)
