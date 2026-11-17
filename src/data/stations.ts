@@ -191,8 +191,10 @@ export function nearestStations(
       .map((st) => ({ ...st, distanceKm: distanceKm(lat, lng, st.lat, st.lng) }))
       .sort((a, b) => a.distanceKm - b.distanceKm)
     // Đủ số lượng CHƯA đủ: trạm ở góc hình vuông có thể xa hơn trạm ngoài vòng. Chỉ dừng khi
-    // trạm thứ `limit` nằm trong vòng tròn nội tiếp (bán kính theo vĩ độ, ~111 km/độ).
-    if ((sorted.length >= limit && sorted[limit - 1].distanceKm <= deg * 111) || ring === maxRing) {
+    // trạm thứ `limit` nằm trong vòng tròn nội tiếp. Hình vuông tính theo độ nên cạnh đông-tây
+    // chỉ dài 111·cos(lat) km/độ — lấy cạnh ngắn hơn làm bán kính.
+    const innerKm = deg * 111 * Math.min(1, Math.cos((lat * Math.PI) / 180))
+    if ((sorted.length >= limit && sorted[limit - 1].distanceKm <= innerKm) || ring === maxRing) {
       return sorted.slice(0, limit)
     }
   }

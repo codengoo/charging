@@ -34,7 +34,12 @@ export interface ReviewInput {
   turnstile?: string | null
 }
 
-export class ReviewError extends Error {}
+export class ReviewError extends Error {
+  /** Mã HTTP khi lỗi đến từ server; 0 = lỗi mạng. */
+  constructor(message: string, readonly status = 0) {
+    super(message)
+  }
+}
 
 const MSG = pick({
   vi: { network: 'Không kết nối được máy chủ, thử lại sau.', generic: 'Có lỗi xảy ra, thử lại sau.' },
@@ -80,7 +85,7 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (res.status === 204) return undefined as T
   const body = (await res.json().catch(() => null)) as (T & { error?: string }) | null
   // Lỗi từ server đã là câu tiếng Việt cho người dùng (trang /en vẫn hiện tiếng Việt — chấp nhận).
-  if (!res.ok) throw new ReviewError(body?.error ?? MSG.generic)
+  if (!res.ok) throw new ReviewError(body?.error ?? MSG.generic, res.status)
   return body as T
 }
 
@@ -103,6 +108,8 @@ export function useReviews(entityId: string | null, enabled: boolean) {
   const [state, setState] = useState<ReviewsState>(EMPTY)
   const [nonce, setNonce] = useState(0)
   const shownFor = useRef<string | null>(null)
+  // "Xem thêm" đang chạy: đổi trạm / tải lại thì huỷ, không thì trang cũ nối vào trạm mới.
+  const moreCtrl = useRef<AbortController | null>(null)
 
   useEffect(() => {
     if (!enabled || !entityId) return
@@ -111,29 +118,38 @@ export function useReviews(entityId: string | null, enabled: boolean) {
     if (shownFor.current !== entityId) setState({ ...EMPTY, loading: true })
     else setState((s) => ({ ...s, loading: true }))
     shownFor.current = entityId
-    fetch(`/api/reviews/${encodeURIComponent(entityId)}`, { signal: ctrl.signal, headers: { 'X-Device': deviceId() } })
-      .then(async (res) => {
-        if (res.status === 503) return setState({ ...EMPTY, disabled: true })
-        const body = (await res.json().catch(() => null)) as (ReviewsPage & { error?: string }) | null
-        if (!res.ok || !body) throw new ReviewError(body?.error ?? MSG.generic)
+    moreCtrl.current?.abort()
+    call<ReviewsPage>(`/api/reviews/${encodeURIComponent(entityId)}`, { signal: ctrl.signal })
+      .then((body) => {
+        if (!body) throw new ReviewError(MSG.generic)
         setState({ ...EMPTY, page: body, next: body.next })
       })
       .catch((e: Error) => {
         if (ctrl.signal.aborted) return
-        setState((s) => ({ ...s, loading: false, error: e instanceof ReviewError ? e.message : MSG.network }))
+        if (e instanceof ReviewError && e.status === 503) return setState({ ...EMPTY, disabled: true })
+        setState((s) => ({ ...s, loading: false, error: e.message }))
       })
     return () => ctrl.abort()
   }, [entityId, enabled, nonce])
 
   const reload = useCallback(() => setNonce((n) => n + 1), [])
 
+  useEffect(() => () => moreCtrl.current?.abort(), [])
+
   const loadMore = useCallback(async () => {
     if (!entityId || state.next === null || state.loadingMore) return
+    const ctrl = new AbortController()
+    moreCtrl.current = ctrl
     setState((s) => ({ ...s, loadingMore: true }))
     try {
-      const p = await call<ReviewsPage>(`/api/reviews/${encodeURIComponent(entityId)}?before=${state.next}`)
+      const p = await call<ReviewsPage>(
+        `/api/reviews/${encodeURIComponent(entityId)}?before=${encodeURIComponent(state.next)}`,
+        { signal: ctrl.signal },
+      )
+      if (ctrl.signal.aborted || shownFor.current !== entityId) return
       setState((s) => ({ ...s, more: [...s.more, ...p.items], next: p.next, loadingMore: false }))
     } catch (e) {
+      if (ctrl.signal.aborted) return
       setState((s) => ({ ...s, loadingMore: false, error: (e as Error).message }))
     }
   }, [entityId, state.next, state.loadingMore])

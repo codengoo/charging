@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_FILTERS, KW_BANDS, type Filters, type KwBand } from './stations'
 import { TRIP_RADII, type TripRadius } from './useTrip'
 import { THEME_PREFS, type ThemePref } from '../lib/theme'
@@ -105,17 +105,20 @@ export function filtersFrom(s: Settings): Filters {
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(load)
 
-  const update = useCallback((patch: Partial<Settings>) => {
-    setSettings((s) => {
-      const next = { ...s, ...patch }
-      try {
-        localStorage.setItem(KEY, JSON.stringify(next))
-      } catch {
-        // không lưu được thì vẫn áp dụng trong phiên
-      }
-      return next
-    })
-  }, [])
+  // Updater phải THUẦN (StrictMode gọi hai lần) — ghi kho trong effect.
+  const update = useCallback((patch: Partial<Settings>) => setSettings((s) => ({ ...s, ...patch })), [])
+  const first = useRef(true)
+  useEffect(() => {
+    if (first.current) {
+      first.current = false // vừa đọc từ kho, không ghi lại
+      return
+    }
+    try {
+      localStorage.setItem(KEY, JSON.stringify(settings))
+    } catch {
+      // không lưu được thì vẫn áp dụng trong phiên
+    }
+  }, [settings])
 
   return { settings, update }
 }

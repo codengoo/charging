@@ -18,12 +18,18 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Không còn kẹt lỗi \"không có ảnh\" ở trạm sau một lần tải lỗi.",
       "Đánh giá: \"Xem thêm\" không bỏ sót bài; bài đang bị ẩn không xoá được.",
       "Chặn quét dữ liệu trạm hàng loạt.",
+      "Mở link trạm / hành trình không còn bị GPS kéo bản đồ đi chỗ khác.",
+      "Trạm gần bạn không bỏ sót trạm gần hơn ở hướng đông-tây.",
+      "Ô tìm kiếm đóng khi bấm ra ngoài hoặc nhấn Esc.",
     ],
     titleEn: "Fixes & server protection",
     changesEn: [
       "A station no longer stays stuck without photos after one failed load.",
       "Reviews: \"Show more\" no longer skips posts; hidden posts can't be deleted.",
       "Blocks bulk scraping of station data.",
+      "Opening a station or trip link no longer gets pulled away by GPS.",
+      "Stations near you no longer misses closer stations to the east or west.",
+      "Search results close when you tap outside or press Esc.",
     ],
   },
   {

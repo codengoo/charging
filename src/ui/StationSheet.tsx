@@ -200,7 +200,8 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
           onPickCar={onPickCar}
         />
 
-        {live && <HistoryBox live={live} power={ports} />}
+        {/* key theo trạm: lựa chọn khoảng giờ / mức kW không mang sang trạm khác. */}
+        {live && <HistoryBox key={station.entityId} live={live} power={ports} />}
 
         {detail?.hotline && (
           <a

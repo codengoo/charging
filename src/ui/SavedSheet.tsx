@@ -88,12 +88,15 @@ export function SavedSheet({ open, index, book, notes, now, userPos, onPick, onU
     return rows
   }, [index, book, userPos])
 
-  const shown = filter.size === 0
-    ? items
-    : items.filter(({ st }) => [...filter].some((g) => idsIn(book, g).includes(st.entityId)))
-
   // Chỉ hiện nhóm đang có trạm: nhóm rỗng làm hàng chip dài ra mà bấm vào chỉ được danh sách trống.
   const usedGroups = book.groups.filter((g) => idsIn(book, g.id).length > 0)
+  // Nhóm đang lọc mà vừa rỗng (bỏ lưu, xoá nhóm, hết hạn) thì chip của nó biến mất — bỏ khỏi
+  // bộ lọc luôn, không thì danh sách kẹt "0 trạm" mà không chip nào sáng.
+  const active = new Set([...filter].filter((id) => usedGroups.some((g) => g.id === id)))
+
+  const shown = active.size === 0
+    ? items
+    : items.filter(({ st }) => [...active].some((g) => idsIn(book, g).includes(st.entityId)))
 
   return (
     <ResponsiveDialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -103,7 +106,7 @@ export function SavedSheet({ open, index, book, notes, now, userPos, onPick, onU
           <ResponsiveDialogDescription className="text-sm">
             {items.length === 0
               ? L.empty
-              : filter.size > 0
+              : active.size > 0
                 ? L.filtered(shown.length, items.length)
                 : L.count(items.length)}
           </ResponsiveDialogDescription>
@@ -117,11 +120,11 @@ export function SavedSheet({ open, index, book, notes, now, userPos, onPick, onU
 
         {items.length > 0 && (
           <div className="mt-2 -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 no-scrollbar">
-            <Chip selected={filter.size === 0} onClick={() => setFilter(new Set())}>
+            <Chip selected={active.size === 0} onClick={() => setFilter(new Set())}>
               {L.all}
             </Chip>
             {usedGroups.map((g) => {
-              const on = filter.has(g.id)
+              const on = active.has(g.id)
               return (
                 // Chip nhóm bật thì lấy màu của nhóm (viền + nền nhạt) thay vì brand chung.
                 <Chip

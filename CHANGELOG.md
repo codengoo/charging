@@ -7,6 +7,9 @@ Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app
 - Không còn kẹt lỗi "không có ảnh" ở trạm sau một lần tải lỗi.
 - Đánh giá: "Xem thêm" không bỏ sót bài; bài đang bị ẩn không xoá được.
 - Chặn quét dữ liệu trạm hàng loạt.
+- Mở link trạm / hành trình không còn bị GPS kéo bản đồ đi chỗ khác.
+- Trạm gần bạn không bỏ sót trạm gần hơn ở hướng đông-tây.
+- Ô tìm kiếm đóng khi bấm ra ngoài hoặc nhấn Esc.
 
 ## [0.12.0] — 2026-11-17 — Pin dự phòng, trạm trên cao tốc & bảng gọn hơn
 

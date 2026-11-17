@@ -32,10 +32,12 @@ export function useStationData() {
       if (!alive) return
       shownGen.current = next.generation
       setIndex(next)
+      setError(null) // lần đầu lỗi, lần kiểm lại tải được → bỏ màn lỗi
       setPower(null)
       try {
         const p = await loadPower(next)
-        if (alive) setPower(p)
+        // Power của bản cũ về muộn sau khi đã chuyển sang bản mới thì bỏ.
+        if (alive && shownGen.current === next.generation) setPower(p)
       } catch {
         // Thiếu power chỉ mất số cổng/kW — bản đồ vẫn dùng được, không báo lỗi to.
       }

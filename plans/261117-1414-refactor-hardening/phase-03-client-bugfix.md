@@ -31,3 +31,11 @@
 ```
 fix: sửa 11 lỗi client (trạm gần bỏ sót theo kinh độ, review lẫn trạm, GPS kéo camera, ô tìm kiếm không đóng…)
 ```
+
+## 4. Kết quả (ghi lúc thực hiện)
+
+- B6 làm khác dự kiến: không thêm prop `autoLocate` (bỏ `geo.trigger()` thì mất luôn chấm vị trí và `userPos`). Thay vào đó MapView nghe `movestart`: camera bị app/người dùng dời đi khi control còn `WAITING_ACTIVE` thì đặt `_watchState = 'BACKGROUND'` (trường nội bộ maplibre 4.x) — fix đầu chỉ cập nhật chấm, không kéo camera.
+- B3 không có test: hook React cần môi trường DOM + testing-library, ngoài phạm vi (env `node`).
+- SearchBar thêm `onClick` mở lại danh sách (Escape đóng nhưng ô vẫn giữ focus).
+- Playwright (dev, GPS giả về sau 5 s): `/station/28704-…` camera ở lại trạm (17,45 / 106,63) dù GPS là Hà Nội; `/` không link thì camera bay về Hà Nội (ACTIVE_LOCK); tìm "vincom" → bấm bản đồ đóng, bấm ô mở lại, Esc đóng, chọn kết quả mở trạm.
+- B7 (re-render) chưa đo bằng Profiler — chưa kiểm tra.

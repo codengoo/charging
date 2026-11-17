@@ -2,13 +2,15 @@ import { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { Station, StationPower } from '../data/types'
-import { passesFilters, tierOf, type Filters, type StationIndex } from '../data/stations'
+import { distanceKm, passesFilters, tierOf, type Filters, type StationIndex } from '../data/stations'
 import { allSaved, pinGroupOf, type GroupBook, type StationGroup } from '../data/groups'
 import { TIER_COLORS, pinTipOffset, rasterizePin, type PinSpec } from './pins'
 import type { GeoPoint } from '../lib/flexiblePolyline'
 
 // Trung tâm VN (Đà Nẵng) làm mặc định khi chưa có vị trí người dùng.
 const DEFAULT_CENTER: [number, number] = [108.2, 16.05]
+/** Vị trí GPS mới chỉ báo lên App khi lệch bản trước ≥ 50 m. */
+const LOCATE_MIN_KM = 0.05
 // Positron = nền xám nhạt, tối giản, ít POI — tương đương HERE "lite.day" của app mobile,
 // để ghim trạm nổi bật trên nền. (Các lựa chọn khác: liberty, bright.) Giao diện tối dùng
 // "dark" cùng nhà — chung sprite và glyphs nên đổi qua lại không phải nạp lại font.
@@ -250,8 +252,22 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
     // tự bay về chỗ người dùng lúc mở và báo onLocate. Góc trên phải chỉ có control này.
     const corner = map.getContainer().querySelector<HTMLElement>('.maplibregl-ctrl-top-right')
     if (corner) corner.style.display = 'none'
+    // Theo dõi vị trí bắn ~1 lần/giây trên điện thoại; mỗi lần báo lên là App render lại cả cây.
+    // Chỉ báo khi dịch đủ xa — đứng yên GPS vẫn nhảy vài chục mét.
+    let reported: { lat: number; lng: number } | null = null
     geo.on('geolocate', (e: GeolocationPosition) => {
-      latest.current.onLocate?.({ lat: e.coords.latitude, lng: e.coords.longitude })
+      const pos = { lat: e.coords.latitude, lng: e.coords.longitude }
+      if (reported && distanceKm(reported.lat, reported.lng, pos.lat, pos.lng) < LOCATE_MIN_KM) return
+      reported = pos
+      latest.current.onLocate?.(pos)
+    })
+    // Fix đầu tiên về sau khi camera đã đi chỗ khác (mở link trạm / hành trình, người dùng kéo
+    // bản đồ) thì đừng kéo camera về vị trí người dùng. Lúc chờ fix (WAITING_ACTIVE) control không
+    // tự chuyển sang BACKGROUND khi camera di chuyển — tự đặt (trường nội bộ của maplibre 4.x).
+    map.on('movestart', (e: { geolocateSource?: boolean; originalEvent?: Event }) => {
+      const g = geo as unknown as { _watchState: string }
+      if (e.geolocateSource || e.originalEvent?.type === 'resize') return
+      if (g._watchState === 'WAITING_ACTIVE') g._watchState = 'BACKGROUND'
     })
 
     map.on('moveend', () => {

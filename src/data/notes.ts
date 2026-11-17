@@ -2,7 +2,7 @@
  * Ghi chú cá nhân cho từng trạm ("cổng 2 hay lỗi", "đỗ tầng B2"…). Chỉ nằm trong localStorage
  * của máy — không gửi lên server; chuyển máy bằng sao lưu (backup.ts mang theo `notes`).
  */
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export interface Note {
   text: string
@@ -59,24 +59,29 @@ function save(notes: NoteMap) {
 export function useNotes() {
   const [notes, setNotes] = useState<NoteMap>(load)
 
-  const update = useCallback((fn: (n: NoteMap) => NoteMap) => {
-    setNotes((cur) => {
-      const next = fn(cur)
-      save(next)
-      return next
-    })
-  }, [])
+  // Updater phải THUẦN (StrictMode gọi hai lần) — ghi kho trong effect, thời điểm tính ở ngoài.
+  const update = useCallback((fn: (n: NoteMap) => NoteMap) => setNotes(fn), [])
+  const first = useRef(true)
+  useEffect(() => {
+    if (first.current) {
+      first.current = false // vừa đọc từ kho, không ghi lại
+      return
+    }
+    save(notes)
+  }, [notes])
 
   /** Chữ rỗng (sau khi bỏ khoảng trắng) = xoá ghi chú. */
   const set = useCallback(
-    (entityId: string, text: string) =>
+    (entityId: string, text: string) => {
+      const at = Date.now()
+      const t = text.trim().slice(0, NOTE_MAX)
       update((cur) => {
         const next = { ...cur }
-        const t = text.trim().slice(0, NOTE_MAX)
-        if (t) next[entityId] = { text: t, at: Date.now() }
+        if (t) next[entityId] = { text: t, at }
         else delete next[entityId]
         return next
-      }),
+      })
+    },
     [update],
   )
 

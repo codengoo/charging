@@ -109,8 +109,8 @@ describe('nearestStations', () => {
   })
   // B1: điều kiện dừng dùng deg*111 cho cả kinh độ (thiếu cos(lat)). Ở 21°N, 0,1° kinh độ chỉ
   // ~10,4 km — trạm A ở phía bắc 10,8 km (trong vòng 1, dưới 11,1 km) làm vòng lặp dừng, bỏ sót
-  // trạm B phía đông chỉ cách 10,5 km nhưng nằm ở ô ngoài vòng 1. Phase 03 sửa → bỏ `.fails`.
-  it.fails('B1 nearestStations bỏ sót trạm gần hơn lệch đông-tây', () => {
+  // trạm B phía đông chỉ cách 10,5 km nhưng nằm ở ô ngoài vòng 1. Đã sửa (bán kính dừng × cos(lat)).
+  it('B1 nearestStations không bỏ sót trạm gần hơn lệch đông-tây', () => {
     const user = { lat: 21.05, lng: 105.899 }
     const A = st('A', 21.147, 105.899)
     const B = st('B', 21.05, 106.0005)

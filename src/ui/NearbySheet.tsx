@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Loader2, LocateFixed } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -94,6 +94,10 @@ export type GpsResult = 'ok' | 'denied' | 'failed'
 export function NearbySheet({ open, index, power, filters, origin, fromGps, driveOrigin, onRequestGps, onPick, onClose }: Props) {
   const [locating, setLocating] = useState(false)
   const [gpsError, setGpsError] = useState<GpsResult | null>(null)
+  // Sheet giữ gắn khi đóng — mở lại thì bỏ lỗi GPS của lần trước.
+  useEffect(() => {
+    if (open) setGpsError(null)
+  }, [open])
 
   async function requestGps() {
     setLocating(true)

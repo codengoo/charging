@@ -54,7 +54,8 @@ export function downloadBlob(blob: Blob, fileName: string) {
   a.href = url
   a.download = fileName
   a.click()
-  URL.revokeObjectURL(url)
+  // Thu hồi ngay sau click có thể huỷ lượt tải trên Safari/Firefox.
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 function fitText(ctx: CanvasRenderingContext2D, text: string, max: number) {
