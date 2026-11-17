@@ -2,3 +2,7 @@
 # Asset build có hash trong tên -> cache vĩnh viễn
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+# Service worker: luôn hỏi lại để bản mới thay ngay, không kẹt bản cũ.
+/sw.js
+  Cache-Control: no-cache

@@ -9,6 +9,7 @@ import { ChangelogModal } from './ui/ChangelogModal'
 import { PowerLegend } from './ui/PowerLegend'
 import { NearbySheet } from './ui/NearbySheet'
 import { QrScanSheet } from './ui/QrScanSheet'
+import { OfflineBadge } from './ui/OfflineBadge'
 import { getPosition, type GpsResult } from './lib/geo'
 import { BackupSheet } from './ui/BackupSheet'
 import { SettingsSheet } from './ui/SettingsSheet'
@@ -221,6 +222,7 @@ export function App() {
           onToggleKw={toggleKw}
           onList={() => sheets.open('saved')}
         />
+        <OfflineBadge />
       </div>
 
       {settings.showLegend && <PowerLegend />}
