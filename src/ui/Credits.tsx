@@ -1,6 +1,14 @@
-import { ExternalLink } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronDown, ExternalLink } from 'lucide-react'
 import { APP_VERSION } from '../data/changelog'
 import { pick } from '../i18n'
+
+/**
+ * Chia Tiền kèm UTM để bên đó thống kê được lượt truy cập đến từ app này (nguồn = domain app, kênh =
+ * referral, chiến dịch = mục ghi công trong Cài đặt).
+ */
+const CHIATIEN_URL =
+  'https://chiatien.cangao.asia/?utm_source=charging.cangao.asia&utm_medium=referral&utm_campaign=tramsac_credits&utm_content=settings'
 
 /** Người làm app (tên tác giả commit trong repo). */
 const DEVELOPER = 'NghiaDT'
@@ -27,7 +35,7 @@ const L = pick({
       { name: 'HERE Technologies', what: 'Tìm đường, tìm địa chỉ', href: 'https://www.here.com' },
       { name: 'ev-database.org · evkx.net', what: 'Đối chiếu đường cong sạc (ước tính)', href: 'https://ev-database.org' },
     ] as Credit[],
-    otherList: [{ name: 'Chia Tiền', what: 'App chia tiền nhóm, đi du lịch — miễn phí', href: 'https://chiatien.cangao.asia' }] as Credit[],
+    otherList: [{ name: 'Chia Tiền', what: 'App chia tiền nhóm, đi du lịch — miễn phí', href: CHIATIEN_URL }] as Credit[],
   },
   en: {
     title: 'About & credits',
@@ -44,7 +52,7 @@ const L = pick({
       { name: 'HERE Technologies', what: 'Routing and address search', href: 'https://www.here.com' },
       { name: 'ev-database.org · evkx.net', what: 'Charging curve reference (estimates)', href: 'https://ev-database.org' },
     ] as Credit[],
-    otherList: [{ name: 'Chia Tiền', what: 'Group expense splitting for trips — free', href: 'https://chiatien.cangao.asia' }] as Credit[],
+    otherList: [{ name: 'Chia Tiền', what: 'Group expense splitting for trips — free', href: CHIATIEN_URL }] as Credit[],
   },
 })
 
@@ -57,11 +65,11 @@ export function Credits() {
       <Group title={L.dev}>
         <Row item={{ name: DEVELOPER, what: L.version(APP_VERSION) }} />
       </Group>
-      <Group title={L.sources}>
+      <Collapsible title={L.sources} summary={L.sourceList.map((c) => c.name).join(', ')}>
         {L.sourceList.map((c) => (
           <Row key={c.name} item={c} />
         ))}
-      </Group>
+      </Collapsible>
       <Group title={L.others}>
         {L.otherList.map((c) => (
           <Row key={c.name} item={c} />
@@ -78,6 +86,28 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
     <div className="flex flex-col gap-1">
       <span className="text-xs text-muted-foreground">{title}</span>
       <ul className="flex flex-col overflow-hidden rounded-xl bg-muted">{children}</ul>
+    </div>
+  )
+}
+
+/** Nhóm thu gọn mặc định: một hàng tóm tắt + mũi tên, bấm để mở danh sách. */
+function Collapsible({ title, summary, children }: { title: string; summary: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs text-muted-foreground">{title}</span>
+      <div className="overflow-hidden rounded-xl bg-muted">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-full items-center gap-3 px-3 py-2.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-brand/35"
+        >
+          <span className="min-w-0 flex-1 truncate text-sm">{summary}</span>
+          <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+        </button>
+        {open && <ul className="flex flex-col border-t border-border/60">{children}</ul>}
+      </div>
     </div>
   )
 }
