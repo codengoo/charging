@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import { distanceKm, type GeoPoint } from '../lib/geo'
 import type { Station } from './types'
 import { fetchJson } from '../lib/http'
+import { sumSummary } from './here'
 
 export interface DriveInfo {
   meters: number
@@ -37,13 +38,8 @@ async function fetchDrive(origin: GeoPoint, st: Station, signal: AbortSignal): P
   }>(`/api/drive?from=${coord(origin)}&to=${st.lat},${st.lng}`, { signal })
   const sections = body.routes?.[0]?.sections
   if (!sections?.length) return null
-  let meters = 0
-  let seconds = 0
-  for (const s of sections) {
-    meters += s.summary?.length ?? 0
-    seconds += s.summary?.duration ?? 0
-  }
-  return meters > 0 ? { meters, seconds } : null
+  const sum = sumSummary(sections)
+  return sum.meters > 0 ? sum : null
 }
 
 /**

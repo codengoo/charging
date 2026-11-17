@@ -5,11 +5,9 @@
  * Mô hình cố ý đơn giản: tiêu thụ cố định theo xe × hệ số tốc độ trung bình × điều hoà, hiện
  * thành KHOẢNG ±8% thay vì một con số chính xác giả. Không tính độ dốc (đường đèo tốn hơn).
  */
-import { useCallback, useState } from 'react'
 import type { LivePorts } from './live'
-import type { StationPower } from './types'
+import type { PortGroup, StationPower } from './types'
 import type { Vehicle } from './vehicles'
-import { readJson, writeJson } from '../lib/storage'
 
 /** % pin người dùng nhập, kèm lúc nhập. */
 export interface BatteryReading {
@@ -59,10 +57,13 @@ export function avgKmh(meters: number, seconds: number): number {
   return seconds > 0 ? meters / 1000 / (seconds / 3600) : FALLBACK_KMH
 }
 
-export interface ChargePort {
-  kw: number
-  dc: boolean
-}
+export type ChargePort = Omit<PortGroup, 'count'>
+
+/** Live chỉ có kW: trên mức này coi là DC khi không tra được nhóm cổng. */
+const AC_MAX_KW = 22
+/** DC: xe giữ trung bình ~75% công suất đỉnh dưới 80%; AC gần như phẳng (~90%). */
+const DC_CURVE = 0.75
+const AC_CURVE = 0.9
 
 /**
  * Cổng sẽ cắm: mạnh nhất còn trống theo live nếu có, không thì nhóm cổng mạnh nhất (ưu tiên DC).
@@ -71,7 +72,7 @@ export interface ChargePort {
 export function chargePort(power: StationPower | undefined, live: LivePorts[] | null): ChargePort | null {
   const groups = power?.groups ?? []
   const free = live?.filter((p) => p.free > 0).sort((a, b) => b.kw - a.kw)[0]
-  if (free) return { kw: free.kw, dc: groups.find((g) => g.kw === free.kw)?.dc ?? free.kw > 22 }
+  if (free) return { kw: free.kw, dc: groups.find((g) => g.kw === free.kw)?.dc ?? free.kw > AC_MAX_KW }
   const best = [...groups].sort((a, b) => Number(b.dc) - Number(a.dc) || b.kw - a.kw)[0]
   return best ? { kw: best.kw, dc: best.dc } : null
 }
@@ -82,31 +83,8 @@ export function chargePort(power: StationPower | undefined, live: LivePorts[] | 
  */
 export function chargeMinutes(fromPct: number, port: ChargePort, v: Vehicle, toPct = TARGET_PCT): number | null {
   if (fromPct >= toPct) return null
-  const kw = port.dc ? Math.min(port.kw, v.dcKw) * 0.75 : Math.min(port.kw, v.acKw) * 0.9
+  const kw = port.dc ? Math.min(port.kw, v.dcKw) * DC_CURVE : Math.min(port.kw, v.acKw) * AC_CURVE
   if (kw <= 0) return null
   const kwh = ((toPct - Math.max(0, fromPct)) / 100) * v.kwh
   return (kwh / kw) * 60
-}
-
-const KEY = 'tramsac.battery'
-
-function load(): BatteryReading | null {
-  // JSON hỏng / localStorage bị chặn → như chưa nhập
-  const o = readJson(KEY) as Partial<BatteryReading> | null
-  if (o && typeof o.pct === 'number' && typeof o.at === 'number' && o.pct >= 0 && o.pct <= 100) return { pct: o.pct, at: o.at }
-  return null
-}
-
-/** % pin hiện tại, dùng chung cho bảng trạm và Dọc đường (một instance ở App). */
-export function useBattery() {
-  const [reading, setReading] = useState<BatteryReading | null>(load)
-
-  const set = useCallback((pct: number) => {
-    const next = { pct: Math.round(Math.min(100, Math.max(0, pct))), at: Date.now() }
-    setReading(next)
-    writeJson(KEY, next) // không lưu được thì vẫn dùng trong phiên
-  }, [])
-
-  const stale = reading !== null && Date.now() - reading.at > STALE_MS
-  return { reading, stale, set }
 }

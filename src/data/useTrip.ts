@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getPosition, type GeoPoint } from '../lib/geo'
 import { NO_AVOID, type Avoid } from '../lib/mapsLink'
-import { alongRoute, type RouteHits, type RoutePath } from './routeCorridor'
+import { alongRoute, type RouteHits } from './routeCorridor'
+import type { RoutePath, TripRadius } from './tripTypes'
 import type { StationIndex } from './stations'
 import type { Station } from './types'
 import { MSG, TripError, fetchRoutes, resolveTrip, waypointsOf, type TripPoint } from './trip'
-
-export type TripRadius = 2 | 5 | 10
-export const TRIP_RADII: TripRadius[] = [2, 5, 10]
 
 /** Số tuyến khác xin thêm khi hành trình chỉ có điểm đi + điểm đến (tối đa 3 tuyến). */
 const ALTERNATIVES = 2
@@ -76,8 +74,11 @@ export function useTrip(
   )
   // Số trạm của từng tuyến cho thẻ chọn tuyến. Chỉ tính khi có hơn một tuyến.
   const routeTotals = useMemo(
-    () => (index && trip.routes.length > 1 ? trip.routes.map((r) => alongRoute(index, r, trip.radiusKm, keep).total) : []),
-    [index, trip.routes, trip.radiusKm, keep],
+    () =>
+      index && trip.routes.length > 1
+        ? trip.routes.map((r, i) => (i === trip.routeIdx ? hits.total : alongRoute(index, r, trip.radiusKm, keep).total))
+        : [],
+    [index, trip.routes, trip.routeIdx, trip.radiusKm, keep, hits.total],
   )
 
   /** Lượt mới huỷ lượt cũ: chỉ kết quả của lượt mới nhất được ghi vào state. */

@@ -10,17 +10,7 @@
 import { KM_PER_LAT, KM_PER_LNG, toRad, type GeoPoint } from '../lib/geo'
 import { CELL_SIZE, cellOf, type StationIndex } from './stations'
 import type { Station } from './types'
-
-/**
- * Đường đi đầy đủ. `limited[i]`: đoạn bắt đầu từ điểm i có nằm trên đường CÓ KIỂM SOÁT LỐI RA
- * (cao tốc, functionalClass 1) không — dùng để bỏ trạm bên kia dải phân cách. Dài bằng `points`.
- */
-export interface RoutePath {
-  points: GeoPoint[]
-  limited: boolean[]
-  meters: number
-  seconds: number
-}
+import type { RoutePath } from './tripTypes'
 
 /** Một trạm trong hành lang. */
 export interface AlongRoute {

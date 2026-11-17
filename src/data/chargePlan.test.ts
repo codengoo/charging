@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EXIT_ACCESS_KM, PLAN_MIN_DC_KW, planCharging } from '@/data/chargePlan'
+import { EXIT_ACCESS_KM, PLAN_MIN_DC_KW, passByKm, planCharging } from '@/data/chargePlan'
 import type { AlongRoute } from '@/data/routeCorridor'
 import type { PortGroup, Station, StationPower } from '@/data/types'
 import type { Vehicle } from '@/data/vehicles'
@@ -136,5 +136,14 @@ describe('planCharging', () => {
     const power = powerOf([['s200', dc(150)], ['s320', dc(150)]])
     const p = planCharging(items, power, route(500), 80, V, false, RESERVE)
     expect(p.stops.map((s) => s.item.station.entityId)).toEqual(['s200'])
+  })
+})
+
+describe('passByKm', () => {
+  it('rẽ vào rồi quay ra tuyến: atKm + 2 × accessKm', () => {
+    expect(passByKm({ atKm: 120, offsetKm: 1.5, viaExit: false })).toBe(123)
+    expect(passByKm({ atKm: 0, offsetKm: 0, viaExit: false })).toBe(0)
+    // Phải ra cao tốc: mỗi chiều cộng thêm quãng ra nút giao.
+    expect(passByKm({ atKm: 50, offsetKm: 0.2, viaExit: true })).toBeCloseTo(50 + 2 * (0.2 + EXIT_ACCESS_KM))
   })
 })

@@ -6,8 +6,8 @@ import {
   pickAlongRoute,
   routeBounds,
   thinRoute,
-  type RoutePath,
 } from '@/data/routeCorridor'
+import type { RoutePath } from '@/data/tripTypes'
 import { cellOf, type StationIndex } from '@/data/stations'
 import { foldText } from '@/lib/text'
 import type { Station } from '@/data/types'

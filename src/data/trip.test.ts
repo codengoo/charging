@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { limitedFlags, parseHereRoutes, waypointsOf } from '@/data/trip'
+import { limitedFlags, parseHereRoutes, sumSummary } from '@/data/here'
+import { waypointsOf } from '@/data/trip'
 import { decodeFlexiblePolyline } from '@/lib/flexiblePolyline'
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
@@ -124,5 +125,12 @@ describe('parseHereRoutes', () => {
   it('body rỗng → []', () => {
     expect(parseHereRoutes({})).toEqual([])
     expect(decodeFlexiblePolyline(s2)).toHaveLength(2)
+  })
+})
+
+describe('sumSummary', () => {
+  it('cộng mét + giây của mọi section, thiếu summary tính 0', () => {
+    expect(sumSummary([{ summary: { length: 1200, duration: 90 } }, {}, { summary: { length: 800 } }])).toEqual({ meters: 2000, seconds: 90 })
+    expect(sumSummary([])).toEqual({ meters: 0, seconds: 0 })
   })
 })

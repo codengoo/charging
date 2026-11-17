@@ -6,7 +6,8 @@ import { Chip } from '@/components/ui/chip'
 import { Input } from '@/components/ui/input'
 import { fmtDistance, fmtKw, fmtMinutes } from '@/lib/format'
 import type { RouteHits } from '../data/routeCorridor'
-import { TRIP_RADII, type TripRadius, type TripState } from '../data/useTrip'
+import type { TripState } from '../data/useTrip'
+import { TRIP_RADII, type TripRadius } from '../data/tripTypes'
 import type { Station, StationPower } from '../data/types'
 import { KW_BANDS, KW_BAND_LABEL, kwActive, tierOf, type KwBand } from '../data/stations'
 import { TIER_COLORS } from '../map/pins'
@@ -14,7 +15,7 @@ import { pick } from '../i18n'
 import { arrivalPct, avgKmh, type ArrivalEstimate, type BatteryReading } from '../data/battery'
 import type { Vehicle } from '../data/vehicles'
 import { BatteryControl, DANGER_PCT, fmtRange, pctOf, pctTone } from './BatteryControl'
-import { PLAN_MIN_DC_KW, accessKm, type ChargePlan } from '../data/chargePlan'
+import { PLAN_MIN_DC_KW, passByKm, type ChargePlan } from '../data/chargePlan'
 import type { Avoid } from '../lib/mapsLink'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { readStr, writeStr } from '@/lib/storage'
@@ -199,7 +200,7 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
   const estimates: ArrivalEstimate[] | null =
     vehicle && route && trip.status === 'ready'
       ? hits.items.map((h) =>
-          arrivalPct(startPct, h.atKm + 2 * accessKm(h), avgKmh(route.meters, route.seconds), vehicle, climate),
+          arrivalPct(startPct, passByKm(h), avgKmh(route.meters, route.seconds), vehicle, climate),
         )
       : null
   let lastOk = -1

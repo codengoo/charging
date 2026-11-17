@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_FILTERS, KW_BANDS, type Filters, type KwBand } from './stations'
-import { TRIP_RADII, type TripRadius } from './useTrip'
+import { TRIP_RADII, type TripRadius } from './tripTypes'
 import { THEME_PREFS, type ThemePref } from '../lib/theme'
 import { VEHICLE_IDS } from './vehicles'
 import { RESERVE_MAX, RESERVE_MIN, RESERVE_PCT } from './battery'

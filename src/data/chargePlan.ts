@@ -47,9 +47,16 @@ export type ChargePlan =
 export const EXIT_ACCESS_KM = 2.5
 
 /** Km từ tuyến vào tới trạm (một chiều): độ lệch, cộng quãng ra nút giao nếu phải ra cao tốc. */
-export function accessKm(item: AlongRoute): number {
+export function accessKm(item: Pick<AlongRoute, 'offsetKm' | 'viaExit'>): number {
   return item.offsetKm + (item.viaExit ? EXIT_ACCESS_KM : 0)
 }
+
+/**
+ * Km đã lái khi NGANG QUA một trạm dọc tuyến: rẽ vào rồi quay ra tuyến (2 × accessKm). Bảng Dọc
+ * đường dùng số này cho "% khi ngang qua" và vạch "Trạm cuối còn kịp" — bi quan hơn kế hoạch sạc,
+ * vốn tính tới trạm (`atKm + accessKm`) rồi cộng đoạn quay ra vào chặng sau.
+ */
+export const passByKm = (item: Pick<AlongRoute, 'atKm' | 'offsetKm' | 'viaExit'>): number => item.atKm + 2 * accessKm(item)
 
 /** Trạm sau phải xa hơn trạm trước ít nhất chừng này — tránh "ghé" lại trạm cạnh nhau. */
 const MIN_HOP_KM = 1
