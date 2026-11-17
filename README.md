@@ -43,20 +43,21 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   HERE dạng via `passThrough`), tránh `!2m…!1b1` cao tốc / `!2b1` thu phí / `!3b1` phà, tuyến đang chọn
   `!5iN` (chỉ để gợi ý). Link iOS `maps.google.com/?saddr=…&daddr=…&geocode=…` cũng đọc được. Client giải mã flexible polyline
   (`src/lib/flexiblePolyline.ts`), lọc hành lang 2/5/10 km (`src/data/routeCorridor.ts`: đo phẳng,
-  bỏ trạm bên kia dải phân cách cao tốc, trần 400 trạm theo độ lệch), xếp theo km gặp trên đường.
+  bỏ trạm bên kia dải phân cách cao tốc, trạm sát cao tốc mà không phải trạm dừng nghỉ cùng chiều (phải
+  > 150 m hoặc bên trái) gắn `viaExit` — kế hoạch sạc không chọn, trần 400 trạm theo độ lệch), xếp theo km gặp trên đường.
   URL `/trip?link=…` mở lại hành trình. Cần secret `HERE_API_KEY` (xem "API proxy HERE").
 - **% pin khi đến trạm** (`src/data/battery.ts`, `src/data/vehicles.ts`, `src/ui/BatteryControl.tsx`): chọn xe
   trong Cài đặt (10 mẫu VinFast hoặc Tuỳ chỉnh, công tắc điều hoà ×1,08), kéo % pin hiện tại (localStorage
   `tramsac.battery`, cũ sau 2 giờ). Bảng trạm hiện "Còn ~X–Y% khi tới" theo quãng đường lái (`/api/drive`; đường
   chim bay × 1,3 khi lỗi) và thời gian sạc lên 80% ở cổng mạnh nhất còn trống; Dọc đường hiện % tại từng trạm
-  (`atKm + 2 × offsetKm`) và vạch "Trạm cuối còn kịp" (ước tính bi quan ≥ 10%). Tính hoàn toàn ở client, không
+  (`atKm + 2 × offsetKm`) và vạch "Trạm cuối còn kịp" (ước tính bi quan ≥ mức dự phòng, mặc định 10%). Tính hoàn toàn ở client, không
   gọi thêm HERE/EVCS. Mô hình: tiêu thụ thực tế ước tính của xe × hệ số tốc độ trung bình (< 40 km/h 0,95 … ≥ 90
   km/h 1,25), hiện khoảng ±8%, chưa tính độ dốc. Thông số xe tra 2026-11-17, `kwhPer100` là ước tính (≈ dung
   lượng ÷ NEDC × 0,8), không phải số hãng công bố.
 - **Ghi đè tiêu thụ:** VehicleSheet có ô "Tiêu thụ thực tế" (`Settings.usageOverride`) — giữ pin / công suất sạc
   của mẫu, chỉ thay kWh/100 km. Đổi mẫu thì xoá.
 - **Kế hoạch dừng sạc** (`src/data/chargePlan.ts`): chip "Lên kế hoạch sạc" trong Dọc đường. Tham lam "đi xa
-  nhất": ghé trạm DC ≥ 50 kW xa nhất còn ≥ 10% pin (ước tính bi quan), sạc lên 80%; điểm dừng cuối chỉ sạc vừa đủ
+  nhất": ghé trạm DC ≥ 50 kW xa nhất còn ≥ mức dự phòng (`Settings.reservePct`, mặc định 10%, ước tính bi quan), sạc lên 80%; điểm dừng cuối chỉ sạc vừa đủ
   tới đích. Tính trên danh sách trạm dọc đường đang hiện (theo bộ lọc công suất), không gọi thêm API. Bật thì bản
   đồ chỉ vẽ ghim các điểm dừng.
 - **Ghi chú cá nhân** (`src/data/notes.ts`, `src/ui/NoteBox.tsx`): localStorage `tramsac.notes`, ≤ 1.000 ký tự;
