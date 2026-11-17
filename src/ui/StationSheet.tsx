@@ -184,7 +184,7 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
           </button>
         )}
 
-        <NoteBox key={station.entityId} note={note} onSave={onNote} />
+        <NoteBox key={`note-${station.entityId}`} note={note} onSave={onNote} />
 
         <PortsBox power={ports} powerLoading={powerLoading || (!ports && detailLoading)} standards={detail?.standards} live={live} />
 
@@ -212,7 +212,7 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
           </a>
         )}
 
-        <ReviewsSection key={station.entityId} reviews={reviews} theme={theme} />
+        <ReviewsSection key={`reviews-${station.entityId}`} reviews={reviews} theme={theme} />
 
         <ResponsiveDialogFooter className="flex-row">
           <Button
