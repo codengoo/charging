@@ -87,6 +87,49 @@ export async function geocode(q: string, at: GeoPoint | null, signal: AbortSigna
   return { label: it?.title || q, lat, lng }
 }
 
+/** Một gợi ý địa chỉ (địa điểm hay dùng). */
+export interface PlaceHit {
+  label: string
+  address: string
+  lat: number
+  lng: number
+}
+
+/** Gợi ý khi gõ địa chỉ: tối đa 5 kết quả, ưu tiên gần `at` nếu có. */
+export async function searchAddress(q: string, at: GeoPoint | null, signal: AbortSignal): Promise<PlaceHit[]> {
+  const params = new URLSearchParams({ q, limit: '5' })
+  if (at) params.set('at', `${at.lat},${at.lng}`)
+  const r = await api<HereItems>(`/api/geocode?${params}`, signal)
+  const out: PlaceHit[] = []
+  for (const it of r?.items ?? []) {
+    const lat = it.position?.lat
+    const lng = it.position?.lng
+    if (typeof lat !== 'number' || typeof lng !== 'number') continue
+    const label = it.title?.trim() || q
+    const address = it.address?.label?.trim() ?? ''
+    out.push({ label, address: address === label ? '' : address, lat, lng })
+  }
+  return out
+}
+
+/**
+ * Link Google Maps của MỘT địa điểm (hoặc link chỉ đường — lấy điểm đến) → địa điểm. Toạ độ có sẵn
+ * trong link thì dùng thẳng, không thì nhờ HERE đoán theo tên. Không đọc được → null.
+ */
+export async function placeFromLink(text: string, near: GeoPoint | null, signal: AbortSignal): Promise<PlaceHit | null> {
+  const raw = firstUrl(text)
+  if (!raw) return null
+  const full = isShortLink(raw) ? await expandLink(raw, signal) : raw
+  const stop = full ? parseMapsUrl(full)?.stops.at(-1) : undefined
+  if (!stop) return null
+  if (hasFix(stop)) {
+    const label = stop.text?.trim() || (await reverse(stop, signal).catch(() => null)) || `${stop.lat.toFixed(5)}, ${stop.lng.toFixed(5)}`
+    return { label, address: '', lat: stop.lat, lng: stop.lng }
+  }
+  const g = stop.text ? await geocode(stop.text, near, signal) : null
+  return g ? { label: g.label, address: '', lat: g.lat, lng: g.lng } : null
+}
+
 /** Toạ độ → tên chỗ; null khi hỏng (nơi gọi phải có đường lui). */
 export async function reverse(p: GeoPoint, signal: AbortSignal): Promise<string | null> {
   const r = await api<HereItems>(`/api/revgeocode?at=${p.lat},${p.lng}`, signal)

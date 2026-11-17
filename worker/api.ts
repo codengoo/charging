@@ -135,7 +135,9 @@ async function geocode(url: URL, env: ApiEnv): Promise<Response> {
   else target.searchParams.set('in', 'countryCode:VNM')
   target.searchParams.set('q', q)
   target.searchParams.set('lang', 'vi-VN')
-  target.searchParams.set('limit', '1')
+  // `limit` 1–5: gợi ý khi gõ địa chỉ cho địa điểm hay dùng; mặc định 1 (đoán toạ độ chặng hành trình).
+  const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') ?? '', 10) || 1, 1), 5)
+  target.searchParams.set('limit', String(limit))
   target.searchParams.set('apiKey', key)
   return passHere(target, 3600)
 }

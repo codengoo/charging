@@ -4,7 +4,7 @@ import { Segmented } from '@/components/ui/segmented'
 import { DEFAULT_SETTINGS, type Settings } from '../data/settings'
 import { KW_BANDS, KW_BAND_LABEL } from '../data/stations'
 import { TRIP_RADII, type TripRadius } from '../data/tripTypes'
-import { CarFront, CheckIcon, ChevronRight } from 'lucide-react'
+import { CarFront, CheckIcon, ChevronRight, MapPin } from 'lucide-react'
 import { cn } from 'cn'
 import { LANG, pick, type Lang } from '@/i18n'
 import { switchLang } from '@/lib/langSwitch'
@@ -30,6 +30,8 @@ const L = pick({
     hide: 'Ẩn',
     reset: 'Khôi phục mặc định',
     vehicle: 'Xe của bạn',
+    places: 'Địa điểm của tôi',
+    noPlaces: 'Nhà, Công ty… — chạm để đặt',
     noVehicle: 'Chưa chọn',
     climateOn: 'điều hoà bật',
   },
@@ -50,6 +52,8 @@ const L = pick({
     hide: 'Hide',
     reset: 'Reset to defaults',
     vehicle: 'Your car',
+    places: 'My places',
+    noPlaces: 'Home, Work… — tap to set',
     noVehicle: 'Not set',
     climateOn: 'A/C on',
   },
@@ -67,6 +71,9 @@ interface Props {
   settings: Settings
   onChange: (patch: Partial<Settings>) => void
   onClose: () => void
+  /** "Nhà · Công ty · Quê" — null khi chưa đặt địa điểm nào. */
+  placesSummary: string | null
+  onOpenPlaces: () => void
 }
 
 const onOff = (on: string, off: string) => [
@@ -75,7 +82,7 @@ const onOff = (on: string, off: string) => [
 ]
 
 /** Cấu hình hiển thị: đổi là lưu và áp dụng ngay, không có nút "Lưu". */
-export function SettingsSheet({ open, settings, onChange, onClose }: Props) {
+export function SettingsSheet({ open, settings, onChange, onClose, placesSummary, onOpenPlaces }: Props) {
   const [vehicleOpen, setVehicleOpen] = useState(false)
   const car = vehicleSummary(settings)
   return (
@@ -116,6 +123,18 @@ export function SettingsSheet({ open, settings, onChange, onClose }: Props) {
             ) : (
               <span className="min-w-0 flex-1 truncate text-muted-foreground">{L.noVehicle}</span>
             )}
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          </button>
+        </Field>
+
+        <Field title={L.places}>
+          <button
+            type="button"
+            onClick={onOpenPlaces}
+            className="flex h-12 w-full items-center gap-3 rounded-xl bg-muted px-3 text-left text-sm outline-none focus-visible:ring-3 focus-visible:ring-brand/35"
+          >
+            <MapPin className="size-5 shrink-0 text-brand" aria-hidden />
+            <span className={`min-w-0 flex-1 truncate ${placesSummary ? '' : 'text-muted-foreground'}`}>{placesSummary ?? L.noPlaces}</span>
             <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
           </button>
         </Field>
