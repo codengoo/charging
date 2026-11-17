@@ -1,4 +1,4 @@
-import { useState, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { chargeMinutes, dcCurveKw } from '../data/battery'
 import type { Vehicle } from '../data/vehicles'
 import { fmtMinutes } from '@/lib/format'
@@ -38,6 +38,41 @@ const X_TICKS = [0, 20, 40, 60, 80, 100]
 const STATIONS = [60, 120, 250] as const
 type StationKw = (typeof STATIONS)[number]
 
+/** Thời gian chuyển giữa các mức trụ (ms). */
+const ANIM_MS = 350
+const easeOutCubic = (t: number) => 1 - (1 - t) ** 3
+
+/**
+ * Số chạy mượt tới `target` (requestAnimationFrame, easeOutCubic) — dùng cho mức cắt của trụ khi
+ * đổi trụ. Không dùng CSS transition trên thuộc tính `d` vì Safari không hỗ trợ. Người dùng bật
+ * "giảm chuyển động" thì nhảy thẳng.
+ */
+function useTween(target: number): number {
+  const [value, setValue] = useState(target)
+  const from = useRef(target)
+  const current = useRef(target)
+  useEffect(() => {
+    if (current.current === target) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      current.current = target
+      setValue(target)
+      return
+    }
+    from.current = current.current
+    const start = performance.now()
+    let raf = 0
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / ANIM_MS)
+      current.current = from.current + (target - from.current) * easeOutCubic(t)
+      setValue(current.current)
+      if (t < 1) raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [target])
+  return value
+}
+
 /**
  * Biểu đồ đường: công suất DC xe nhận (kW) theo % pin, từ `vehicle.dcCurve`, ở một mức trụ chọn được
  * (60 / 120 / 250 kW): nét liền = thực nhận min(đường cong, trụ), nét đứt mờ = đường cong của xe khi
@@ -51,6 +86,9 @@ export function ChargeCurveChart({ vehicle }: { vehicle: Vehicle }) {
   const samples = Array.from({ length: 201 }, (_, i) => dcCurveKw(vehicle, i / 2))
   const peak = Math.round(Math.max(...samples))
   const capped = station < peak
+  // Mức cắt vẽ ra: trụ ≥ đỉnh xe thì như không cắt (120 / 250 kW giống nhau khi xe chỉ nhận 116 kW).
+  const cap = useTween(Math.min(station, peak))
+  const showCut = cap < peak - 0.5
   const yMax = Math.max(50, Math.ceil(peak / 50) * 50)
   const yTicks = Array.from({ length: yMax / 50 + 1 }, (_, i) => i * 50).filter((v, _i, a) => a.length <= 5 || v % 100 === 0)
   const x = (soc: number) => PAD.l + (soc / 100) * PW
@@ -64,7 +102,7 @@ export function ChargeCurveChart({ vehicle }: { vehicle: Vehicle }) {
     setHover(soc >= 0 && soc <= 100 ? soc : null)
   }
 
-  const hKw = hover === null ? 0 : Math.min(station, dcCurveKw(vehicle, hover))
+  const hKw = hover === null ? 0 : Math.min(cap, dcCurveKw(vehicle, hover))
   const tipLeft = hover !== null && hover > 60 // chú thích lật sang trái khi gần mép phải
 
   return (
@@ -106,14 +144,13 @@ export function ChargeCurveChart({ vehicle }: { vehicle: Vehicle }) {
             kW
           </text>
           {/* Trụ thấp hơn đỉnh xe: đường cong gốc nét đứt mờ + vạch giới hạn trụ. */}
-          {capped && (
-            <>
-              <path d={pathOf(Infinity)} fill="none" className="stroke-muted-foreground/50" strokeWidth={1.5} strokeDasharray="4 3" />
-              <line x1={PAD.l} x2={W - PAD.r} y1={y(station)} y2={y(station)} className="stroke-muted-foreground/40" strokeWidth={1} strokeDasharray="2 3" />
-            </>
-          )}
+          {/* Mờ dần hiện / mờ dần đi theo mức cắt đang chạy. */}
+          <g style={{ opacity: showCut ? 1 : 0, transition: 'opacity 250ms ease-out' }}>
+            <path d={pathOf(Infinity)} fill="none" className="stroke-muted-foreground/50" strokeWidth={1.5} strokeDasharray="4 3" />
+            <line x1={PAD.l} x2={W - PAD.r} y1={y(cap)} y2={y(cap)} className="stroke-muted-foreground/40" strokeWidth={1} strokeDasharray="2 3" />
+          </g>
           {/* Thực nhận ở trụ đang chọn: 2px, màu brand */}
-          <path d={pathOf(station)} fill="none" className="stroke-brand" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          <path d={pathOf(cap)} fill="none" className="stroke-brand" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
           {/* Con trỏ dọc + điểm */}
           {hover !== null && (
             <g pointerEvents="none">
