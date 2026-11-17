@@ -126,6 +126,30 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: applicati
   --data '{"hidden":0}' https://charging.cangao.asia/api/admin/reviews/<id>
 ```
 
+### Hạn chế đã biết: "mỗi thiết bị một đánh giá" chưa chặt
+
+Hiện **không dựa vào IP**: duy nhất theo `UNIQUE (station_id, device_hash)`, với "thiết bị" = mã ngẫu nhiên trong
+localStorage (`tramsac.device`). IP chỉ dùng tạm cho rate limit (`REVIEW_LIMIT` 5 ghi / `API_LIMIT` 30 đọc mỗi phút)
+và gửi kèm khi xác minh Turnstile — không lưu vào D1. Chốt giữ như vậy (2026-11-17), khắc phục khi có dấu hiệu bị
+dìm / thổi điểm.
+
+**Lỗ hổng:** tab ẩn danh, xoá dữ liệu trang, trình duyệt khác, PWA trên iOS (localStorage tách khỏi Safari) → mã
+thiết bị mới → đánh giá thêm cho cùng trạm. Turnstile chỉ chặn bot, không chặn người làm tay.
+
+**Các hướng đã cân nhắc** (chi tiết lý do trong lịch sử thảo luận khi làm 0.10.0):
+
+| Hướng | Được | Vướng |
+|---|---|---|
+| Chặn cứng N bài / IP / trạm / 30 ngày | Chặn người vô tình đánh giá lại trên cùng mạng | CGNAT 4G và wifi công cộng tại trạm → chặn nhầm đúng người đang ở trạm; máy bay / đổi mạng / IPv6 / VPN là lách; IP là dữ liệu cá nhân (NĐ 13/2023) — phải HMAC có pepper (IPv4 băm thường dò ngược được), cron xoá sau 30 ngày; phải đếm theo nhật ký tạo bài (không thì xoá rồi viết lại là lách) |
+| FingerprintJS mã nguồn mở (v5, MIT) | Miễn phí, chạy ở trình duyệt | Chính xác ~40–60%: iPhone cùng đời trùng mã → chặn nhầm; mã sinh ở client nên tự sửa được; chỉ đáng làm tín hiệu phụ |
+| Fingerprint Pro (trả phí) | Nhận ra ẩn danh / xoá dữ liệu, server xác minh, ~99,5% (hãng công bố) | ~99 USD / tháng / 20k lượt (giá 2026, kiểm lại); phụ thuộc dịch vụ ngoài; là công nghệ theo dõi — cần ghi vào chính sách riêng tư, có thể phải xin đồng ý |
+| Đăng nhập (Google / Zalo) | Thật sự mỗi người một bài | Làm OAuth + phiên; người dùng ngại đăng nhập |
+
+**Đề xuất khi cần làm:** bước đầu **không chặn mà gộp khi tính điểm** — lưu `HMAC(pepper, IP hoặc tiền tố IPv6 /64)`
+(xoá sau 30 ngày) cho mỗi bài; điểm trung bình tính các bài trùng mạng của cùng trạm là một (bình luận vẫn hiện đủ);
+`/api/admin/reviews` thêm lọc "nhiều bài từ cùng mạng". Cần chắc chắn mỗi người một bài thì chuyển sang đăng nhập
+(hoặc Fingerprint Pro nếu chấp nhận chi phí). Kiểm tra định kỳ: `GET /api/admin/reviews?hidden=all`.
+
 ## Chạy local
 
 ```bash
@@ -270,3 +294,6 @@ nên **client không phải đổi gì**. Kích hoạt khi một Worker streamin
 - **Phase 2:** ~~chi tiết trạm từ `get-locator` qua Worker proxy~~ (xong); status refresh +
   EVCS real-time.
 - **Phase 3:** chỉ đường, PWA offline, chia sẻ URL `?station=`.
+- **Đánh giá:** siết "mỗi thiết bị một đánh giá" — xem "Hạn chế đã biết" trong mục Đánh giá & bình luận.
+- **Tiện ích quanh trạm** (cà phê, WC…): đã bỏ ở 0.10.0 vì Overpass công cộng chặn client tự động (406) và chập
+  chờn. Nếu làm lại: tính sẵn từ bản OSM Việt Nam (Geofabrik) trong GitHub Action → shard R2, hoặc HERE Browse.
