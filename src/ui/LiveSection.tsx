@@ -35,12 +35,9 @@ const L = pick({
     chartLabel: (peak: number) => `Số xe đang sạc theo giờ, cao nhất ${peak} xe`,
     noData: (h: number) => `${h}h: không có dữ liệu`,
     hourAvg: (h: number, v: string) => `${h}h: ~${v} xe`,
-    peak: 'Cao nhất',
-    avg: 'Trung bình',
     fill: 'Lấp đầy',
     busiest: 'Đông nhất',
     quietest: 'Vắng nhất',
-    cars: (v: string) => `${v} xe`,
   },
   en: {
     ports: (n: number) => `${n} port${n === 1 ? '' : 's'}`,
@@ -70,12 +67,9 @@ const L = pick({
     chartLabel: (peak: number) => `Cars charging by hour, peak ${peak}`,
     noData: (h: number) => `${h}:00: no data`,
     hourAvg: (h: number, v: string) => `${h}:00: ~${v} cars`,
-    peak: 'Peak',
-    avg: 'Average',
     fill: 'Occupancy',
     busiest: 'Busiest',
     quietest: 'Quietest',
-    cars: (v: string) => `${v} car${v === '1' ? '' : 's'}`,
   },
 })
 
@@ -210,8 +204,10 @@ export function kwColor(kw: number, dc: boolean | null): string {
 }
 
 /**
- * Chip = thanh tiến độ: nền tô theo tỉ lệ cổng ĐANG CẮM / tổng của mức kW đó. Chưa có số
- * realtime thì là chip thường "× N"; có rồi thì tô dần. Đầy (hết cổng trống) tô kín.
+ * Chip = thanh tiến độ: phần ĐANG CẮM tô màu đặc, phần còn trống là nền pastel cùng màu.
+ * Chưa có số realtime thì chỉ có nền pastel "× N". Đầy (hết cổng trống) chuyển đỏ.
+ * Chữ vẽ hai lớp: lớp dưới chữ đậm trên nền pastel, lớp trên chữ trắng trên nền đặc, cắt
+ * theo đúng phần đã tô (bo tròn cả đầu thanh) — chữ vắt qua mép thanh vẫn đủ tương phản.
  */
 const FULL_RED = '#E53935'
 
@@ -222,37 +218,44 @@ function PortChip({ row: r, approx }: { row: Row; approx: boolean }) {
   const full = hasLive && used >= r.total!
   // Hết cổng trống: cả chip chuyển đỏ, bất kể màu của mức kW — nhìn lướt là biết "đầy".
   const color = full ? FULL_RED : kwColor(r.kw, r.dc)
+  // Nền đặc đậm hơn màu gốc một chút để chữ trắng đọc được (xanh lá gốc quá sáng).
+  const solid = `color-mix(in srgb, ${color} 80%, #000)`
+  const track = `color-mix(in srgb, ${color} 16%, var(--card))`
+  const ink = `color-mix(in srgb, ${color} 75%, var(--foreground))`
+  const content = (onSolid: boolean) => (
+    <>
+      <span className="font-semibold" style={{ color: onSolid ? '#fff' : ink }}>
+        {fmtKw(r.kw)} kW
+      </span>
+      {hasLive ? (
+        <span className={onSolid ? 'text-white/85' : 'text-muted-foreground'}>
+          {L.inUse} {approx && '~'}
+          <span className={onSolid ? 'font-semibold text-white' : 'font-semibold text-foreground'}>{used}</span>/{r.total}
+        </span>
+      ) : (
+        <span className="text-muted-foreground">× {r.count}</span>
+      )}
+      {r.dc !== null && <span className={onSolid ? 'text-white/85' : 'text-muted-foreground'}>· {r.dc ? 'DC' : 'AC'}</span>}
+    </>
+  )
+  const box = 'inline-flex h-7 items-center gap-1.5 px-3 text-xs whitespace-nowrap'
   return (
     <span
-      className="relative inline-flex h-7 shrink-0 items-center gap-1.5 overflow-hidden rounded-full border bg-card px-3 text-xs whitespace-nowrap"
-      style={{ borderColor: `${color}66` }}
+      className={`relative shrink-0 overflow-hidden rounded-full ${box}`}
+      style={{ background: track }}
       role={hasLive ? 'meter' : undefined}
       aria-valuemin={hasLive ? 0 : undefined}
       aria-valuemax={hasLive ? r.total! : undefined}
       aria-valuenow={hasLive ? used : undefined}
     >
-      {hasLive && (
+      {content(false)}
+      {hasLive && pct > 0 && (
         <span
           aria-hidden
-          className="absolute inset-y-0 left-0 transition-[width] duration-500"
-          style={{ width: `${pct}%`, background: `${color}${full ? '40' : '26'}` }}
-        />
-      )}
-      <span className="relative font-semibold" style={{ color }}>
-        {fmtKw(r.kw)} kW
-      </span>
-      {hasLive ? (
-        <span className="relative" style={full ? { color } : undefined}>
-          <span className={full ? '' : 'text-muted-foreground'}>{L.inUse} {approx && '~'}</span>
-          <span className={full ? 'font-semibold' : 'font-semibold text-foreground'}>{used}</span>
-          <span className={full ? '' : 'text-muted-foreground'}>/{r.total}</span>
-        </span>
-      ) : (
-        <span className="relative text-muted-foreground">× {r.count}</span>
-      )}
-      {r.dc !== null && (
-        <span className={full ? 'relative' : 'relative text-muted-foreground'} style={full ? { color } : undefined}>
-          · {r.dc ? 'DC' : 'AC'}
+          className={`absolute inset-0 transition-[clip-path] duration-500 ${box}`}
+          style={{ background: solid, clipPath: `inset(0 ${100 - pct}% 0 0 round 9999px)` }}
+        >
+          {content(true)}
         </span>
       )}
     </span>
@@ -344,18 +347,17 @@ function HourChart({ stats }: { stats: HistoryStats }) {
 }
 
 function StatRow({ stats }: { stats: HistoryStats }) {
-  const items: Array<[string, string]> = [
-    [L.peak, L.cars(String(stats.peak))],
-    [L.avg, L.cars(stats.avg.toFixed(1))],
-  ]
+  const items: Array<[string, string]> = []
   if (stats.fillRate !== null) items.push([L.fill, `${Math.round(Math.min(1, stats.fillRate) * 100)}%`])
   if (stats.peakHour !== null) items.push([L.busiest, `${stats.peakHour}h`])
   if (stats.quietHour !== null) items.push([L.quietest, `${stats.quietHour}h`])
+  if (!items.length) return null
+  // Tối đa 3 ô trên một hàng, chia đều — nhãn ngắn, không xuống dòng.
   return (
-    <dl className="mt-2 grid grid-cols-3 gap-1.5 sm:grid-cols-5">
+    <dl className="mt-2 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
       {items.map(([k, v]) => (
-        <div key={k} className="rounded-lg bg-background/70 px-2 py-1.5">
-          <dt className="text-[11px] text-muted-foreground">{k}</dt>
+        <div key={k} className="min-w-0 rounded-lg bg-background/70 px-2 py-1.5 whitespace-nowrap">
+          <dt className="truncate text-[11px] text-muted-foreground">{k}</dt>
           <dd className="text-sm font-semibold tabular-nums">{v}</dd>
         </div>
       ))}

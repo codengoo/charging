@@ -149,6 +149,9 @@ export function pinSvg({ colorHex, glyph, shadow = true }: PinSpec, width: numbe
   )
 }
 
+/** Hình phích cắm của ghim trạm (khung 24×24, evenodd) — chú giải vẽ lại không cần vỏ ghim. */
+export const CHARGER_GLYPH = GLYPHS.charger.d
+
 export function pinDataUrl(spec: PinSpec, width: number): string {
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(pinSvg(spec, width))
 }

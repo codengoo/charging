@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { DEFAULT_FILTERS, KW_BANDS, type Filters, type KwBand } from './stations'
 import { TRIP_RADII, type TripRadius } from './useTrip'
+import { THEME_PREFS, type ThemePref } from '../lib/theme'
 
 /**
  * Cấu hình hiển thị người dùng tự chọn, nhớ trong localStorage. Đây là giá trị MẶC ĐỊNH lúc mở
@@ -15,6 +16,8 @@ export interface Settings {
   tripRadiusKm: TripRadius
   /** Chú giải màu ghim góc dưới phải. */
   showLegend: boolean
+  /** Sáng / tối / theo máy. index.html đọc trường này trước khi app nạp. */
+  theme: ThemePref
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -22,6 +25,7 @@ export const DEFAULT_SETTINGS: Settings = {
   activeOnly: DEFAULT_FILTERS.activeOnly,
   tripRadiusKm: 2,
   showLegend: true,
+  theme: 'system',
 }
 
 const KEY = 'tramsac.settings'
@@ -52,6 +56,7 @@ export function parseSettings(raw: string | null): Settings {
     activeOnly: typeof o.activeOnly === 'boolean' ? o.activeOnly : d.activeOnly,
     tripRadiusKm: TRIP_RADII.includes(o.tripRadiusKm as TripRadius) ? (o.tripRadiusKm as TripRadius) : d.tripRadiusKm,
     showLegend: typeof o.showLegend === 'boolean' ? o.showLegend : d.showLegend,
+    theme: THEME_PREFS.includes(o.theme as ThemePref) ? (o.theme as ThemePref) : d.theme,
   }
 }
 

@@ -6,23 +6,24 @@ import { passesFilters, tierOf, type Filters, type StationIndex } from '../data/
 import { allSaved, pinGroupOf, type GroupBook, type StationGroup } from '../data/groups'
 import { TIER_COLORS, pinTipOffset, rasterizePin, type PinSpec } from './pins'
 import type { GeoPoint } from '../lib/flexiblePolyline'
-import { LIVE_BADGE_ZOOM, badgeLabel, type NearbyLive } from '../data/live'
 
 // Trung tâm VN (Đà Nẵng) làm mặc định khi chưa có vị trí người dùng.
 const DEFAULT_CENTER: [number, number] = [108.2, 16.05]
 // Positron = nền xám nhạt, tối giản, ít POI — tương đương HERE "lite.day" của app mobile,
-// để ghim trạm nổi bật trên nền. (Các lựa chọn khác: liberty, bright.)
-const STYLE = 'https://tiles.openfreemap.org/styles/positron'
+// để ghim trạm nổi bật trên nền. (Các lựa chọn khác: liberty, bright.) Giao diện tối dùng
+// "dark" cùng nhà — chung sprite và glyphs nên đổi qua lại không phải nạp lại font.
+const STYLES = {
+  light: 'https://tiles.openfreemap.org/styles/positron',
+  dark: 'https://tiles.openfreemap.org/styles/dark',
+} as const
 
 const SRC = 'stations'
 const SRC_SELECTED = 'station-selected'
 /** Chế độ hành trình: tuyến + chỉ trạm dọc tuyến, KHÔNG gom cụm (≤ 400 điểm, gom sẽ giấu trạm). */
 const SRC_TRIP = 'stations-trip'
 const SRC_ROUTE = 'trip-route'
-/** Huy hiệu số cổng trống (EVCS) đè trên ghim, chỉ từ zoom LIVE_BADGE_ZOOM. */
-const SRC_BADGE = 'live-badges'
 /** Các lớp của bản đồ thường, ẩn đi khi đang có tuyến. */
-const NORMAL_LAYERS = ['clusters', 'cluster-count', 'point', 'live-badge']
+const NORMAL_LAYERS = ['clusters', 'cluster-count', 'point']
 const ROUTE_COLOR = '#009966'
 
 /** Tuyến đang mở: đường vẽ, id trạm dọc tuyến, khung bay camera. */
@@ -91,32 +92,6 @@ function feature(
     // tier = mức công suất, quyết định màu ghim thường.
     properties: { id: st.entityId, grp, rank: grp ? 1 : 0, st: st.status, tier: tierOf(power?.get(st.entityId)) },
   }
-}
-
-/**
- * Huy hiệu "120kW×5 · 60kW×2" cho trạm có số cổng trống từ /search, chỉ trạm đang qua bộ
- * lọc (ghim bị lọc ẩn thì huy hiệu cũng ẩn). Trạm hết chỗ / đóng cửa không có huy hiệu.
- */
-function badgeGeoJSON(
-  index: StationIndex,
-  live: Map<string, NearbyLive>,
-  filters: Filters,
-  book: GroupBook,
-  power: Map<string, StationPower> | null,
-): GeoJSON.FeatureCollection {
-  const saved = allSaved(book)
-  const features: GeoJSON.Feature[] = []
-  if (live.size) {
-    for (const st of index.all) {
-      const nl = live.get(st.storeId)
-      if (!nl || !passesFilters(st, filters, power, saved)) continue
-      const label = badgeLabel(nl)
-      if (label) {
-        features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [st.lng, st.lat] }, properties: { id: st.entityId, label } })
-      }
-    }
-  }
-  return { type: 'FeatureCollection', features }
 }
 
 function routeGeoJSON(path: GeoPoint[]): GeoJSON.FeatureCollection {
@@ -214,15 +189,16 @@ interface Props {
   onLocate?: (pos: { lat: number; lng: number }) => void
   /** Tâm bản đồ sau mỗi lần kéo/zoom — "Gần tôi" dùng khi chưa có GPS. */
   onMoveEnd?: (view: { lat: number; lng: number; zoom: number }) => void
-  /** Số cổng trống theo storeId (EVCS /search) — vẽ huy hiệu trên ghim. */
-  live?: Map<string, NearbyLive>
   /** Hành trình đang mở (null = bản đồ thường). */
   trip?: TripLayer | null
+  /** Nền bản đồ theo giao diện sáng / tối. */
+  theme?: 'light' | 'dark'
 }
 
-const EMPTY_LIVE = new Map<string, NearbyLive>()
+/** Nguồn của app (không thuộc style nền) — mang sang khi đổi nền sáng/tối. */
+const OWN_SOURCES = new Set([SRC, SRC_SELECTED, SRC_TRIP, SRC_ROUTE])
 
-export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate, onMoveEnd, trip = null, live = EMPTY_LIVE }: Props) {
+export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate, onMoveEnd, trip = null, theme = 'light' }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const loadedRef = useRef(false)
@@ -235,7 +211,7 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
     if (!containerRef.current || mapRef.current) return
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: STYLE,
+      style: STYLES[theme],
       center: DEFAULT_CENTER,
       zoom: 5,
       attributionControl: { compact: true },
@@ -274,7 +250,6 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
       map.addSource(SRC_SELECTED, { type: 'geojson', data: selectedGeoJSON(sel) })
       map.addSource(SRC_TRIP, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addSource(SRC_ROUTE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
-      map.addSource(SRC_BADGE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
 
       // Tuyến hành trình: viền trắng + lõi màu brand, nằm DƯỚI mọi ghim.
       map.addLayer({
@@ -346,29 +321,6 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
         },
       })
 
-      // Huy hiệu số cổng trống: nhãn chữ nằm ngay trên đầu ghim. Không cho đè nhau — trạm sát
-      // nhau thì MapLibre tự giấu bớt nhãn (ghim vẫn còn, bấm vào vẫn thấy số trong bảng trạm).
-      map.addLayer({
-        id: 'live-badge',
-        type: 'symbol',
-        source: SRC_BADGE,
-        minzoom: LIVE_BADGE_ZOOM,
-        filter: notSelected(sel?.entityId ?? ''),
-        layout: {
-          'text-field': ['get', 'label'],
-          'text-font': ['Noto Sans Bold'],
-          'text-size': 11,
-          'text-anchor': 'bottom',
-          'text-offset': [0, -3.4],
-          'text-padding': 1,
-        },
-        paint: {
-          'text-color': '#0B6B3A',
-          'text-halo-color': '#ffffff',
-          'text-halo-width': 2,
-        },
-      })
-
       map.on('click', 'clusters', (e) => {
         const feat = map.queryRenderedFeatures(e.point, { layers: ['clusters'] })[0]
         const clusterId = feat.properties?.cluster_id
@@ -415,12 +367,23 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
     src?.setData(toGeoJSON(index, filters, book, power))
   }, [index, filters, book, power])
 
-  // Số cổng trống mới (EVCS) hoặc lọc đổi → dựng lại huy hiệu.
+  // Đổi nền sáng/tối tại chỗ: giữ nguyên nguồn + lớp của app (ghim, tuyến) bằng transformStyle,
+  // camera không nhảy. Ảnh ghim (addImage) nằm ở image manager, không mất khi đổi style.
+  const styleTheme = useRef(theme)
   useEffect(() => {
     const map = mapRef.current
-    if (!map || !loadedRef.current) return
-    ;(map.getSource(SRC_BADGE) as maplibregl.GeoJSONSource | undefined)?.setData(badgeGeoJSON(index, live, filters, book, power))
-  }, [index, live, filters, book, power])
+    if (!map || styleTheme.current === theme) return
+    styleTheme.current = theme
+    map.setStyle(STYLES[theme], {
+      transformStyle: (prev, next) => {
+        if (!prev) return next
+        const sources = { ...next.sources }
+        for (const [id, src] of Object.entries(prev.sources)) if (OWN_SOURCES.has(id)) sources[id] = src
+        const own = prev.layers.filter((l) => 'source' in l && OWN_SOURCES.has(l.source as string))
+        return { ...next, sources, layers: [...next.layers, ...own] }
+      },
+    })
+  }, [theme])
 
   // Nhóm mới tạo cần ảnh ghim riêng.
   useEffect(() => {
@@ -440,7 +403,6 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
       map.setFilter('point', ['all', ['!', ['has', 'point_count']], notSelected(selected?.entityId ?? '')])
     }
     if (map.getLayer('trip-point')) map.setFilter('trip-point', notSelected(selected?.entityId ?? ''))
-    if (map.getLayer('live-badge')) map.setFilter('live-badge', notSelected(selected?.entityId ?? ''))
   }, [selected])
 
   // Hành trình: vẽ tuyến + chỉ ghim dọc tuyến; đóng thì về bản đồ cụm như cũ.

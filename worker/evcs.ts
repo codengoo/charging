@@ -5,7 +5,6 @@
 //
 //   GET /api/live/<storeId>          → JSON /charging nguyên văn (cache 60 s, dùng chung)
 //   GET /api/live-history/<storeId>  → {"all":[[t,xe]…],"kw":{hours,series}|null} 24h (cache 5')
-//   GET /api/live-nearby?at=lat,lng  → JSON /search nguyên văn: ~50 trạm quanh đó (cache 5')
 //
 // Worker CHỈ làm I/O, không parse JSON lớn (Free plan 10 ms CPU): lịch sử ghép bằng cắt chuỗi.
 // Cache bằng Cache API theo trạm — nhiều người mở cùng một trạm chỉ tốn một lượt gọi EVCS,
@@ -13,7 +12,7 @@
 
 const SITE = 'https://evcs.vn'
 /**
- * /charging và /search gọi qua host phụ: Cloudflare của EVCS chặn hai đường này trên evcs.vn khi
+ * /charging gọi qua host phụ: Cloudflare của EVCS chặn đường này trên evcs.vn khi
  * request đi từ Worker (403), còn www1 thì qua (www2 cũng bị chặn). Referer vẫn là
  * trang evcs.vn — /charging đòi Referer thuộc evcs.vn.
  */
@@ -22,7 +21,6 @@ const WS_URL = 'https://www2.evcs.vn/socket.io/?EIO=4&transport=websocket'
 const UA =
   'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
 const STORE_ID = /^C\.[A-Z0-9]{2,8}$/i
-const COORD = /^-?\d{1,3}(?:\.\d+)?,-?\d{1,3}(?:\.\d+)?$/
 
 /** apiToken sống 299 s, chargeToken 599 s — làm mới cả đôi trước cái yếu hơn, chừa 60 s. */
 const TOKEN_TTL_MS = 180_000
@@ -36,7 +34,6 @@ const KW_GRACE_MS = 2000
 const TTL_LIVE = 60
 /** Ngắn hơn 5' vì lịch sử còn là nguồn dự phòng cho số cổng trống khi /charging bị chặn. */
 const TTL_HISTORY = 120
-const TTL_NEARBY = 300
 
 /** Token ở cấp phiên, không gắn theo trạm. Sống theo isolate — đủ để đỡ phần lớn lượt xin. */
 let tokens: { charge: string; api: string; at: number } | null = null
@@ -187,24 +184,6 @@ async function history(storeId: string): Promise<Response> {
   }
 }
 
-/**
- * ~50 trạm gần một toạ độ kèm số cổng trống theo kW — chính bản đồ của EVCS dùng endpoint
- * này. Không cần token, chỉ cần UA trình duyệt. Toạ độ đã làm tròn ở client (~1 km).
- */
-async function nearby(at: string): Promise<Response> {
-  const [lat, lng] = at.split(',').map(Number)
-  const res = await fetch(`${API}/search`, {
-    method: 'POST',
-    headers: { ...browser(`${SITE}/`), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ latitude: lat, longitude: lng }),
-  })
-  const text = await res.text()
-  if (!res.ok || !text.startsWith('{')) {
-    return failJson(503, `EVCS đang bận (search http ${res.status})`)
-  }
-  return json(text, 200, TTL_NEARBY)
-}
-
 /** Bọc Cache API: trúng cache thì không đụng EVCS; chỉ lưu kết quả 200. */
 async function cached(key: string, run: () => Promise<Response>): Promise<Response> {
   const cache = caches.default
@@ -227,11 +206,6 @@ export async function serveLive(url: URL): Promise<Response> {
     const id = decodeURIComponent(p.slice('/api/live-history/'.length)).toUpperCase()
     if (!STORE_ID.test(id)) return failJson(400, 'storeId không hợp lệ')
     return cached(`history/${id}`, () => history(id))
-  }
-  if (p === '/api/live-nearby') {
-    const at = url.searchParams.get('at') ?? ''
-    if (!COORD.test(at)) return failJson(400, 'at không hợp lệ')
-    return cached(`nearby/${at}`, () => nearby(at))
   }
   return failJson(404, 'Not found')
 }

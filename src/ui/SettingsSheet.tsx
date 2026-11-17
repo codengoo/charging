@@ -15,12 +15,15 @@ import { CheckIcon } from 'lucide-react'
 import { cn } from 'cn'
 import { LANG, pick, type Lang } from '@/i18n'
 import { switchLang } from '@/lib/langSwitch'
+import { THEME_PREFS, type ThemePref } from '@/lib/theme'
 
 const L = pick({
   vi: {
     title: 'Cài đặt hiển thị',
     description: 'Áp dụng mỗi lần mở app. Chip lọc trên bản đồ vẫn bật/tắt tạm thời được.',
     language: 'Ngôn ngữ',
+    theme: 'Giao diện',
+    themeNames: { system: 'Theo máy', light: 'Sáng', dark: 'Tối' } as Record<ThemePref, string>,
     power: 'Công suất ưu tiên',
     powerHint: 'Theo cổng mạnh nhất của trạm. Bỏ chọn bớt mức thì trạm chưa có dữ liệu công suất bị ẩn.',
     status: 'Trạng thái trạm',
@@ -36,6 +39,8 @@ const L = pick({
     title: 'Display settings',
     description: 'Applied every time you open the app. Map filter chips can still be toggled temporarily.',
     language: 'Language',
+    theme: 'Appearance',
+    themeNames: { system: 'System', light: 'Light', dark: 'Dark' } as Record<ThemePref, string>,
     power: 'Preferred power',
     powerHint: "By the station's fastest port. Unticking a level hides stations without power data.",
     status: 'Station status',
@@ -82,6 +87,15 @@ export function SettingsSheet({ open, settings, onChange, onClose }: Props) {
           {/* Đổi ngôn ngữ = chuyển sang URL kia (/ ↔ /en/) và tải lại. */}
           <Field title={L.language}>
             <Segmented label={L.language} value={LANG} onChange={switchLang} options={LANG_OPTIONS} />
+          </Field>
+
+          <Field title={L.theme}>
+            <Segmented
+              label={L.theme}
+              value={settings.theme}
+              onChange={(v) => onChange({ theme: v })}
+              options={THEME_PREFS.map((t) => ({ value: t, label: L.themeNames[t] }))}
+            />
           </Field>
 
           <Field title={L.power} hint={L.powerHint}>

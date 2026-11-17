@@ -12,8 +12,9 @@ import { NearbySheet } from './ui/NearbySheet'
 import { BackupSheet } from './ui/BackupSheet'
 import { SettingsSheet } from './ui/SettingsSheet'
 import { useDriveDistance, useStableOrigin } from './data/drive'
-import { useLiveStatus, useNearbyLive } from './data/live'
+import { useLiveStatus } from './data/live'
 import { filtersFrom, useSettings, type Settings } from './data/settings'
+import { useResolvedTheme } from './lib/theme'
 import { ImportDialog, pendingImport, type PendingImport } from './ui/ImportDialog'
 import { IMPORT_HASH, decodeBackup } from './data/backup'
 import { TripPanel } from './ui/TripPanel'
@@ -82,8 +83,6 @@ export function App() {
   const detail = useStationDetail(sheetStation?.entityId ?? null)
   // Số cổng trống + lịch sử 24h (EVCS) — chỉ khi bảng trạm đang mở.
   const live = useLiveStatus(sheetStation?.storeId ?? null, selected !== null)
-  // Huy hiệu số cổng trống trên ghim quanh tâm bản đồ (từ zoom 13).
-  const nearbyLive = useNearbyLive()
   const [grouping, setGrouping] = useState(false)
   const [sharing, setSharing] = useState(false)
   // Đọc NGAY lúc khởi tạo: effect đồng bộ URL bên dưới sẽ ghi đè pathname.
@@ -106,6 +105,7 @@ export function App() {
   // Trang hành trình /trip?link=… (hoặc ?text=/?url= từ Web Share Target): đọc NGAY lúc khởi tạo.
   const [tripLink] = useState(() => readTripLink(location))
   const { settings, update: updateSettings } = useSettings()
+  const theme = useResolvedTheme(settings.theme)
   const [showSettings, setShowSettings] = useState(false)
   // Mở app với bộ lọc theo cài đặt; chip đổi tạm trong phiên, không ghi ngược vào cài đặt.
   const [filters, setFilters] = useState<Filters>(() => filtersFrom(settings))
@@ -243,6 +243,7 @@ export function App() {
   return (
     <div className="relative h-dvh w-full overflow-hidden">
       <MapView
+        theme={theme}
         index={index}
         filters={filters}
         book={book}
@@ -253,9 +254,7 @@ export function App() {
         onLocate={setUserPos}
         onMoveEnd={(v) => {
           mapCenter.current = { lat: v.lat, lng: v.lng }
-          nearbyLive.refresh(v.lat, v.lng, v.zoom)
         }}
-        live={nearbyLive.byStore}
         trip={tripLayer}
       />
 

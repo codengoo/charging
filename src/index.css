@@ -216,3 +216,15 @@
   border-radius: var(--radius-lg) !important;
   overflow: hidden;
 }
+
+/* Khung ghi nguồn bản đồ: mặc định trắng cứng — theo màu thẻ để hợp giao diện tối. */
+.maplibregl-ctrl.maplibregl-ctrl-attrib {
+  background-color: color-mix(in srgb, var(--card) 85%, transparent);
+  color: var(--foreground);
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--foreground);
+}
+.dark .maplibregl-ctrl-attrib-button {
+  filter: invert(1);
+}
