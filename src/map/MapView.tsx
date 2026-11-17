@@ -2,10 +2,10 @@ import { useEffect, useRef } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { Station, StationPower } from '../data/types'
-import { distanceKm, passesFilters, tierOf, type Filters, type StationIndex } from '../data/stations'
+import { passesFilters, tierOf, type Filters, type StationIndex } from '../data/stations'
 import { allSaved, pinGroupOf, type GroupBook, type StationGroup } from '../data/groups'
 import { TIER_COLORS, pinTipOffset, rasterizePin, type PinSpec } from './pins'
-import type { GeoPoint } from '../lib/flexiblePolyline'
+import { distanceKm, type GeoPoint } from '../lib/geo'
 
 // Trung tâm VN (Đà Nẵng) làm mặc định khi chưa có vị trí người dùng.
 const DEFAULT_CENTER: [number, number] = [108.2, 16.05]

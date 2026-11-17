@@ -4,6 +4,7 @@ import { TRIP_RADII, type TripRadius } from './useTrip'
 import { THEME_PREFS, type ThemePref } from '../lib/theme'
 import { VEHICLE_IDS } from './vehicles'
 import { RESERVE_MAX, RESERVE_MIN, RESERVE_PCT } from './battery'
+import { readStr, writeJson } from '../lib/storage'
 
 /**
  * Cấu hình hiển thị người dùng tự chọn, nhớ trong localStorage. Đây là giá trị MẶC ĐỊNH lúc mở
@@ -89,13 +90,8 @@ export function parseSettings(raw: string | null): Settings {
   }
 }
 
-function load(): Settings {
-  try {
-    return parseSettings(localStorage.getItem(KEY))
-  } catch {
-    return DEFAULT_SETTINGS // chế độ riêng tư chặn localStorage
-  }
-}
+/** Chế độ riêng tư chặn localStorage → mặc định. */
+const load = (): Settings => parseSettings(readStr(KEY))
 
 /** Bộ lọc lúc mở app theo cấu hình. "Đã lưu" luôn tắt — đó là thao tác tạm, không phải sở thích. */
 export function filtersFrom(s: Settings): Filters {
@@ -113,11 +109,7 @@ export function useSettings() {
       first.current = false // vừa đọc từ kho, không ghi lại
       return
     }
-    try {
-      localStorage.setItem(KEY, JSON.stringify(settings))
-    } catch {
-      // không lưu được thì vẫn áp dụng trong phiên
-    }
+    writeJson(KEY, settings) // không lưu được thì vẫn áp dụng trong phiên
   }, [settings])
 
   return { settings, update }

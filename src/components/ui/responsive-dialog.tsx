@@ -1,23 +1,19 @@
 import * as React from 'react'
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
 import {
   Drawer,
-  DrawerClose,
   DrawerContent,
   DrawerDescription,
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from '@/components/ui/drawer'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { cn } from '@/lib/utils'
@@ -96,26 +92,6 @@ export function ResponsiveDialog({
       )}
     </ResponsiveDialogContext.Provider>
   )
-}
-
-export function ResponsiveDialogTrigger({
-  ...props
-}: React.ComponentProps<typeof DialogTrigger>) {
-  const { isMobile } = React.useContext(ResponsiveDialogContext)
-  if (isMobile) {
-    return <DrawerTrigger {...props} />
-  }
-  return <DialogTrigger {...props} />
-}
-
-export function ResponsiveDialogClose({
-  ...props
-}: React.ComponentProps<typeof DialogClose>) {
-  const { isMobile } = React.useContext(ResponsiveDialogContext)
-  if (isMobile) {
-    return <DrawerClose {...props} />
-  }
-  return <DialogClose {...props} />
 }
 
 export interface ResponsiveDialogContentProps

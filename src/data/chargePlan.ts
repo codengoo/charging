@@ -16,6 +16,7 @@ import { TARGET_PCT, arrivalPct, avgKmh, chargeMinutes, type ArrivalEstimate } f
 import type { AlongRoute } from './routeCorridor'
 import type { StationPower } from './types'
 import type { Vehicle } from './vehicles'
+import { dcMaxKw } from './stations'
 
 /** Chỉ ghé trạm có cổng DC từ mức này — AC hay DC chậm thì một lần dừng mất hàng giờ. */
 export const PLAN_MIN_DC_KW = 50
@@ -37,11 +38,6 @@ export interface PlanStop {
 export type ChargePlan =
   | { ok: true; stops: PlanStop[]; arriveDest: ArrivalEstimate; chargeMin: number; totalSeconds: number }
   | { ok: false; stops: PlanStop[]; stuckAtKm: number }
-
-/** Cổng DC mạnh nhất; 0 = không có DC / chưa có dữ liệu. */
-function dcMax(p: StationPower | undefined): number {
-  return p ? p.groups.reduce((m, g) => (g.dc ? Math.max(m, g.kw) : m), 0) : 0
-}
 
 /**
  * Trạm sát cao tốc phải ra nút giao (`viaExit`): mỗi chiều cộng thêm chừng này km ngoài độ lệch —
@@ -76,7 +72,7 @@ export function planCharging(
   const totalKm = route.meters / 1000
   const speed = avgKmh(route.meters, route.seconds)
   const fast = items
-    .map((item) => ({ item, kw: dcMax(power?.get(item.station.entityId)) }))
+    .map((item) => ({ item, kw: dcMaxKw(power?.get(item.station.entityId)) }))
     .filter((c) => c.kw >= PLAN_MIN_DC_KW)
   // Ưu tiên trạm vào thẳng; trạm phải ra cao tốc chỉ dùng ở chặng không còn trạm vào thẳng nào tới được
   // (đoạn cao tốc dài ít trạm dừng nghỉ) — quãng vòng của nó chỉ là ước tính.

@@ -6,6 +6,7 @@
  */
 
 import { pick } from '../i18n'
+import { readJson, readStr, removeKey, writeStr } from '../lib/storage'
 
 /** Mã hình — tầng dữ liệu không phụ thuộc React, UI tự tra mã ra icon. */
 export type GroupIconKey =
@@ -129,10 +130,6 @@ export function idsIn(book: GroupBook, groupId: string): string[] {
 /** Trạm này đang nằm trong nhóm nào, theo thứ tự nhóm. */
 export function groupsOf(book: GroupBook, entityId: string): string[] {
   return book.groups.filter((g) => entityId in (book.members[g.id] ?? {})).map((g) => g.id)
-}
-
-export function isSaved(book: GroupBook, entityId: string): boolean {
-  return Object.values(book.members).some((m) => entityId in m)
 }
 
 /** Tất cả trạm đã lưu, không phân biệt nhóm. */
@@ -331,15 +328,19 @@ export function bookFromStored(s: Partial<StoredBook>): GroupBook {
   return { groups, members }
 }
 
-export function serializeBook(book: GroupBook): string {
-  const stored: StoredBook = {
+/** Dạng lưu kho / sao lưu: chỉ nhóm tự tạo (nhóm dựng sẵn dựng lại từ code). */
+export function toStored(book: GroupBook): StoredBook {
+  return {
     v: 1,
     groups: book.groups
       .filter((g) => !g.builtIn)
       .map(({ builtIn: _b, ...g }) => g),
     members: book.members,
   }
-  return JSON.stringify(stored)
+}
+
+export function serializeBook(book: GroupBook): string {
+  return JSON.stringify(toStored(book))
 }
 
 /**
@@ -348,17 +349,16 @@ export function serializeBook(book: GroupBook): string {
  */
 export function loadBook(): GroupBook {
   try {
-    let book = parseBook(localStorage.getItem(STORAGE_KEY))
-    const legacy = localStorage.getItem(LEGACY_FAVORITES_KEY)
-    if (legacy) {
-      const ids = JSON.parse(legacy) as unknown
+    let book = parseBook(readStr(STORAGE_KEY))
+    if (readStr(LEGACY_FAVORITES_KEY)) {
+      const ids = readJson(LEGACY_FAVORITES_KEY)
       if (Array.isArray(ids)) {
         const fav = { ...(book.members[FAVORITE] ?? {}) }
         for (const id of ids) if (typeof id === 'string' && !(id in fav)) fav[id] = 0
         book = { ...book, members: { ...book.members, [FAVORITE]: fav } }
       }
-      localStorage.setItem(STORAGE_KEY, serializeBook(book))
-      localStorage.removeItem(LEGACY_FAVORITES_KEY)
+      writeStr(STORAGE_KEY, serializeBook(book))
+      removeKey(LEGACY_FAVORITES_KEY)
     }
     return book
   } catch {
@@ -367,11 +367,7 @@ export function loadBook(): GroupBook {
 }
 
 export function saveBook(book: GroupBook): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, serializeBook(book))
-  } catch {
-    // bỏ qua: chế độ riêng tư / hết dung lượng
-  }
+  writeStr(STORAGE_KEY, serializeBook(book)) // chế độ riêng tư / hết dung lượng: bỏ qua
 }
 
 /**

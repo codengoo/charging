@@ -8,17 +8,14 @@
  */
 
 import { LANG, stripLang, withLang, type Lang } from '../i18n'
+import { stripDiacritics } from './text'
 
 /** Domain chính thức — dùng khi đang chạy local (QR trỏ về localhost thì điện thoại không mở được). */
 export const SITE_URL = 'https://charging.cangao.asia'
 
 /** Hạ dấu tiếng Việt + gạch nối: "Vincom Hầm B3" -> "vincom-ham-b3". */
 export function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/đ/g, 'd')
+  return stripDiacritics(s)
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 80)

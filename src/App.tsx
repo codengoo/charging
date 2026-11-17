@@ -8,7 +8,8 @@ import { SavedSheet } from './ui/SavedSheet'
 import { ShareSheet } from './ui/ShareSheet'
 import { ChangelogModal } from './ui/ChangelogModal'
 import { PowerLegend } from './ui/PowerLegend'
-import { NearbySheet, type GpsResult } from './ui/NearbySheet'
+import { NearbySheet } from './ui/NearbySheet'
+import { getPosition, type GpsResult } from './lib/geo'
 import { BackupSheet } from './ui/BackupSheet'
 import { SettingsSheet } from './ui/SettingsSheet'
 import { VehicleSheet } from './ui/VehicleSheet'
@@ -247,20 +248,13 @@ export function App() {
   }, [index, selected, tripOpen, trip.link, tripLink])
 
   /** Nút "Dùng vị trí của tôi" trong Trạm gần bạn: hỏi vị trí, có thì xếp lại theo chỗ đứng. */
-  function requestGps(): Promise<GpsResult> {
-    if (!('geolocation' in navigator)) return Promise.resolve('failed')
-    return new Promise((resolve) =>
-      navigator.geolocation.getCurrentPosition(
-        (p) => {
-          const pos = { lat: p.coords.latitude, lng: p.coords.longitude }
-          setUserPos(pos)
-          setNearby({ origin: pos, fromGps: true })
-          resolve('ok')
-        },
-        (e) => resolve(e.code === e.PERMISSION_DENIED ? 'denied' : 'failed'),
-        { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
-      ),
-    )
+  async function requestGps(): Promise<GpsResult> {
+    const { pos, result } = await getPosition(true)
+    if (pos) {
+      setUserPos(pos)
+      setNearby({ origin: pos, fromGps: true })
+    }
+    return result
   }
 
   function pick(st: Station) {

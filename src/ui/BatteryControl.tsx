@@ -1,6 +1,7 @@
 import { BatteryMedium, ChevronRight, Zap } from 'lucide-react'
 import {
   DEFAULT_PCT,
+  FALLBACK_KMH,
   arrivalPct,
   avgKmh,
   chargeMinutes,
@@ -8,13 +9,14 @@ import {
   type ArrivalEstimate,
   type BatteryReading,
 } from '../data/battery'
-import { fmtMinutes, type DriveState } from '../data/drive'
+import type { DriveState } from '../data/drive'
 import type { LivePorts } from '../data/live'
 import type { StationPower } from '../data/types'
 import type { Vehicle } from '../data/vehicles'
 import { fmtKw } from '@/lib/format'
 import { Slider } from '@/components/ui/slider'
 import { LOCALE, pick } from '@/i18n'
+import { fmtMinutes } from '@/lib/format'
 
 const L = pick({
   vi: {
@@ -155,7 +157,7 @@ export function BatteryBox({
   const pct = pctOf(reading)
   let est: ArrivalEstimate | null = null
   if (drive?.kind === 'ok') est = arrivalPct(pct, drive.info.meters / 1000, avgKmh(drive.info.meters, drive.info.seconds), vehicle, climate)
-  else if (drive?.kind === 'fallback') est = arrivalPct(pct, drive.straightKm * DETOUR, 50, vehicle, climate)
+  else if (drive?.kind === 'fallback') est = arrivalPct(pct, drive.straightKm * DETOUR, FALLBACK_KMH, vehicle, climate)
 
   const port = chargePort(power, live)
   const minutes = est && port && est.high >= 0 ? chargeMinutes((est.low + est.high) / 2, port, vehicle) : null

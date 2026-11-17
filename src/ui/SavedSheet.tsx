@@ -19,7 +19,8 @@ import {
   soonestExpiry,
   type GroupBook,
 } from '../data/groups'
-import { distanceKm, type StationIndex } from '../data/stations'
+import type { StationIndex } from '../data/stations'
+import { distanceKm } from '../lib/geo'
 import type { Station } from '../data/types'
 import type { NoteMap } from '../data/notes'
 import { GroupGlyph, PinPreview } from './groupIcons'

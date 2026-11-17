@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { StationDetail } from './types'
+import { HttpError, fetchJson } from '../lib/http'
 
 type State = { detail?: StationDetail; loading: boolean; failed: boolean }
 
@@ -17,20 +18,19 @@ export function useStationDetail(entityId: string | null): State {
     if (!entityId || memo.has(entityId)) return
     const ctrl = new AbortController()
     setState({ id: entityId, loading: true, failed: false })
-    fetch(`/api/station/${encodeURIComponent(entityId)}`, { signal: ctrl.signal })
-      .then(async (res) => {
-        if (res.status === 404) {
-          memo.set(entityId, null)
-          return setState({ id: entityId, loading: false, failed: false })
-        }
-        if (!res.ok) throw new Error(String(res.status))
-        const detail = (await res.json()) as StationDetail
+    fetchJson<StationDetail>(`/api/station/${encodeURIComponent(entityId)}`, { signal: ctrl.signal })
+      .then((detail) => {
         memo.set(entityId, detail)
         setState({ id: entityId, detail, loading: false, failed: false })
       })
-      .catch(() => {
-        // Lỗi tạm (VinFast chặn, mất mạng): không nhớ lại, lần mở sau thử tiếp.
-        if (!ctrl.signal.aborted) setState({ id: entityId, loading: false, failed: true })
+      .catch((e: unknown) => {
+        if (ctrl.signal.aborted) return
+        // 404 = trạm không có chi tiết: nhớ luôn. Lỗi tạm (VinFast chặn, mất mạng): lần mở sau thử tiếp.
+        if (e instanceof HttpError && e.status === 404) {
+          memo.set(entityId, null)
+          return setState({ id: entityId, loading: false, failed: false })
+        }
+        setState({ id: entityId, loading: false, failed: true })
       })
     return () => ctrl.abort()
   }, [entityId])

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { decodeFlexiblePolyline, type GeoPoint } from '@/lib/flexiblePolyline'
+import { decodeFlexiblePolyline } from '@/lib/flexiblePolyline'
+import type { GeoPoint } from '@/lib/geo'
 
 const near = (got: GeoPoint[], want: Array<[number, number]>) => {
   expect(got).toHaveLength(want.length)

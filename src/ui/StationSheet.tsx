@@ -16,7 +16,7 @@ import type { Station, StationDetail, StationPower } from '../data/types'
 import { GroupGlyph } from './groupIcons'
 import { ImagePreview } from './ImagePreview'
 import { fmtDistance } from '@/lib/format'
-import { fmtMinutes, type DriveState } from '../data/drive'
+import type { DriveState } from '../data/drive'
 import type { LiveState } from '../data/live'
 import { HistoryBox, PortsBox } from './LiveSection'
 import { BatteryBox } from './BatteryControl'
@@ -26,6 +26,7 @@ import type { Note } from '../data/notes'
 import type { BatteryReading } from '../data/battery'
 import type { Vehicle } from '../data/vehicles'
 import { pick } from '@/i18n'
+import { fmtMinutes } from '@/lib/format'
 
 const L = pick({
   vi: {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { GeoPoint } from '../lib/flexiblePolyline'
+import { getPosition, type GeoPoint } from '../lib/geo'
 import { NO_AVOID, type Avoid } from '../lib/mapsLink'
 import { alongRoute, type RouteHits, type RoutePath } from './routeCorridor'
 import type { StationIndex } from './stations'
@@ -50,17 +50,8 @@ const CLOSED: TripState = {
 }
 const EMPTY_HITS: RouteHits = { items: [], total: 0 }
 
-/** Vị trí hiện tại: dùng `userPos` nếu đã có, không thì hỏi trình duyệt (tối đa 10 s). */
-function askPosition(): Promise<GeoPoint | null> {
-  if (!('geolocation' in navigator)) return Promise.resolve(null)
-  return new Promise((resolve) =>
-    navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
-      () => resolve(null),
-      { timeout: 10_000, maximumAge: 60_000 },
-    ),
-  )
-}
+/** Vị trí hiện tại khi chưa có `userPos`: hỏi trình duyệt (tối đa 10 s). */
+const askPosition = async (): Promise<GeoPoint | null> => (await getPosition()).pos
 
 /** Hành trình "trạm dọc đường". Port tripJob / handleSharedText / setTripRadius của MapViewModel. */
 export function useTrip(

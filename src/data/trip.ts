@@ -3,10 +3,12 @@
  * toạ độ. Port phần mạng của MapsLink.kt, HereRouting.path, HerePlaces và
  * MapViewModel.handleSharedText (charge-map-android).
  */
-import { decodeFlexiblePolyline, type GeoPoint } from '../lib/flexiblePolyline'
+import { decodeFlexiblePolyline } from '../lib/flexiblePolyline'
+import type { GeoPoint } from '../lib/geo'
 import { firstUrl, hasFix, isShortLink, parseMapsUrl, type Avoid, type TripStop } from '../lib/mapsLink'
 import type { RoutePath } from './routeCorridor'
 import { pick } from '../i18n'
+import { HttpError, fetchJson } from '../lib/http'
 
 /** Một chặng đã có toạ độ, kèm tên để hiện. */
 export interface TripPoint {
@@ -55,11 +57,15 @@ export const MSG = pick({
 const LIMITED_ACCESS_CLASS = 1
 
 async function api<T>(path: string, signal: AbortSignal): Promise<T | null> {
-  const res = await fetch(path, { signal })
-  if (res.status === 429) throw new TripError(MSG.tooFast)
-  if (res.status === 503) throw new TripError(MSG.noKey)
-  if (!res.ok) return null
-  return (await res.json()) as T
+  try {
+    return await fetchJson<T>(path, { signal })
+  } catch (e) {
+    if (!(e instanceof HttpError)) throw e
+    if (e.status === 0) throw e.cause
+    if (e.status === 429) throw new TripError(MSG.tooFast)
+    if (e.status === 503) throw new TripError(MSG.noKey)
+    return null
+  }
 }
 
 /** Mở link rút gọn ở Worker; null nếu không mở được. */

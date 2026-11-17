@@ -7,8 +7,8 @@
  * không đáng kể so với bán kính hành lang tính bằng km, mà rẻ hơn haversine hàng chục lần. Và ở
  * đây phải chạy HÀNG TRIỆU phép đo: mỗi trạm ứng viên đối chiếu với mỗi đoạn của tuyến.
  */
-import type { GeoPoint } from '../lib/flexiblePolyline'
-import { cellOf, type StationIndex } from './stations'
+import { KM_PER_LAT, KM_PER_LNG, toRad, type GeoPoint } from '../lib/geo'
+import { CELL_SIZE, cellOf, type StationIndex } from './stations'
 import type { Station } from './types'
 
 /**
@@ -49,10 +49,6 @@ export interface ThinRoute {
   limited: boolean[]
 }
 
-/** 1 độ vĩ độ ~ 110,574 km; 1 độ kinh độ ~ 111,320 km × cos(vĩ độ). */
-const KM_PER_LAT = 110.574
-const KM_PER_LNG = 111.32
-
 /**
  * Số điểm tối đa giữ lại. HERE trả rất dày — tuyến 300 km có thể hơn 10 nghìn điểm, đủ vẽ mượt
  * nhưng để đo khoảng cách thì thừa: hai điểm cách nhau vài trăm mét không thể giấu một trạm ở giữa.
@@ -73,11 +69,9 @@ const OPPOSITE_SIDE_KM = 0.3
  * như không trạm nào nằm trên cao tốc.
  */
 const REST_STOP_KM = 0.15
-const CELL_SIZE = 0.1
 /** Trần số trạm hiện trong danh sách (giống ALONG_ROUTE_LIMIT bên Android). */
 export const ALONG_ROUTE_LIMIT = 400
 
-const toRad = (d: number) => (d * Math.PI) / 180
 const sq = (v: number) => v * v
 
 function flatKm(a: GeoPoint, b: GeoPoint, kx: number): number {

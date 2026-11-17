@@ -1,25 +1,17 @@
 import type { DataBundle, DataManifest, Station, StationPower, StationStatus } from './types'
 import { pick } from '../i18n'
 import { parsePowerGroups, type PowerRow } from './format'
+import { foldText } from '../lib/text'
+import { distanceKm, kmPerLng, KM_PER_LAT } from '../lib/geo'
+import { HttpError, fetchJson } from '../lib/http'
 
-const CELL_SIZE = 0.1
+export const CELL_SIZE = 0.1
 
 /** Mã ô lưới ~11 km. Khớp với cellOf() trong Station.kt. */
 export function cellOf(lat: number, lng: number): number {
   const la = Math.floor(lat / CELL_SIZE)
   const ln = Math.floor(lng / CELL_SIZE)
   return (la + 1000) * 100_000 + (ln + 2000)
-}
-
-/** Hạ dấu tiếng Việt để tìm kiếm không phân biệt dấu. Port searchKeyOf / TextFold. */
-export function foldText(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '') // bỏ dấu tổ hợp
-    .replace(/đ/g, 'd')
-    .replace(/\s+/g, ' ')
-    .trim()
 }
 
 /** Giải mã một dòng packed [id,storeId,name,address,lat,lng,flags,availableDate,status]. */
@@ -68,9 +60,12 @@ const LOAD_FAILED = pick({
 })
 
 async function getJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${DATA_BASE}/${path}`, init)
-  if (!res.ok) throw new Error(LOAD_FAILED(path, res.status))
-  return (await res.json()) as T
+  try {
+    return await fetchJson<T>(`${DATA_BASE}/${path}`, init)
+  } catch (e) {
+    if (e instanceof HttpError) throw e.status ? new Error(LOAD_FAILED(path, e.status)) : e.cause
+    throw e
+  }
 }
 
 /**
@@ -160,18 +155,6 @@ export function searchStations(index: StationIndex, query: string, limit = 50): 
   return out
 }
 
-/** Khoảng cách Haversine (km). */
-export function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
-  const R = 6371
-  const dLat = ((bLat - aLat) * Math.PI) / 180
-  const dLng = ((bLng - aLng) * Math.PI) / 180
-  const la1 = (aLat * Math.PI) / 180
-  const la2 = (bLat * Math.PI) / 180
-  const h =
-    Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLng / 2) ** 2
-  return 2 * R * Math.asin(Math.sqrt(h))
-}
-
 /**
  * Các trạm gần một điểm, sắp xếp theo khoảng cách tăng dần. Quét rộng dần theo vòng ô lưới
  * (~11 km/vòng) cho tới khi đủ `limit` trạm qua `predicate`, tối đa `maxRing` vòng.
@@ -193,7 +176,7 @@ export function nearestStations(
     // Đủ số lượng CHƯA đủ: trạm ở góc hình vuông có thể xa hơn trạm ngoài vòng. Chỉ dừng khi
     // trạm thứ `limit` nằm trong vòng tròn nội tiếp. Hình vuông tính theo độ nên cạnh đông-tây
     // chỉ dài 111·cos(lat) km/độ — lấy cạnh ngắn hơn làm bán kính.
-    const innerKm = deg * 111 * Math.min(1, Math.cos((lat * Math.PI) / 180))
+    const innerKm = deg * Math.min(KM_PER_LAT, kmPerLng(lat))
     if ((sorted.length >= limit && sorted[limit - 1].distanceKm <= innerKm) || ring === maxRing) {
       return sorted.slice(0, limit)
     }
@@ -239,11 +222,15 @@ export const FAST_KW = 120
 /** 0 = AC hoặc chưa có dữ liệu, 1 = DC dưới 120 kW, 2 = DC từ 120 kW. */
 export type PowerTier = 0 | 1 | 2
 
+/** Cổng DC mạnh nhất (kW); 0 = không có DC / chưa có dữ liệu. */
+export function dcMaxKw(p: StationPower | undefined): number {
+  return p ? p.groups.reduce((m, g) => (g.dc ? Math.max(m, g.kw) : m), 0) : 0
+}
+
 /** Theo cổng DC mạnh nhất, không theo maxKw chung (AC 11 kW + DC 60 kW là tier 1). */
 export function tierOf(p: StationPower | undefined): PowerTier {
   if (!p || p.dcCount === 0) return 0
-  const dcMax = p.groups.reduce((m, g) => (g.dc ? Math.max(m, g.kw) : m), 0)
-  return dcMax >= FAST_KW ? 2 : 1
+  return dcMaxKw(p) >= FAST_KW ? 2 : 1
 }
 
 /** Mức lọc công suất theo cổng mạnh nhất (AC lẫn DC): ≥ 120 / 60–119 / dưới 60 kW. */

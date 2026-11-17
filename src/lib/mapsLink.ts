@@ -9,7 +9,8 @@
  * Kể cả khi đọc được, ta CHỈ lấy các chặng chứ không lấy được đường đi — liên kết không chứa
  * đường. Tuyến được tính lại bằng HERE nên có thể lệch chút so với cái người dùng thấy trên Maps.
  */
-import type { GeoPoint } from './flexiblePolyline'
+import type { GeoPoint } from './geo'
+import { fromBase64Url } from './text'
 
 /** Một chặng: có toạ độ, có tên, hoặc cả hai. Chỉ có tên thì phải nhờ HERE đoán toạ độ. */
 export interface TripStop {
@@ -255,7 +256,7 @@ function readLegacy(u: URL): ParsedLink | null {
 function geocodePoint(b64: string): GeoPoint | null {
   let bytes: Uint8Array
   try {
-    bytes = Uint8Array.from(atob(b64.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))
+    bytes = fromBase64Url(b64)
   } catch {
     return null
   }

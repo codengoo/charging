@@ -9,6 +9,7 @@ import { useCallback, useState } from 'react'
 import type { LivePorts } from './live'
 import type { StationPower } from './types'
 import type { Vehicle } from './vehicles'
+import { readJson, writeJson } from '../lib/storage'
 
 /** % pin người dùng nhập, kèm lúc nhập. */
 export interface BatteryReading {
@@ -50,9 +51,12 @@ export function arrivalPct(startPct: number, km: number, avgKmh: number, v: Vehi
   return { low: startPct - used * (1 + SPREAD), high: startPct - used * (1 - SPREAD) }
 }
 
+/** Tốc độ trung bình giả định khi không có thời gian lái (đường hỗn hợp). */
+export const FALLBACK_KMH = 50
+
 /** Tốc độ trung bình (km/h) của một quãng; thiếu thời gian thì coi như đường hỗn hợp. */
 export function avgKmh(meters: number, seconds: number): number {
-  return seconds > 0 ? meters / 1000 / (seconds / 3600) : 50
+  return seconds > 0 ? meters / 1000 / (seconds / 3600) : FALLBACK_KMH
 }
 
 export interface ChargePort {
@@ -87,12 +91,9 @@ export function chargeMinutes(fromPct: number, port: ChargePort, v: Vehicle, toP
 const KEY = 'tramsac.battery'
 
 function load(): BatteryReading | null {
-  try {
-    const o = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<BatteryReading> | null
-    if (o && typeof o.pct === 'number' && typeof o.at === 'number' && o.pct >= 0 && o.pct <= 100) return { pct: o.pct, at: o.at }
-  } catch {
-    // JSON hỏng / localStorage bị chặn → như chưa nhập
-  }
+  // JSON hỏng / localStorage bị chặn → như chưa nhập
+  const o = readJson(KEY) as Partial<BatteryReading> | null
+  if (o && typeof o.pct === 'number' && typeof o.at === 'number' && o.pct >= 0 && o.pct <= 100) return { pct: o.pct, at: o.at }
   return null
 }
 
@@ -103,11 +104,7 @@ export function useBattery() {
   const set = useCallback((pct: number) => {
     const next = { pct: Math.round(Math.min(100, Math.max(0, pct))), at: Date.now() }
     setReading(next)
-    try {
-      localStorage.setItem(KEY, JSON.stringify(next))
-    } catch {
-      // không lưu được thì vẫn dùng trong phiên
-    }
+    writeJson(KEY, next) // không lưu được thì vẫn dùng trong phiên
   }, [])
 
   const stale = reading !== null && Date.now() - reading.at > STALE_MS

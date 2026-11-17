@@ -1,24 +1,17 @@
 // Phần chỉ chạy trên trình duyệt của i18n (Worker không có localStorage / location).
 import { LANG, langFromPath, stripLang, withLang, type Lang } from '../i18n'
+import { readStr, writeStr } from './storage'
 
 const PREF_KEY = 'tramsac.lang'
 
 export function savedLang(): Lang | null {
-  try {
-    const v = localStorage.getItem(PREF_KEY)
-    return v === 'vi' || v === 'en' ? v : null
-  } catch {
-    return null
-  }
+  const v = readStr(PREF_KEY)
+  return v === 'vi' || v === 'en' ? v : null
 }
 
 /** Đổi ngôn ngữ: nhớ lựa chọn rồi chuyển sang cùng trang ở ngôn ngữ kia (tải lại). */
 export function switchLang(lang: Lang) {
-  try {
-    localStorage.setItem(PREF_KEY, lang)
-  } catch {
-    // không lưu được thì vẫn chuyển trang
-  }
+  writeStr(PREF_KEY, lang) // không lưu được thì vẫn chuyển trang
   if (lang === LANG) return
   location.assign(withLang(stripLang(location.pathname), lang) + location.search + location.hash)
 }

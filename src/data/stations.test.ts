@@ -3,8 +3,6 @@ import {
   DEFAULT_FILTERS,
   bandOf,
   cellOf,
-  distanceKm,
-  foldText,
   kwActive,
   kwLabel,
   nearestStations,
@@ -16,6 +14,8 @@ import {
   type StationIndex,
 } from '@/data/stations'
 import type { Station, StationPower, StationStatus } from '@/data/types'
+import { distanceKm } from '@/lib/geo'
+import { foldText } from '@/lib/text'
 
 function st(id: string, lat: number, lng: number, extra: Partial<Station> = {}): Station {
   const name = extra.name ?? `Trạm ${id}`

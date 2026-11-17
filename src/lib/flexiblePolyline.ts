@@ -1,3 +1,4 @@
+import type { GeoPoint } from './geo'
 /**
  * Giải mã "flexible polyline" của HERE. Port từ FlexiblePolyline.kt (charge-map-android).
  *
@@ -17,10 +18,6 @@
  * bit của JS chỉ 32 bit nên varint/zigzag tính bằng nhân/chia thay vì `<<`/`>>`.
  */
 
-export interface GeoPoint {
-  lat: number
-  lng: number
-}
 
 /** Bảng tra ngược của bảng chữ cái, đánh số từ ký tự '-' (45). */
 const TABLE = [

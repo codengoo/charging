@@ -8,9 +8,10 @@ import {
   thinRoute,
   type RoutePath,
 } from '@/data/routeCorridor'
-import { cellOf, foldText, type StationIndex } from '@/data/stations'
+import { cellOf, type StationIndex } from '@/data/stations'
+import { foldText } from '@/lib/text'
 import type { Station } from '@/data/types'
-import type { GeoPoint } from '@/lib/flexiblePolyline'
+import type { GeoPoint } from '@/lib/geo'
 
 const KM_PER_LAT = 110.574
 const LNG0 = 105.9

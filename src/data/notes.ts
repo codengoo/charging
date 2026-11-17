@@ -3,6 +3,7 @@
  * của máy — không gửi lên server; chuyển máy bằng sao lưu (backup.ts mang theo `notes`).
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { readJson, writeJson } from '../lib/storage'
 
 export interface Note {
   text: string
@@ -40,21 +41,9 @@ export function newNotesCount(mine: NoteMap, incoming: NoteMap): number {
   return Object.entries(incoming).filter(([id, n]) => !mine[id] || mine[id].at < n.at).length
 }
 
-function load(): NoteMap {
-  try {
-    return parseNotes(JSON.parse(localStorage.getItem(NOTES_KEY) ?? 'null'))
-  } catch {
-    return {}
-  }
-}
-
-function save(notes: NoteMap) {
-  try {
-    localStorage.setItem(NOTES_KEY, JSON.stringify(notes))
-  } catch {
-    // chế độ riêng tư / đầy bộ nhớ: vẫn dùng trong phiên
-  }
-}
+const load = (): NoteMap => parseNotes(readJson(NOTES_KEY))
+/** Chế độ riêng tư / đầy bộ nhớ: vẫn dùng trong phiên. */
+const save = (notes: NoteMap) => writeJson(NOTES_KEY, notes)
 
 export function useNotes() {
   const [notes, setNotes] = useState<NoteMap>(load)

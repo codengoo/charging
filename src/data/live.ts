@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { pick } from '../i18n'
+import { HttpError, fetchJson } from '../lib/http'
 
 export interface LivePorts {
   kw: number
@@ -91,17 +92,15 @@ const MSG = pick({
 export const UNAVAILABLE = 'unavailable'
 
 async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
-  let res: Response
   try {
-    res = await fetch(path, { signal })
+    return await fetchJson<T>(path, { signal })
   } catch (e) {
-    if (signal?.aborted) throw e
-    throw new LiveError(MSG.network)
+    if (!(e instanceof HttpError)) throw e
+    if (e.status === 0) throw new LiveError(MSG.network)
+    if (e.status === 429) throw new LiveError(MSG.tooFast)
+    if (e.status === 404) throw new LiveError(UNAVAILABLE)
+    throw new LiveError(e.status === 504 ? MSG.timeout : MSG.busy)
   }
-  if (res.status === 429) throw new LiveError(MSG.tooFast)
-  if (res.status === 404) throw new LiveError(UNAVAILABLE)
-  if (!res.ok) throw new LiveError(res.status === 504 ? MSG.timeout : MSG.busy)
-  return (await res.json()) as T
 }
 
 export async function fetchLive(storeId: string, signal?: AbortSignal): Promise<LiveStatus> {

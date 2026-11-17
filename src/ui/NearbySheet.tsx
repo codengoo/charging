@@ -13,7 +13,8 @@ import type { Station, StationPower } from '../data/types'
 import { TIER_COLORS } from '../map/pins'
 import { ChargerDot } from './ChargerDot'
 import { fmtDistance, fmtKw } from '@/lib/format'
-import { cachedDrive, type DriveInfo, type LatLng } from '../data/drive'
+import { cachedDrive, type DriveInfo } from '../data/drive'
+import type { GeoPoint, GpsResult } from '../lib/geo'
 import { pick } from '../i18n'
 
 const L = pick({
@@ -81,14 +82,13 @@ interface Props {
   origin: { lat: number; lng: number }
   fromGps: boolean
   /** Điểm gốc của quãng đường lái (useStableOrigin) — để mượn kết quả cache của trạm đã mở. */
-  driveOrigin: LatLng | null
+  driveOrigin: GeoPoint | null
   /** Xin vị trí (chỉ hiện nút khi chưa có GPS). Thành công thì App đổi `origin` + `fromGps`. */
   onRequestGps: () => Promise<GpsResult>
   onPick: (st: Station) => void
   onClose: () => void
 }
 
-export type GpsResult = 'ok' | 'denied' | 'failed'
 
 /** Các trạm đang hoạt động gần nhất, theo đúng bộ lọc công suất đang bật trên bản đồ. */
 export function NearbySheet({ open, index, power, filters, origin, fromGps, driveOrigin, onRequestGps, onPick, onClose }: Props) {

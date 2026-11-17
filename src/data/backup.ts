@@ -4,8 +4,9 @@
  * hay log. Nhập luôn GỘP vào sổ hiện có — không xoá gì của máy nhận. Ghi chú cá nhân (notes.ts)
  * đi kèm trong trường `notes` (bản sao lưu cũ không có — vẫn nhập được).
  */
-import { bookFromStored, serializeBook, type GroupBook, type StoredBook } from './groups'
+import { bookFromStored, toStored, type GroupBook, type StoredBook } from './groups'
 import { newNotesCount, parseNotes, type NoteMap } from './notes'
+import { fromBase64Url, toBase64Url } from '../lib/text'
 
 export interface GroupBackup extends StoredBook {
   kind: 'tramsac.groups'
@@ -24,23 +25,12 @@ export const QR_MAX = 2000
 export const IMPORT_HASH = '#import='
 
 export function toBackup(book: GroupBook, notes: NoteMap): GroupBackup {
-  const b: GroupBackup = { ...(JSON.parse(serializeBook(book)) as StoredBook), kind: 'tramsac.groups' }
+  const b: GroupBackup = { ...toStored(book), kind: 'tramsac.groups' }
   if (Object.keys(notes).length) b.notes = notes
   return b
 }
 
 // ------------------------------------------------------------ mã hoá link
-
-function toBase64Url(bytes: Uint8Array): string {
-  let bin = ''
-  for (const b of bytes) bin += String.fromCharCode(b)
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function fromBase64Url(s: string): Uint8Array {
-  const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/'))
-  return Uint8Array.from(bin, (c) => c.charCodeAt(0))
-}
 
 async function pipe(bytes: Uint8Array, stream: CompressionStream | DecompressionStream): Promise<Uint8Array> {
   const out = new Response(new Blob([bytes as BlobPart]).stream().pipeThrough(stream))
@@ -108,7 +98,7 @@ export function mergeBooks(book: GroupBook, incoming: GroupBook): GroupBook {
     members[gid] = { ...m, ...(book.members[gid] ?? {}) }
   }
   // bookFromStored lo thứ tự nhóm (dựng sẵn trước, rồi theo tên) như lúc đọc từ kho.
-  return bookFromStored(JSON.parse(serializeBook({ groups: [...book.groups, ...added], members })) as StoredBook)
+  return bookFromStored(toStored({ groups: [...book.groups, ...added], members }))
 }
 
 /** Đếm để hiện câu xác nhận: số trạm mới (chưa nằm trong nhóm đó), số nhóm mới, số ghi chú mới / mới hơn. */

@@ -32,3 +32,11 @@ Hằng số: `CELL_SIZE` một chỗ (`stations.ts`, `routeCorridor` import); `d
 ```
 refactor(lib): gom localStorage, fetch, định vị, bỏ dấu, định dạng thời gian; xoá code không dùng
 ```
+
+## 4. Kết quả (ghi lúc thực hiện)
+
+- Thêm `src/lib/{storage,http,geo,text}.ts` (+ test cho storage, http, text). `GeoPoint` một chỗ ở `lib/geo.ts` (bỏ `LatLng` của drive.ts, `GeoPoint` của flexiblePolyline.ts); `GpsResult` + `getPosition()` thay 2 bản `getCurrentPosition` (App, useTrip). `navigator.geolocation` chỉ còn ở `lib/geo.ts` (GeolocateControl của MapView tự lo theo dõi).
+- `fmtMinutes` về `lib/format.ts`; `fmtDuration` của TripPanel bỏ (khác duy nhất: tuyến < 30 s nay hiện "1 phút" thay vì "0 phút"). `clock()` chỉ có một bản (LiveSection) nên giữ nguyên; `remaining()` của groups khác ngữ nghĩa (một đơn vị, làm tròn lên) nên giữ.
+- `CELL_SIZE`, `dcMaxKw`, `FALLBACK_KMH` một chỗ. `toStored()` thay vòng `JSON.parse(serializeBook())`. Không viết thêm `normalizeBook` — `bookFromStored(toStored(…))` đủ.
+- Xoá: `card.tsx`, `separator.tsx`, `useIsSmallScreen`, `useIsDesktop`, `ResponsiveDialogTrigger/Close`, `isSaved`, token sidebar/chart trong `index.css`.
+- Playwright (dev, proxy production): mở trạm tải đủ chi tiết / cổng trống / lịch sử / đánh giá; chặn `/api/**` → "Không có mạng — chưa lấy được số cổng trống / lịch sử", đánh giá "Không kết nối được máy chủ" — như trước.

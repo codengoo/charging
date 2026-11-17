@@ -4,6 +4,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { pick } from '../i18n'
+import { readStr, writeStr } from '../lib/storage'
+import { HttpError, errorText, fetchJson } from '../lib/http'
 
 export interface Review {
   id: number
@@ -53,40 +55,28 @@ let memDevice: string | null = null
 
 /** 32 hex ngẫu nhiên, nhớ trong localStorage (không có thì nhớ trong phiên). */
 export function deviceId(): string {
-  try {
-    const v = localStorage.getItem(DEVICE_KEY)
-    if (v && /^[0-9a-f]{32}$/.test(v)) return v
-  } catch {
-    // localStorage bị chặn
-  }
+  const v = readStr(DEVICE_KEY)
+  if (v && /^[0-9a-f]{32}$/.test(v)) return v
   if (!memDevice) {
     const b = crypto.getRandomValues(new Uint8Array(16))
     memDevice = [...b].map((x) => x.toString(16).padStart(2, '0')).join('')
   }
-  try {
-    localStorage.setItem(DEVICE_KEY, memDevice)
-  } catch {
-    // dùng trong phiên
-  }
+  writeStr(DEVICE_KEY, memDevice) // không ghi được thì dùng trong phiên
   return memDevice
 }
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
-  let res: Response
   try {
-    res = await fetch(path, {
+    return await fetchJson<T>(path, {
       ...init,
       headers: { 'X-Device': deviceId(), ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...init.headers },
     })
   } catch (e) {
-    if ((e as Error).name === 'AbortError') throw e
-    throw new ReviewError(MSG.network)
+    if (!(e instanceof HttpError)) throw e
+    if (e.status === 0) throw new ReviewError(MSG.network)
+    // Lỗi từ server đã là câu tiếng Việt cho người dùng (trang /en vẫn hiện tiếng Việt — chấp nhận).
+    throw new ReviewError(errorText(e) ?? MSG.generic, e.status)
   }
-  if (res.status === 204) return undefined as T
-  const body = (await res.json().catch(() => null)) as (T & { error?: string }) | null
-  // Lỗi từ server đã là câu tiếng Việt cho người dùng (trang /en vẫn hiện tiếng Việt — chấp nhận).
-  if (!res.ok) throw new ReviewError(body?.error ?? MSG.generic, res.status)
-  return body as T
 }
 
 export interface ReviewsState {
@@ -159,11 +149,7 @@ export function useReviews(entityId: string | null, enabled: boolean) {
     async (input: ReviewInput) => {
       if (!entityId) return
       await call<Review>(`/api/reviews/${encodeURIComponent(entityId)}`, { method: 'PUT', body: JSON.stringify(input) })
-      try {
-        localStorage.setItem(NICK_KEY, input.nickname.trim())
-      } catch {
-        // không nhớ được biệt danh — lần sau nhập lại
-      }
+      writeStr(NICK_KEY, input.nickname.trim()) // không nhớ được thì lần sau nhập lại
       reload()
     },
     [entityId, reload],
@@ -185,10 +171,4 @@ export function useReviews(entityId: string | null, enabled: boolean) {
   return { ...state, reload, loadMore, save, remove, report }
 }
 
-export function savedNickname(): string {
-  try {
-    return localStorage.getItem(NICK_KEY) ?? ''
-  } catch {
-    return ''
-  }
-}
+export const savedNickname = (): string => readStr(NICK_KEY) ?? ''

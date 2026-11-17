@@ -13,7 +13,6 @@ import {
   deleteGroup,
   expiresAt,
   groupsOf,
-  isSaved,
   newCustomId,
   parseBook,
   pinGroupOf,
@@ -121,13 +120,12 @@ describe('pruneExpired', () => {
   })
 })
 
-describe('groupsOf / isSaved / allSaved / removeFromAll / pinGroupOf', () => {
+describe('groupsOf / allSaved / removeFromAll / pinGroupOf', () => {
   const { book, id } = withTimed()
   const b = [FAVORITE, STAR, id].reduce((acc, g) => toggleMembership(acc, g, '1', NOW), book)
-  it('groupsOf theo thứ tự nhóm, isSaved, allSaved', () => {
+  it('groupsOf theo thứ tự nhóm, allSaved', () => {
     expect(groupsOf(b, '1')).toEqual([FAVORITE, STAR, id])
-    expect(isSaved(b, '1')).toBe(true)
-    expect(isSaved(b, '2')).toBe(false)
+    expect(allSaved(b).has('2')).toBe(false)
     expect([...allSaved(toggleMembership(b, PLANNED, '9', NOW))].sort()).toEqual(['1', '9'])
   })
   it('pinGroupOf: tự tạo > sẽ đến > sao > yêu thích', () => {
@@ -138,7 +136,7 @@ describe('groupsOf / isSaved / allSaved / removeFromAll / pinGroupOf', () => {
   })
   it('removeFromAll bỏ khỏi mọi nhóm', () => {
     const r = removeFromAll(b, '1')
-    expect(isSaved(r, '1')).toBe(false)
+    expect(allSaved(r).has('1')).toBe(false)
     expect(r.groups).toBe(b.groups)
   })
 })

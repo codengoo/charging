@@ -4,7 +4,7 @@ import { ChevronDown, ChevronUp, ClipboardPaste, Loader2, Route, X, Zap } from '
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { Input } from '@/components/ui/input'
-import { fmtDistance, fmtKw } from '@/lib/format'
+import { fmtDistance, fmtKw, fmtMinutes } from '@/lib/format'
 import type { RouteHits } from '../data/routeCorridor'
 import { TRIP_RADII, type TripRadius, type TripState } from '../data/useTrip'
 import type { Station, StationPower } from '../data/types'
@@ -15,9 +15,9 @@ import { arrivalPct, avgKmh, type ArrivalEstimate, type BatteryReading } from '.
 import type { Vehicle } from '../data/vehicles'
 import { BatteryControl, DANGER_PCT, fmtRange, pctOf, pctTone } from './BatteryControl'
 import { PLAN_MIN_DC_KW, accessKm, type ChargePlan } from '../data/chargePlan'
-import { fmtMinutes } from '../data/drive'
 import type { Avoid } from '../lib/mapsLink'
 import { useIsMobile } from '@/hooks/use-media-query'
+import { readStr, writeStr } from '@/lib/storage'
 
 const L = pick({
   vi: {
@@ -44,9 +44,6 @@ const L = pick({
     count: (n: number, km: number) => `${n} trạm trong ${km} km`,
     cap: (n: number) => ` (hiện ${n} trạm sát tuyến nhất)`,
     idle: 'Mở Google Maps, chỉ đường rồi bấm Chia sẻ → Trạm sạc, hoặc dán link vào đây.',
-    min: (m: number) => `${m} phút`,
-    hr: (h: number) => `${h} giờ`,
-    hrMin: (h: number, m: number) => `${h} giờ ${m} phút`,
     lastReachable: (r: number) => `Trạm cuối còn kịp (còn ≥ ${r}% pin)`,
     noneReachable: (p: number, r: number) => `Với ${p}% pin, không trạm nào chắc chắn tới được (còn ≥ ${r}%)`,
     pctAria: (p: number) => `còn khoảng ${p}% pin khi tới`,
@@ -98,9 +95,6 @@ const L = pick({
     count: (n: number, km: number) => `${n} ${n === 1 ? 'station' : 'stations'} within ${km} km`,
     cap: (n: number) => ` (showing ${n} closest to the route)`,
     idle: 'In Google Maps, get directions and tap Share → Trạm Sạc, or paste the link here.',
-    min: (m: number) => `${m} min`,
-    hr: (h: number) => `${h} h`,
-    hrMin: (h: number, m: number) => `${h} h ${m} min`,
     lastReachable: (r: number) => `Last station you can reach (≥ ${r}% battery left)`,
     noneReachable: (p: number, r: number) => `With ${p}% battery, no station is safely reachable (≥ ${r}% left)`,
     pctAria: (p: number) => `about ${p}% battery left on arrival`,
@@ -486,20 +480,9 @@ const TRIP_SHEET_FULL = 'calc(100dvh - env(safe-area-inset-top) - 8px)'
 
 /** Hộp tuỳ chọn đang mở hay thu — tiện ích riêng từng máy, lỗi storage thì mặc định mở. */
 const OPTS_KEY = 'tramsac.tripOpts'
-function readOptsOpen(): boolean {
-  try {
-    return localStorage.getItem(OPTS_KEY) !== '0'
-  } catch {
-    return true
-  }
-}
-function saveOptsOpen(open: boolean) {
-  try {
-    localStorage.setItem(OPTS_KEY, open ? '1' : '0')
-  } catch {
-    // chế độ riêng tư chặn localStorage — chỉ mất phần nhớ
-  }
-}
+const readOptsOpen = (): boolean => readStr(OPTS_KEY) !== '0'
+/** Chế độ riêng tư chặn localStorage — chỉ mất phần nhớ. */
+const saveOptsOpen = (open: boolean) => writeStr(OPTS_KEY, open ? '1' : '0')
 
 /** "2 km · tránh thu phí · ≥ 120 kW, 60–119 kW · 55%" — dòng tóm tắt khi hộp tuỳ chọn thu lại. */
 function optsSummary(trip: TripState, bands: KwBand[], pct: number | null, planOn: boolean): string {
@@ -539,7 +522,7 @@ function RoutePicker({ trip, totals, onSelect }: { trip: TripState; totals: numb
                 on ? 'border-brand bg-brand/10 text-foreground' : 'border-border bg-card text-muted-foreground hover:bg-muted'
               }`}
             >
-              <span className={`block text-sm font-semibold ${on ? 'text-brand' : 'text-foreground'}`}>{fmtDuration(r.seconds)}</span>
+              <span className={`block text-sm font-semibold ${on ? 'text-brand' : 'text-foreground'}`}>{fmtMinutes(r.seconds)}</span>
               {L.routeCard(Math.round(r.meters / 1000), totals[i] ?? 0)}
             </button>
           )
@@ -555,7 +538,7 @@ function PlanView({ plan, reservePct, onPick }: { plan: ChargePlan; reservePct: 
     ? L.planFail(Math.round(plan.stuckAtKm))
     : plan.stops.length === 0
       ? L.noStop(fmtRange(plan.arriveDest))
-      : L.planOk(plan.stops.length, fmtMinutes(plan.chargeMin * 60), fmtDuration(plan.totalSeconds), fmtRange(plan.arriveDest))
+      : L.planOk(plan.stops.length, fmtMinutes(plan.chargeMin * 60), fmtMinutes(plan.totalSeconds), fmtRange(plan.arriveDest))
   return (
     <>
       <p className={`rounded-xl px-3 py-2 text-sm ${plan.ok ? 'bg-brand/10 text-foreground' : 'bg-destructive/10 text-destructive'}`}>
@@ -645,16 +628,10 @@ function summary(trip: TripState, hits: RouteHits): string {
       const via = trip.stops.length > 2 ? L.via(trip.stops.length - 2) : ''
       const count = L.count(hits.total, trip.radiusKm)
       const cap = hits.total > hits.items.length ? L.cap(hits.items.length) : ''
-      return `${via}${Math.round(r.meters / 1000)} km · ${fmtDuration(r.seconds)} · ${count}${cap}`
+      return `${via}${Math.round(r.meters / 1000)} km · ${fmtMinutes(r.seconds)} · ${count}${cap}`
     }
     default:
       return L.idle
   }
 }
 
-function fmtDuration(seconds: number): string {
-  const m = Math.round(seconds / 60)
-  if (m < 60) return L.min(m)
-  const h = Math.floor(m / 60)
-  return m % 60 ? L.hrMin(h, m % 60) : L.hr(h)
-}

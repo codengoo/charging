@@ -3,6 +3,7 @@ import { TIER_COLORS } from '../map/pins'
 import { ChargerDot } from './ChargerDot'
 import { FAST_KW } from '../data/stations'
 import { pick } from '../i18n'
+import { readStr, writeStr } from '@/lib/storage'
 
 const KEY = 'tramsac.legend'
 
@@ -27,13 +28,7 @@ const ROWS = [
   { color: TIER_COLORS[2], label: `DC ≥ ${FAST_KW} kW` },
 ]
 
-function readOpen(): boolean {
-  try {
-    return localStorage.getItem(KEY) !== 'closed'
-  } catch {
-    return true
-  }
-}
+const readOpen = (): boolean => readStr(KEY) !== 'closed'
 
 /**
  * Chú giải màu ghim, góc dưới phải. Bấm để thu thành chấm nhỏ; nhớ lựa chọn trong localStorage
@@ -45,11 +40,7 @@ export function PowerLegend() {
   function toggle() {
     const next = !open
     setOpen(next)
-    try {
-      localStorage.setItem(KEY, next ? 'open' : 'closed')
-    } catch {
-      // bỏ qua
-    }
+    writeStr(KEY, next ? 'open' : 'closed')
   }
 
   return (
