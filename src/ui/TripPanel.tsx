@@ -197,7 +197,7 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
   return (
     <section
       aria-label={L.title}
-      className="absolute inset-x-0 bottom-0 z-[6] flex max-h-[60dvh] flex-col rounded-t-2xl bg-card shadow-[0_-8px_30px_rgba(0,0,0,0.12)] sm:inset-x-auto sm:bottom-14 sm:left-3 sm:max-h-[calc(100dvh-11rem)] sm:w-[380px] sm:rounded-2xl sm:shadow-xl"
+      className="absolute inset-x-0 bottom-0 z-[6] flex max-h-[60dvh] flex-col rounded-t-2xl pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0 bg-card shadow-[0_-8px_30px_rgba(0,0,0,0.12)] sm:inset-x-auto sm:bottom-14 sm:left-3 sm:max-h-[calc(100dvh-11rem)] sm:w-[380px] sm:rounded-2xl sm:shadow-xl"
     >
       <button
         type="button"
@@ -230,7 +230,8 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
       </p>
 
       {expanded && (
-        <div className="flex min-h-0 flex-1 flex-col gap-2 px-4 pb-3">
+        // Cả thân bảng cuộn chung: hộp cấu hình + thẻ tuyến đã cao, để riêng danh sách cuộn thì nó bị ép về 0.
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain px-4 pb-3 [&>*]:shrink-0">
           <form onSubmit={submit} className="flex gap-2">
             <Input
               value={text}
@@ -309,7 +310,7 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
           {planOn && plan && <PlanView plan={plan} onPick={onPick} />}
 
           {!(planOn && plan) && hits.items.length > 0 && (
-            <ul className="-mx-4 min-h-0 flex-1 overflow-y-auto px-4" aria-label={L.listAria}>
+            <ul className="-mx-4 px-4" aria-label={L.listAria}>
               {estimates && lastOk === -1 && <ReachDivider text={L.noneReachable(startPct)} />}
               {hits.items.map(({ station, atKm, offsetKm }, i) => {
                 const p = power?.get(station.entityId)
@@ -402,7 +403,7 @@ function PlanView({ plan, onPick }: { plan: ChargePlan; onPick: (st: Station) =>
         <span className="mt-0.5 block text-[11px] text-muted-foreground">{L.planNote}</span>
       </p>
       {plan.stops.length > 0 && (
-        <ol className="-mx-4 min-h-0 flex-1 overflow-y-auto px-4" aria-label={L.planAria}>
+        <ol className="-mx-4 px-4" aria-label={L.planAria}>
           {plan.stops.map((s, i) => (
             <li key={s.item.station.entityId} className="border-b border-border/60 last:border-b-0">
               <button type="button" onClick={() => onPick(s.item.station)} className="flex w-full items-center gap-3 py-2.5 text-left">
