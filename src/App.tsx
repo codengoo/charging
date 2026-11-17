@@ -123,6 +123,11 @@ export function App() {
 
   useUrlSync({ index, selected, tripCtl, pick, askImport })
   const tripOpen = trip.status !== 'closed'
+  // Giữ bảng Dọc đường trong cây sau lần mở đầu: gỡ ngay khi đóng thì drawer mất luôn, không trượt xuống.
+  const [tripMounted, setTripMounted] = useState(false)
+  useEffect(() => {
+    if (tripOpen) setTripMounted(true)
+  }, [tripOpen])
 
   const plan = useTripPlan({
     trip,
@@ -219,8 +224,9 @@ export function App() {
 
       {settings.showLegend && <PowerLegend />}
 
-      {tripOpen && (
+      {tripMounted && (
         <TripPanel
+          visible={tripOpen}
           trip={trip}
           hits={hits}
           power={power}

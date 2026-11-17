@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type FormEvent } from 'react'
+import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Drawer as DrawerPrimitive } from 'vaul'
 import { ChevronDown, ChevronUp, ClipboardPaste, Loader2, Route, X, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -126,6 +126,8 @@ const L = pick({
 })
 
 interface Props {
+  /** Đang mở hành trình. Đóng thì vẫn gắn để drawer chạy hiệu ứng trượt xuống. */
+  visible: boolean
   trip: TripState
   hits: RouteHits
   power: Map<string, StationPower> | null
@@ -161,7 +163,12 @@ interface Props {
  * tuyến, và bảng chi tiết trạm mở đè lên được. Điện thoại: dải dưới đáy, bấm tay cầm để thu/mở.
  * Màn rộng: thẻ nổi góc trái.
  */
-export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, routeTotals, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, onClose, vehicle, climate, reservePct, battery, batteryStale, onBattery, planOn, plan, onTogglePlan }: Props) {
+export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, stationOpen, onOpen, onRadius, routeTotals, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, onClose, vehicle, climate, reservePct, battery, batteryStale, onBattery, planOn, plan, onTogglePlan }: Props) {
+  // Đóng xong App xoá hành trình ngay; giữ bản lúc còn mở để bảng không chớp sang trạng thái trống
+  // trong lúc trượt xuống.
+  const last = useRef({ trip: tripNow, hits: hitsNow })
+  if (visible) last.current = { trip: tripNow, hits: hitsNow }
+  const { trip, hits } = visible ? { trip: tripNow, hits: hitsNow } : last.current
   const [text, setText] = useState(trip.link ?? '')
   const isMobile = useIsMobile()
   // Màn rộng: thẻ nổi thu/mở. Điện thoại: drawer vaul 3 mốc, "thu" = mốc thấp (chỉ còn tiêu đề).
@@ -171,6 +178,10 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
   const setOpen = (v: boolean) => (isMobile ? setSnap(v ? TRIP_SNAP_MID : TRIP_SNAP_PEEK) : setExpanded(v))
   // Link đổi từ ngoài (mở /trip?link=…, share target) → ô nhập theo.
   useEffect(() => setText(trip.link ?? ''), [trip.link])
+  // Mở lại hành trình → về mốc giữa.
+  useEffect(() => {
+    if (visible) setSnap(TRIP_SNAP_MID)
+  }, [visible])
   useEffect(() => {
     if (stationOpen) {
       setExpanded(false)
@@ -434,7 +445,7 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
       // Không chặn bản đồ (modal={false}, không lớp phủ), không vuốt để đóng — đóng bằng nút ✕.
       // snapPoints: vaul tự chia cử chỉ — chưa ở mốc cao nhất thì vuốt là kéo bảng, ở mốc cao nhất mới cuộn.
       <DrawerPrimitive.Root
-        open
+        open={visible}
         modal={false}
         dismissible={false}
         snapPoints={TRIP_SNAPS}
@@ -458,6 +469,7 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
     )
   }
 
+  if (!visible) return null
   return (
     <section
       aria-label={L.title}
