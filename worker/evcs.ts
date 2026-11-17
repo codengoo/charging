@@ -12,6 +12,12 @@
 // và EVCS vốn đã cache phía họ ~5 phút, gọi dày hơn không tươi hơn mà dễ bị chặn nhịp.
 
 const SITE = 'https://evcs.vn'
+/**
+ * /charging và /search gọi qua host phụ: Cloudflare của EVCS chặn hai đường này trên evcs.vn khi
+ * request đi từ Worker (403), còn www1 thì qua (www2 cũng bị chặn). Referer vẫn là
+ * trang evcs.vn — /charging đòi Referer thuộc evcs.vn.
+ */
+const API = 'https://www1.evcs.vn'
 const WS_URL = 'https://www2.evcs.vn/socket.io/?EIO=4&transport=websocket'
 const UA =
   'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36'
@@ -74,7 +80,7 @@ async function getTokens(storeId: string): Promise<{ charge: string; api: string
 
 async function liveOnce(storeId: string): Promise<string> {
   const t = await getTokens(storeId)
-  const res = await fetch(`${SITE}/charging`, {
+  const res = await fetch(`${API}/charging`, {
     method: 'POST',
     headers: { ...browser(pageOf(storeId)), 'x-t': t.charge, 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: storeId, t: 'vinfast' }),
@@ -187,7 +193,7 @@ async function history(storeId: string): Promise<Response> {
  */
 async function nearby(at: string): Promise<Response> {
   const [lat, lng] = at.split(',').map(Number)
-  const res = await fetch(`${SITE}/search`, {
+  const res = await fetch(`${API}/search`, {
     method: 'POST',
     headers: { ...browser(`${SITE}/`), 'Content-Type': 'application/json' },
     body: JSON.stringify({ latitude: lat, longitude: lng }),
