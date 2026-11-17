@@ -258,7 +258,8 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
       {expanded && (
         // Cả thân bảng cuộn chung: hộp cấu hình + thẻ tuyến đã cao, để riêng danh sách cuộn thì nó bị ép về 0.
         // overflow-x-hidden: overflow-y-auto kéo theo cuộn ngang, phần lề âm -mx-4 sẽ kéo lệch được.
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-3 [&>*]:shrink-0">
+        // pt-1: vùng cuộn cắt mọi thứ tràn ra — chừa chỗ cho viền focus (ring 3px) của ô link.
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pt-1 pb-3 [&>*]:shrink-0">
           <form onSubmit={submit} className="flex gap-2">
             <Input
               value={text}
