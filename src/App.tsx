@@ -22,6 +22,7 @@ import { vehicleOf } from './data/vehicles'
 import { useResolvedTheme } from './lib/theme'
 import { ImportDialog, pendingImport, type PendingImport } from './ui/ImportDialog'
 import { useNotes } from './data/notes'
+import { usePlaces } from './data/places'
 import { useReviews } from './data/reviews'
 import { TripPanel } from './ui/TripPanel'
 import { useTrip } from './data/useTrip'
@@ -82,6 +83,7 @@ export function App() {
   const [nearby, setNearby] = useState<Nearby | null>(null)
   const groups = useGroupBook()
   const notes = useNotes()
+  const places = usePlaces()
   const { book } = groups
   const isMobile = useIsMobile()
   const { settings, update: updateSettings } = useSettings()
@@ -103,8 +105,8 @@ export function App() {
   const { trip, hits } = tripCtl
   // Giữ lần nhập cuối để hộp xác nhận còn nội dung lúc trôi xuống.
   const [pending, setPending] = useState<PendingImport | null>(null)
-  function askImport(incoming: Parameters<typeof pendingImport>[2]) {
-    setPending(pendingImport(book, notes.notes, incoming))
+  function askImport(incoming: Parameters<typeof pendingImport>[3]) {
+    setPending(pendingImport(book, notes.notes, places.places, incoming))
     sheets.open('import')
   }
   const savedCount = allSaved(book).size
@@ -336,6 +338,7 @@ export function App() {
           open={sheets.is('backup')}
           book={book}
           notes={notes.notes}
+          places={places.places}
           onImportFile={(incoming) => {
             sheets.close('saved')
             askImport(incoming)
@@ -360,6 +363,7 @@ export function App() {
         onConfirm={(incoming) => {
           groups.merge(incoming.book)
           notes.merge(incoming.notes)
+          places.merge(incoming.places)
           sheets.close('import')
           sheets.open('saved') // cho thấy ngay các trạm vừa gộp
         }}

@@ -7,6 +7,7 @@ import { shareOrigin } from '@/lib/stationUrl'
 import { allSaved, type GroupBook } from '../data/groups'
 import { QR_MAX, backupUrl, readBackupFile, toBackup, type Backup } from '../data/backup'
 import type { NoteMap } from '../data/notes'
+import type { Place } from '../data/places'
 import { pick } from '../i18n'
 import { AppSheet } from './AppSheet'
 import { useCopy, useQrCanvas } from './useQrCanvas'
@@ -49,13 +50,14 @@ interface Props {
   open: boolean
   book: GroupBook
   notes: NoteMap
+  places: Place[]
   /** Đã đọc được file sao lưu — App mở hộp xác nhận gộp. null = file không đọc được. */
   onImportFile: (incoming: Backup | null) => void
   onClose: () => void
 }
 
 /** Sao lưu / chuyển sổ nhóm: QR + link `#import=`, tải file .json, nhập từ file. */
-export function BackupSheet({ open, book, notes, onImportFile, onClose }: Props) {
+export function BackupSheet({ open, book, notes, places, onImportFile, onClose }: Props) {
   const [link, setLink] = useState<string | null>(null)
   const { copied, copy, reset: resetCopied } = useCopy(link)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -68,11 +70,11 @@ export function BackupSheet({ open, book, notes, onImportFile, onClose }: Props)
     if (!open) return
     let alive = true
     resetCopied()
-    void backupUrl(shareOrigin(), book, notes).then((u) => alive && setLink(u))
+    void backupUrl(shareOrigin(), book, notes, places).then((u) => alive && setLink(u))
     return () => {
       alive = false
     }
-  }, [open, book, notes])
+  }, [open, book, notes, places])
 
   const showQr = link !== null && link.length <= QR_MAX
   const { ref: setQr, size: qrDisplaySize } = useQrCanvas(showQr ? link : null)
@@ -87,7 +89,7 @@ export function BackupSheet({ open, book, notes, onImportFile, onClose }: Props)
   }
 
   function downloadFile() {
-    const blob = new Blob([JSON.stringify(toBackup(book, notes), null, 1)], { type: 'application/json' })
+    const blob = new Blob([JSON.stringify(toBackup(book, notes, places), null, 1)], { type: 'application/json' })
     const d = new Date()
     const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
     downloadBlob(blob, `tramsac-nhom-${ymd}.json`)

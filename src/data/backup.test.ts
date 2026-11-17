@@ -37,7 +37,7 @@ describe('encodeBackup / decodeBackup', () => {
     const s = await encodeBackup(toBackup(book, NOTES))
     expect(s.startsWith('z.')).toBe(true)
     expect(s).toMatch(/^z\.[A-Za-z0-9_-]+$/)
-    expect(await decodeBackup(s)).toEqual({ book, notes: NOTES })
+    expect(await decodeBackup(s)).toEqual({ book, notes: NOTES, places: [] })
   })
   it('j. (JSON thô) cũng đọc được; file sửa tay thiếu kind vẫn nhận', async () => {
     const r = await decodeBackup(jPayload({ members: { favorite: { '9': 1 } } }))
@@ -86,10 +86,19 @@ describe('diffCount', () => {
       members: { [FAVORITE]: { '7': 1, '8': 2 }, [STAR]: { '7': 1 }, cz: { '8': 1 } },
     }
     const notes: NoteMap = { '7': { text: 'mới hơn', at: NOW + 1 }, '8': { text: 'x', at: 1 } }
-    expect(diffCount(book, NOTES, { book: incoming, notes })).toEqual({ stations: 2, groups: 1, notes: 2 })
+    expect(diffCount(book, NOTES, { book: incoming, notes, places: [] })).toEqual({ stations: 2, groups: 1, notes: 2, places: 0 })
   })
   it('bản sao lưu giống hệt → toàn 0', () => {
     const { book } = sample()
-    expect(diffCount(book, NOTES, { book, notes: NOTES })).toEqual({ stations: 0, groups: 0, notes: 0 })
+    expect(diffCount(book, NOTES, { book, notes: NOTES, places: [] })).toEqual({ stations: 0, groups: 0, notes: 0, places: 0 })
+  })
+  it('địa điểm: mang theo trong sao lưu, đếm cái mới / mới hơn', async () => {
+    const { book } = sample()
+    const home = { id: 'home', kind: 'home' as const, name: '', lat: 21, lng: 105.8, address: 'A', at: 5 }
+    const s = await encodeBackup(toBackup(book, NOTES, [home]))
+    const back = await decodeBackup(s)
+    expect(back?.places).toEqual([home])
+    expect(diffCount(book, NOTES, back!, [])).toMatchObject({ places: 1 })
+    expect(diffCount(book, NOTES, back!, [{ ...home, at: 9 }])).toMatchObject({ places: 0 })
   })
 })
