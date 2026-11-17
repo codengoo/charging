@@ -319,3 +319,14 @@ function stopOf(raw: string): TripStop {
   }
   return { text: raw.trim() }
 }
+
+/**
+ * Link chỉ đường Google Maps tới `dest` (từ `origin`, bỏ trống = vị trí hiện tại). Mở bằng
+ * trip.open như link người dùng dán — parseMapsUrl đọc được, URL /trip?link=… chia sẻ được.
+ */
+export function directionsLink(dest: GeoPoint, origin?: GeoPoint | null): string {
+  const pt = (p: GeoPoint) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`
+  const q = new URLSearchParams({ api: '1', destination: pt(dest) })
+  if (origin) q.set('origin', pt(origin))
+  return `https://www.google.com/maps/dir/?${q}`
+}

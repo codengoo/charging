@@ -5,6 +5,7 @@ import type { Station, StationPower } from '../data/types'
 import type { Filters, StationIndex } from '../data/stations'
 import type { GroupBook } from '../data/groups'
 import { distanceKm } from '../lib/geo'
+import { createPlaceMarkers, type MapPlace } from './placeMarkers'
 import {
   OWN_SOURCES,
   SRC,
@@ -52,15 +53,28 @@ interface Props {
   onPickRoute?: (idx: number) => void
   /** Nền bản đồ theo giao diện sáng / tối. */
   theme?: 'light' | 'dark'
+  /** Địa điểm hay dùng (Nhà, Công ty…) vẽ thành ghim; bấm → onPlaceClick. */
+  places?: MapPlace[]
+  onPlaceClick?: (id: string) => void
+  /** Chạm giữ (điện thoại) / chuột phải (máy tính) trên bản đồ. */
+  onLongPress?: (p: { lat: number; lng: number }) => void
+  /** Ghim tạm ở điểm vừa chạm giữ (đang mở bảng "Chỗ này"). */
+  pinAt?: { lat: number; lng: number } | null
 }
 
-export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate, onMoveEnd, trip = null, onPickRoute, theme = 'light' }: Props) {
+/** Giữ ngón tay chừng này (ms) không di chuyển quá LONG_PRESS_SLOP px thì coi là chạm giữ. */
+const LONG_PRESS_MS = 550
+const LONG_PRESS_SLOP = 10
+
+export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate, onMoveEnd, trip = null, onPickRoute, theme = 'light', places = [], onPlaceClick, onLongPress, pinAt = null }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const loadedRef = useRef(false)
   // Giá trị mới nhất cho các handler đăng ký một lần trong lúc khởi tạo.
-  const latest = useRef({ index, filters, book, power, selected, onSelect, onLocate, onMoveEnd, trip, onPickRoute })
-  latest.current = { index, filters, book, power, selected, onSelect, onLocate, onMoveEnd, trip, onPickRoute }
+  const latest = useRef({ index, filters, book, power, selected, onSelect, onLocate, onMoveEnd, trip, onPickRoute, onPlaceClick, onLongPress })
+  latest.current = { index, filters, book, power, selected, onSelect, onLocate, onMoveEnd, trip, onPickRoute, onPlaceClick, onLongPress }
+  const placeMarkers = useRef<ReturnType<typeof createPlaceMarkers> | null>(null)
+  const pinMarker = useRef<maplibregl.Marker | null>(null)
 
   // Khởi tạo map một lần.
   useEffect(() => {
@@ -103,6 +117,35 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
       if (g._watchState === 'WAITING_ACTIVE') g._watchState = 'BACKGROUND'
     })
 
+    // Chạm giữ: maplibre không phát sự kiện riêng, iOS Safari cũng không bắn contextmenu khi chạm giữ
+    // — tự đo trên touch. Máy tính / Android còn có contextmenu (chuột phải / chạm giữ) — chặn bắn đôi.
+    let pressTimer: ReturnType<typeof setTimeout> | null = null
+    let pressAt: maplibregl.Point | null = null
+    let lastLongPress = 0
+    const fireLongPress = (ll: maplibregl.LngLat) => {
+      if (Date.now() - lastLongPress < 800) return
+      lastLongPress = Date.now()
+      latest.current.onLongPress?.({ lat: ll.lat, lng: ll.lng })
+    }
+    const cancelPress = () => {
+      if (pressTimer) clearTimeout(pressTimer)
+      pressTimer = null
+      pressAt = null
+    }
+    map.on('touchstart', (e) => {
+      cancelPress()
+      if (e.originalEvent.touches.length !== 1) return
+      pressAt = e.point
+      const ll = e.lngLat
+      pressTimer = setTimeout(() => fireLongPress(ll), LONG_PRESS_MS)
+    })
+    map.on('touchmove', (e) => {
+      if (pressAt && e.point.dist(pressAt) > LONG_PRESS_SLOP) cancelPress()
+    })
+    map.on('touchend', cancelPress)
+    map.on('touchcancel', cancelPress)
+    map.on('contextmenu', (e) => fireLongPress(e.lngLat))
+
     map.on('moveend', () => {
       const c = map.getCenter()
       latest.current.onMoveEnd?.({ lat: c.lat, lng: c.lng, zoom: map.getZoom() })
@@ -127,6 +170,8 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
       })
 
       loadedRef.current = true
+      placeMarkers.current = createPlaceMarkers(map, (id) => latest.current.onPlaceClick?.(id))
+      placeMarkers.current.sync(latestPlaces.current)
       applyTrip(map, latest.current.trip, idx, b, p)
       void ensurePinImages(map, latest.current.book.groups)
       // Thử lấy vị trí người dùng ngay lần mở (mirror: mở app là về vị trí hiện tại).
@@ -204,6 +249,23 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
     if (!map || !t?.bounds) return
     map.fitBounds(t.bounds, { padding: t.padding, duration: 800 })
   }, [boundsKey])
+
+  // Địa điểm hay dùng → ghim (đồng bộ theo danh sách; lần đầu đồng bộ trong 'load').
+  const latestPlaces = useRef(places)
+  latestPlaces.current = places
+  useEffect(() => {
+    placeMarkers.current?.sync(places)
+  }, [places])
+  useEffect(() => () => placeMarkers.current?.destroy(), [])
+
+  // Ghim tạm ở điểm chạm giữ.
+  useEffect(() => {
+    const map = mapRef.current
+    pinMarker.current?.remove()
+    pinMarker.current = null
+    if (!map || !pinAt) return
+    pinMarker.current = new maplibregl.Marker({ color: '#009966' }).setLngLat([pinAt.lng, pinAt.lat]).addTo(map)
+  }, [pinAt])
 
   // Bay tới trạm/địa điểm được chọn từ ngoài.
   useEffect(() => {

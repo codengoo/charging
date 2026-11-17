@@ -24,6 +24,8 @@ import { ImportDialog, pendingImport, type PendingImport } from './ui/ImportDial
 import { useNotes } from './data/notes'
 import { placeName, usePlaces } from './data/places'
 import { PlacesSheet, type PlaceDraft } from './ui/PlacesSheet'
+import { PointSheet } from './ui/PointSheet'
+import { directionsLink } from './lib/mapsLink'
 import { useReviews } from './data/reviews'
 import { TripPanel } from './ui/TripPanel'
 import { useTrip } from './data/useTrip'
@@ -59,6 +61,8 @@ const T = tr({
 interface Nearby {
   origin: { lat: number; lng: number }
   fromGps: boolean
+  /** Gốc là địa điểm / điểm chạm giữ — tiêu đề "Trạm gần <label>". */
+  label?: string
 }
 
 export function App() {
@@ -114,6 +118,17 @@ export function App() {
     sheets.close('settings')
     sheets.open('places')
   }
+
+  // Chạm giữ bản đồ / bấm ghim địa điểm → bảng "Chỗ này".
+  const [point, setPoint] = useState<{ at: { lat: number; lng: number }; placeId: string | null } | null>(null)
+  function openPoint(at: { lat: number; lng: number }, placeId: string | null) {
+    setPoint({ at, placeId })
+    sheets.open('point')
+  }
+  const mapPlaces = useMemo(
+    () => places.places.map((p) => ({ id: p.id, kind: p.kind, name: placeName(p), lat: p.lat, lng: p.lng })),
+    [places.places],
+  )
 
   function askImport(incoming: Parameters<typeof pendingImport>[3]) {
     setPending(pendingImport(book, notes.notes, places.places, incoming))
@@ -209,6 +224,13 @@ export function App() {
         }}
         trip={plan.layer}
         onPickRoute={tripCtl.selectRoute}
+        places={mapPlaces}
+        onPlaceClick={(id) => {
+          const pl = places.places.find((x) => x.id === id)
+          if (pl) openPoint({ lat: pl.lat, lng: pl.lng }, id)
+        }}
+        onLongPress={(pt) => openPoint(pt, null)}
+        pinAt={sheets.is('point') && point && !point.placeId ? point.at : null}
       />
 
       {/* Status bar trong suốt (PWA iOS): chữ giờ/pin luôn trắng — dải mờ tối cho đọc được trên nền bản đồ sáng.
@@ -388,6 +410,7 @@ export function App() {
           filters={filters}
           origin={nearby.origin}
           fromGps={nearby.fromGps}
+          originLabel={nearby.label}
           driveOrigin={driveOrigin}
           onRequestGps={requestGps}
           onPick={(st) => {
@@ -415,6 +438,34 @@ export function App() {
         onRemove={places.remove}
         near={userPos ?? mapCenter.current}
         draft={placeDraft}
+      />
+
+      <PointSheet
+        open={sheets.is('point')}
+        onClose={() => sheets.close('point')}
+        point={point?.at ?? null}
+        place={places.places.find((x) => x.id === point?.placeId) ?? null}
+        places={places.places}
+        onRoute={(pt) => {
+          sheets.close('point')
+          setSelected(null)
+          tripCtl.open(directionsLink(pt))
+        }}
+        onNearby={(pt, label) => {
+          sheets.close('point')
+          setNearby({ origin: pt, fromGps: false, label })
+          sheets.open('nearby')
+        }}
+        onSave={(kind, pt, label) => {
+          sheets.close('point')
+          // Nhà / Công ty lưu luôn; địa điểm khác cần đặt tên → màn đặt địa điểm.
+          if (kind === 'custom') openPlaces({ kind, lat: pt.lat, lng: pt.lng, label })
+          else places.save({ id: kind, kind, name: '', lat: pt.lat, lng: pt.lng, address: label })
+        }}
+        onEditPlaces={() => {
+          sheets.close('point')
+          openPlaces(null)
+        }}
       />
 
       <ChangelogModal open={sheets.is('changelog')} onClose={() => sheets.close('changelog')} />

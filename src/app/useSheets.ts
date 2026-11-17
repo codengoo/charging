@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 
 /** Các bảng / hộp thoại App giữ cờ mở (bảng trạm mở theo `selected`, không nằm ở đây). */
-export type SheetName = 'groups' | 'share' | 'car' | 'saved' | 'backup' | 'import' | 'nearby' | 'settings' | 'changelog' | 'scan' | 'places'
+export type SheetName = 'groups' | 'share' | 'car' | 'saved' | 'backup' | 'import' | 'nearby' | 'settings' | 'changelog' | 'scan' | 'places' | 'point'
 
 /**
  * Bảng con mở chồng trong cây hộp thoại của bảng cha: đóng cha thì đóng luôn con, không thì con
