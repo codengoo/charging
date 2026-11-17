@@ -59,16 +59,33 @@ describe('planCharging', () => {
     expect(p.totalSeconds).toBeCloseTo(30_000 + (34 / 112.5) * 3600, 6)
   })
 
-  it('hai điểm dừng: điểm đầu sạc lên 80%, điểm cuối vừa đủ', () => {
+  it('hai điểm dừng: chia mức sạc giữa hai trạm sao cho tổng thời gian ít nhất; điểm cuối vừa đủ', () => {
     const { items, power } = every100(700)
     const p = planCharging(items, power, route(700), 80, V, false, RESERVE)
     expect(p.ok).toBe(true)
     if (!p.ok) return
-    expect(p.stops.map((s) => [s.item.atKm, s.toPct])).toEqual([
-      [300, 80],
-      [600, 32],
-    ])
+    expect(p.stops.map((s) => s.item.atKm)).toEqual([300, 600])
+    expect(p.stops[0].toPct).toBeLessThanOrEqual(80)
+    expect(p.stops[1].toPct).toBe(32)
+    // Công suất phẳng → tổng thời gian = tổng điện nạp, không phụ thuộc chia ở trạm nào (60% + 12%).
     expect(p.chargeMin).toBeCloseTo((60 / 112.5) * 60 + (12 / 112.5) * 60, 6)
+  })
+
+  it('ít lần sạc thắng: một lần dừng ở trạm chậm hơn hai lần dừng ở trạm nhanh', () => {
+    // 600 km từ 80%: trạm 60 kW ở km 300 đủ một lần dừng; trạm 150 kW ở km 200 / 400 thì mỗi trạm
+    // một mình không đủ (200 → đích cần 96%; 400 không tới được từ đầu) → phải dừng cả hai.
+    const items = [item('f200', 200), item('slow300', 300), item('f400', 400)]
+    const power = powerOf([['f200', dc(150)], ['slow300', dc(60)], ['f400', dc(150)]])
+    const p = planCharging(items, power, route(600), 80, V, false, RESERVE)
+    expect(p.stops.map((s) => s.item.station.entityId)).toEqual(['slow300'])
+  })
+
+  it('cùng số lần sạc: trạm sạc nhanh hơn thắng dù gần hơn', () => {
+    // Một lần dừng là đủ ở cả km 200 (150 kW) lẫn km 300 (50 kW): trạm 150 kW sạc nhanh hơn hẳn.
+    const items = [item('fast200', 200), item('slow300', 300)]
+    const power = powerOf([['fast200', dc(150)], ['slow300', dc(50)]])
+    const p = planCharging(items, power, route(500), 80, V, false, RESERVE)
+    expect(p.stops.map((s) => s.item.station.entityId)).toEqual(['fast200'])
   })
 
   it('kẹt: không trạm nào tới được → ok:false, stuckAtKm = chỗ đang đứng', () => {
