@@ -43,3 +43,17 @@ mở lại drawer ──▶ compact (state nằm trong content, gỡ khi đóng)
 
 - vaul tự đặt style khi bàn phím mở (repositionInputs) → có thể đè max-height lúc gõ; chấp nhận, kiểm bằng ô tìm kiếm trong Cài đặt nếu thấy lỗi.
 - Nội dung đổi chiều cao khi đang nâng (tải xong live/đánh giá) → không tự thu; chấp nhận.
+
+## 10. Đổi hướng v2 (cùng ngày): dùng snapPoints của vaul
+
+Người dùng thử bản v1 (đổi max-height theo scrollTop) thấy "dại": muốn chừng nào drawer chưa lên hết thì cú vuốt là KÉO DRAWER, lên hết rồi mới cuộn nội dung — kiểu sheet bản đồ. Bản tự viết bằng touch event bị bỏ, chọn thư viện có sẵn:
+
+| Câu hỏi | Lựa chọn |
+|---|---|
+| Thư viện | vaul (đã dùng). Với `snapPoints`, `shouldDrag` của vaul: chưa ở mốc cao nhất → kéo drawer; ở mốc cao nhất → cuộn; nội dung ở top + vuốt xuống → kéo drawer. |
+| ResponsiveDialog | Nội dung dài hơn 60% (đo bằng ResizeObserver trên lớp bọc trong) → `snapPoints [0.6, 1]`, drawer cao cố định sát dưới status bar, bỏ `data-vaul-no-drag`. Ngắn → như cũ. |
+| Cuộn nội dung | Chỉ `overflow-y-auto` khi ở mốc cao nhất (cách ví dụ chính thức của vaul) — mốc thấp cú vuốt là của drawer. |
+| Bảng Dọc đường | Điện thoại: drawer vaul không chặn bản đồ (`modal={false}`, `dismissible={false}`, không overlay), 3 mốc `118px` (tiêu đề + tóm tắt, thay cho "thu bảng") / 0.6 / 1. Không tự focus ô link. Màn rộng: thẻ nổi như cũ. |
+| Hạn chế | Kéo tới mốc cao nhất thì dừng; muốn cuộn nội dung phải vuốt thêm một lần (vaul không nối liền một cú vuốt). |
+
+`src/lib/useExpandOnScroll.ts` xoá.

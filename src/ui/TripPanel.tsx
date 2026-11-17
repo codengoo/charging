@@ -1,4 +1,5 @@
-import { Fragment, useEffect, useState, type CSSProperties, type FormEvent } from 'react'
+import { Fragment, useEffect, useState, type FormEvent } from 'react'
+import { Drawer as DrawerPrimitive } from 'vaul'
 import { ChevronDown, ChevronUp, ClipboardPaste, Loader2, Route, X, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
@@ -16,7 +17,7 @@ import { BatteryControl, DANGER_PCT, fmtRange, pctOf, pctTone } from './BatteryC
 import { PLAN_MIN_DC_KW, accessKm, type ChargePlan } from '../data/chargePlan'
 import { fmtMinutes } from '../data/drive'
 import type { Avoid } from '../lib/mapsLink'
-import { SHEET_COMPACT, SHEET_EXPANDED, SHEET_TRANSITION, useExpandOnScroll } from '../lib/useExpandOnScroll'
+import { useIsMobile } from '@/hooks/use-media-query'
 
 const L = pick({
   vi: {
@@ -167,15 +168,20 @@ interface Props {
  */
 export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, routeTotals, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, onClose, vehicle, climate, reservePct, battery, batteryStale, onBattery, planOn, plan, onTogglePlan }: Props) {
   const [text, setText] = useState(trip.link ?? '')
+  const isMobile = useIsMobile()
+  // Màn rộng: thẻ nổi thu/mở. Điện thoại: drawer vaul 3 mốc, "thu" = mốc thấp (chỉ còn tiêu đề).
   const [expanded, setExpanded] = useState(true)
+  const [snap, setSnap] = useState<number | string | null>(TRIP_SNAP_MID)
+  const open = isMobile ? snap !== TRIP_SNAP_PEEK : expanded
+  const setOpen = (v: boolean) => (isMobile ? setSnap(v ? TRIP_SNAP_MID : TRIP_SNAP_PEEK) : setExpanded(v))
   // Link đổi từ ngoài (mở /trip?link=…, share target) → ô nhập theo.
   useEffect(() => setText(trip.link ?? ''), [trip.link])
   useEffect(() => {
-    if (stationOpen) setExpanded(false)
+    if (stationOpen) {
+      setExpanded(false)
+      setSnap(TRIP_SNAP_PEEK)
+    }
   }, [stationOpen])
-
-  // Điện thoại: cuộn thân bảng thì nâng gần full, cuộn ngược tới top thì về 60dvh. Màn rộng giữ sm:max-h.
-  const sheet = useExpandOnScroll()
   const [optsOpen, setOptsOpen] = useState(readOptsOpen)
   function toggleOpts() {
     setOptsOpen((v) => {
@@ -212,7 +218,7 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
     e.preventDefault()
     if (text.trim()) {
       onOpen(text.trim())
-      setExpanded(true)
+      setOpen(true)
     }
   }
 
@@ -228,17 +234,13 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
     }
   }
 
-  return (
-    <section
-      aria-label={L.title}
-      style={{ '--sheet-max': sheet.expanded ? SHEET_EXPANDED : SHEET_COMPACT, transition: SHEET_TRANSITION } as CSSProperties}
-      className="absolute inset-x-0 bottom-0 z-[6] flex max-h-(--sheet-max) flex-col rounded-t-2xl pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0 bg-card shadow-[0_-8px_30px_rgba(0,0,0,0.12)] sm:inset-x-auto sm:bottom-14 sm:left-3 sm:max-h-[calc(100dvh-11rem)] sm:w-[380px] sm:rounded-2xl sm:shadow-xl"
-    >
+  const inner = (
+    <>
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
-        aria-label={expanded ? L.collapse : L.expand}
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-label={open ? L.collapse : L.expand}
         className="flex justify-center pt-2 pb-1 sm:hidden"
       >
         <span className="h-1.5 w-10 rounded-full bg-muted-foreground/30" />
@@ -249,8 +251,8 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
         <h2 className="min-w-0 flex-1 truncate text-base font-bold">
           {trip.stops.length > 1 ? trip.stops.map((s) => s.label).join(' → ') : L.title}
         </h2>
-        {!expanded && (
-          <Button variant="ghost" size="icon-sm" aria-label={L.openPanel} onClick={() => setExpanded(true)}>
+        {!open && (
+          <Button variant="ghost" size="icon-sm" aria-label={L.openPanel} onClick={() => setOpen(true)}>
             <ChevronUp />
           </Button>
         )}
@@ -264,13 +266,16 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
         {summary(trip, hits)}
       </p>
 
-      {expanded && (
+      {/* Điện thoại luôn dựng thân bảng (mốc thấp chỉ đẩy nó xuống dưới mép màn hình) để kéo lên là thấy ngay. */}
+      {(isMobile || expanded) && (
         // Cả thân bảng cuộn chung: hộp cấu hình + thẻ tuyến đã cao, để riêng danh sách cuộn thì nó bị ép về 0.
         // overflow-x-hidden: overflow-y-auto kéo theo cuộn ngang, phần lề âm -mx-4 sẽ kéo lệch được.
         // pt-1: vùng cuộn cắt mọi thứ tràn ra — chừa chỗ cho viền focus (ring 3px) của ô link.
         <div
-          {...sheet.bind}
-          className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pt-1 pb-3 [&>*]:shrink-0"
+          className={`flex min-h-0 flex-1 flex-col gap-2 overflow-x-hidden overscroll-contain px-4 pt-1 pb-3 [&>*]:shrink-0 ${
+            // Điện thoại: chỉ cuộn khi bảng ở mốc cao nhất — mốc thấp hơn thì cú vuốt là kéo bảng (vaul).
+            !isMobile || snap === 1 ? 'overflow-y-auto' : 'overflow-y-hidden'
+          }`}
         >
           <form onSubmit={submit} className="flex gap-2">
             <Input
@@ -426,11 +431,58 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
           )}
         </div>
       )}
+    </>
+  )
+
+  if (isMobile) {
+    return (
+      // Không chặn bản đồ (modal={false}, không lớp phủ), không vuốt để đóng — đóng bằng nút ✕.
+      // snapPoints: vaul tự chia cử chỉ — chưa ở mốc cao nhất thì vuốt là kéo bảng, ở mốc cao nhất mới cuộn.
+      <DrawerPrimitive.Root
+        open
+        modal={false}
+        dismissible={false}
+        snapPoints={TRIP_SNAPS}
+        activeSnapPoint={snap}
+        setActiveSnapPoint={setSnap}
+      >
+        <DrawerPrimitive.Portal>
+          <DrawerPrimitive.Content
+            aria-label={L.title}
+            aria-describedby={undefined}
+            // Không tự focus ô link khi mở (bàn phím bật lên che bản đồ).
+            onOpenAutoFocus={(e) => e.preventDefault()}
+            style={{ height: TRIP_SHEET_FULL }}
+            className="fixed inset-x-0 bottom-0 z-[6] flex flex-col rounded-t-2xl bg-card pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-8px_30px_rgba(0,0,0,0.12)] outline-none"
+          >
+            <DrawerPrimitive.Title className="sr-only">{L.title}</DrawerPrimitive.Title>
+            {inner}
+          </DrawerPrimitive.Content>
+        </DrawerPrimitive.Portal>
+      </DrawerPrimitive.Root>
+    )
+  }
+
+  return (
+    <section
+      aria-label={L.title}
+      className="absolute bottom-14 left-3 z-[6] flex max-h-[calc(100dvh-11rem)] w-[380px] flex-col rounded-2xl bg-card shadow-xl"
+    >
+      {inner}
     </section>
   )
 }
 
 const AVOID_KEYS = ['toll', 'highway', 'ferry'] as const
+
+/**
+ * Mốc snap của bảng Dọc đường trên điện thoại: thấp (tay cầm + tiêu đề + dòng tóm tắt), 60% màn
+ * hình, gần full. Bảng cao cố định TRIP_SHEET_FULL, vaul dịch xuống theo mốc.
+ */
+const TRIP_SNAP_PEEK = '118px'
+const TRIP_SNAP_MID = 0.6
+const TRIP_SNAPS = [TRIP_SNAP_PEEK, TRIP_SNAP_MID, 1]
+const TRIP_SHEET_FULL = 'calc(100dvh - env(safe-area-inset-top) - 8px)'
 
 /** Hộp tuỳ chọn đang mở hay thu — tiện ích riêng từng máy, lỗi storage thì mặc định mở. */
 const OPTS_KEY = 'tramsac.tripOpts'
