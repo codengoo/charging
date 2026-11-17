@@ -95,6 +95,12 @@ googleRoute: number | null
 
 Chưa kiểm được: cờ tránh **phà** (đoán là `3b1`, Playwright không tìm thấy ô "Phà"), 2 điểm kéo trên cùng một chặng (lần kéo thứ hai chỉ dời điểm cũ), link chia sẻ từ app Android có điểm kéo (app điện thoại không cho kéo tuyến). Có `HERE_API_KEY` local đang trống nên chưa gọi thử `alternatives` / `avoid` của HERE.
 
+### Phát sinh trong lúc làm (commit riêng, giữa phase 02 và 03)
+
+Người dùng báo `https://maps.app.goo.gl/euKgJxms8gdcQKee6?g_st=ic` (chia sẻ từ app iOS) không đọc được. Link chuyển tới `https://maps.google.com/?saddr=21.0075870,105.8008470&daddr=Thanh+Vân,…&geocode=<b64>;<b64>&dirflg=d`:
+- Worker chỉ nhận `google.<tld>/maps…` → thêm `maps.google.<tld>/…`. Siết luôn host thành `GOOGLE_HOST` (đuôi `.com` / `.vn` / `.com.vn`…) vì `[a-z.]+` cũ cho lọt `google.evil.com`, ở cả kiểm đích lẫn vòng đi theo redirect.
+- `mapsLink.ts` thêm `readLegacy`: `saddr` + `daddr` (nhiều điểm nối bằng ` to:`), toạ độ lấy từ `geocode` (mỗi chặng một protobuf base64: field 2 = vĩ độ × 1e6, field 3 = kinh độ × 1e6), `dirflg` `h`/`t` → tránh cao tốc / thu phí (chưa thấy trong link thật).
+
 ## 8. Phạm vi (In / Out)
 
 **In scope:** các file ở **Scope**.

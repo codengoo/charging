@@ -67,7 +67,7 @@ export function parseMapsUrl(url: string): ParsedLink | null {
   } catch {
     return null
   }
-  const parsed = readDirections(u, url) ?? plain(readSinglePlace(u, url))
+  const parsed = readDirections(u, url) ?? readLegacy(u) ?? plain(readSinglePlace(u, url))
   return parsed && parsed.stops.length > 0 && parsed.stops.every(usable) ? parsed : null
 }
 
@@ -220,6 +220,64 @@ function readPbDirections(raw: string): PbDirections | null {
     avoid: { highway: on(1), toll: on(2), ferry: on(3) },
     googleRoute: Number.isFinite(idx) ? idx : null,
   }
+}
+
+/**
+ * Dạng cũ, app Google Maps iOS vẫn chia sẻ (thấy 2026-11-17, `maps.app.goo.gl/…?g_st=ic`):
+ *   maps.google.com/?saddr=21.0075870,105.8008470&daddr=Thanh+Vân,+…&geocode=<b64>;<b64>&dirflg=d
+ * `daddr` có thể nối nhiều điểm bằng " to:". `geocode` là toạ độ từng chặng (kể cả điểm đi), ngăn
+ * bằng ';', mỗi phần là protobuf base64: field 2 = vĩ độ × 1e6, field 3 = kinh độ × 1e6 (fixed32).
+ * `dirflg` chứa 'h' = tránh cao tốc, 't' = tránh thu phí (theo tài liệu cũ, chưa thấy trong link thật).
+ */
+function readLegacy(u: URL): ParsedLink | null {
+  const daddr = u.searchParams.get('daddr')
+  if (!daddr?.trim()) return null
+  const saddr = u.searchParams.get('saddr')?.trim()
+  const names = [...(saddr ? [saddr] : []), ...daddr.split(/\s+to:/)].map((s) => s.trim()).filter(Boolean)
+  const geo = (u.searchParams.get('geocode') ?? '').split(';').map(geocodePoint)
+  // Không khớp số chặng thì không dám ghép toạ độ — để HERE đoán theo tên.
+  const aligned = geo.length === names.length
+  const stops = names.map((name, i): TripStop => {
+    const own = stopOf(name)
+    if (hasFix(own)) return own
+    const fix = aligned ? geo[i] : null
+    return fix ? { lat: fix.lat, lng: fix.lng, text: own.text } : own
+  })
+  const flg = u.searchParams.get('dirflg') ?? ''
+  return {
+    stops,
+    vias: stops.map(() => []),
+    avoid: { highway: flg.includes('h'), toll: flg.includes('t'), ferry: false },
+    googleRoute: null,
+  }
+}
+
+function geocodePoint(b64: string): GeoPoint | null {
+  let bytes: Uint8Array
+  try {
+    bytes = Uint8Array.from(atob(b64.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0))
+  } catch {
+    return null
+  }
+  const view = new DataView(bytes.buffer)
+  let lat: number | null = null
+  let lng: number | null = null
+  for (let i = 0; i < bytes.length; ) {
+    const field = bytes[i] >> 3
+    const wire = bytes[i] & 7
+    i++
+    if (wire === 5 && i + 4 <= bytes.length) {
+      const v = view.getInt32(i, true) / 1e6
+      if (field === 2) lat = v
+      if (field === 3) lng = v
+      i += 4
+    } else if (wire === 1) {
+      i += 8
+    } else {
+      break // kiểu khác không cần — dừng thay vì đoán độ dài
+    }
+  }
+  return lat !== null && lng !== null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null
 }
 
 /**

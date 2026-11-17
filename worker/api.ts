@@ -13,6 +13,8 @@ export interface ApiEnv {
 
 const SITE_HOSTS = new Set(['charging.cangao.asia', 'localhost', '127.0.0.1'])
 const SHORTENERS = new Set(['maps.app.goo.gl', 'goo.gl', 'g.co'])
+/** Host Google thật: chỉ đuôi .com, .vn, .com.vn, .co.uk… — `[a-z.]+` từng cho lọt google.evil.com. */
+const GOOGLE_HOST = /^(www\.|maps\.)?google\.(?:com|com?\.[a-z]{2}|[a-z]{2})$/
 /** HERE Routing v8 cho tối đa 200 via, nhưng Google Maps chỉ cho 9 — 20 là trần rộng rãi (giống app Android). */
 const MAX_VIA = 20
 /** Google trả trang chuyển hướng gọn hơn cho UA điện thoại (giống app Android). */
@@ -180,11 +182,17 @@ async function revgeocode(url: URL, env: ApiEnv): Promise<Response> {
 
 // ------------------------------------------------------------ link rút gọn
 
-/** URL đích phải là google.<tld>/maps… — chặn biến endpoint thành máy mở link tuỳ ý. */
+/**
+ * URL đích phải là google.<tld>/maps… hoặc maps.google.<tld>/… (link chia sẻ của app iOS dạng
+ * `maps.google.com/?saddr=…&daddr=…`) — chặn biến endpoint thành máy mở link tuỳ ý.
+ */
 function isMapsUrl(s: string): boolean {
   try {
     const u = new URL(s)
-    return u.protocol === 'https:' && /^(www\.)?google\.[a-z.]{2,10}$/.test(u.hostname) && u.pathname.startsWith('/maps')
+    if (u.protocol !== 'https:') return false
+    const m = GOOGLE_HOST.exec(u.hostname)
+    if (!m) return false
+    return m[1] === 'maps.' || u.pathname.startsWith('/maps')
   } catch {
     return false
   }
@@ -214,7 +222,7 @@ async function mapsLink(url: URL): Promise<Response> {
       const next = new URL(loc, current)
       if (isMapsUrl(next.toString())) return ok({ url: next.toString() })
       // Chỉ tiếp tục qua các host rút gọn của Google; host khác (consent, đăng nhập…) thì thôi.
-      if (!SHORTENERS.has(next.hostname) && !/^(www\.)?google\.[a-z.]+$/.test(next.hostname)) break
+      if (next.protocol !== 'https:' || (!SHORTENERS.has(next.hostname) && !GOOGLE_HOST.test(next.hostname))) break
       current = next
       continue
     }
