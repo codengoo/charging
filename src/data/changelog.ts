@@ -11,6 +11,24 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.10.0',
+    date: '2026-11-17',
+    title: 'Kế hoạch sạc, ghi chú & đánh giá trạm',
+    changes: [
+      "Tự lên kế hoạch dừng sạc: trong \"Dọc đường\", bấm \"Lên kế hoạch sạc\" để app chọn các trạm sạc nhanh cần ghé, ước tính thời gian sạc, giờ tới nơi và pin còn lại. Bản đồ chỉ hiện các điểm dừng.",
+      "Nhập mức tiêu thụ thực tế (đọc trên màn hình xe) cho mẫu xe đang chọn — mọi ước tính pin dùng số này.",
+      "Ghi chú riêng cho từng trạm (\"cổng 2 hay lỗi\", \"đỗ tầng B2\"…), lưu trên máy, hiện trong danh sách đã lưu và đi kèm khi sao lưu / chuyển máy.",
+      "Đánh giá sao và bình luận công khai cho từng trạm: điểm trung bình, phân bố sao, sửa / xoá đánh giá của mình, báo cáo bình luận không phù hợp.",
+    ],
+    titleEn: 'Charging plan, notes & station reviews',
+    changesEn: [
+      "Automatic charging plan: in \"Along route\", tap \"Plan charging stops\" to pick the fast chargers to stop at, with estimated charging time, arrival time and battery left. The map shows only the planned stops.",
+      "Enter your car's real consumption (from the car's display) for the selected model — all battery estimates use it.",
+      "Private notes for each station (\"port 2 is often faulty\", \"park on level B2\"…), saved on this device, shown in the saved list and included in backups.",
+      "Public star ratings and comments for each station: average rating, rating breakdown, edit / delete your own review, report inappropriate comments.",
+    ],
+  },
+  {
     version: '0.9.0',
     date: '2026-11-17',
     title: '% pin khi đến trạm',

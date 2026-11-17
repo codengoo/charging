@@ -49,6 +49,15 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   gọi thêm HERE/EVCS. Mô hình: tiêu thụ thực tế ước tính của xe × hệ số tốc độ trung bình (< 40 km/h 0,95 … ≥ 90
   km/h 1,25), hiện khoảng ±8%, chưa tính độ dốc. Thông số xe tra 2026-11-17, `kwhPer100` là ước tính (≈ dung
   lượng ÷ NEDC × 0,8), không phải số hãng công bố.
+- **Ghi đè tiêu thụ:** VehicleSheet có ô "Tiêu thụ thực tế" (`Settings.usageOverride`) — giữ pin / công suất sạc
+  của mẫu, chỉ thay kWh/100 km. Đổi mẫu thì xoá.
+- **Kế hoạch dừng sạc** (`src/data/chargePlan.ts`): chip "Lên kế hoạch sạc" trong Dọc đường. Tham lam "đi xa
+  nhất": ghé trạm DC ≥ 50 kW xa nhất còn ≥ 10% pin (ước tính bi quan), sạc lên 80%; điểm dừng cuối chỉ sạc vừa đủ
+  tới đích. Tính trên danh sách trạm dọc đường đang hiện (theo bộ lọc công suất), không gọi thêm API. Bật thì bản
+  đồ chỉ vẽ ghim các điểm dừng.
+- **Ghi chú cá nhân** (`src/data/notes.ts`, `src/ui/NoteBox.tsx`): localStorage `tramsac.notes`, ≤ 1.000 ký tự;
+  sao lưu mang trường `notes` (gộp giữ bản sửa sau).
+- **Đánh giá & bình luận công khai** (`worker/reviews.ts`, `src/ui/ReviewsSection.tsx`): xem mục bên dưới.
 - **Sao lưu / chuyển máy** (`src/data/backup.ts`, `src/ui/BackupSheet.tsx`): sổ nhóm nén
   `deflate-raw` + base64url trong hash `/#import=…` (không tới server), QR khi link ≤ 2.000 ký
   tự, tải / nhập file `.json`. Nhập luôn **gộp**, hỏi xác nhận trước.
@@ -74,6 +83,48 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
 - **Dữ liệu trạm là nội bộ:** trang `/station/*` gắn `noindex` (header `X-Robots-Tag` + thẻ meta),
   không JSON-LD; `/data/*` cũng `noindex` + `Disallow` trong robots.txt. `public/sitemap.xml`
   chỉ có trang chủ.
+
+## Đánh giá & bình luận (`worker/reviews.ts`, D1)
+
+Mỗi thiết bị một đánh giá (1–5 sao + bình luận ≤ 500 ký tự + biệt danh) mỗi trạm, sửa / xoá được. Ẩn danh: máy
+sinh `deviceId` ngẫu nhiên (`tramsac.device`), gửi header `X-Device`; D1 chỉ lưu `SHA-256(REVIEW_PEPPER:deviceId)`.
+Bài có 3 thiết bị báo cáo thì tự ẩn (tác giả vẫn thấy kèm nhãn). Lọc link / email / số điện thoại (422), giới hạn
+`REVIEW_LIMIT` 5 lần ghi / phút / IP, Turnstile khi có secret. Schema: `migrations/0001_reviews.sql`.
+
+| Endpoint | Việc |
+|---|---|
+| `GET /api/reviews/<entityId>[?before=<updatedAt>]` | Điểm TB, phân bố, bài của tôi, 20 bài mới nhất |
+| `PUT /api/reviews/<entityId>` | Viết / sửa bài của tôi `{ rating, body, nickname, turnstile? }` |
+| `DELETE /api/reviews/<entityId>` | Xoá bài của tôi |
+| `POST /api/reviews/report/<id>` | Báo cáo `{ turnstile? }` |
+| `GET /api/admin/reviews?hidden=1\|2\|all` | Bài bị ẩn (1 tự ẩn, 2 admin ẩn) / tất cả — `Authorization: Bearer <ADMIN_TOKEN>` |
+| `POST /api/admin/reviews/<id>` | `{ "hidden": 0 }` hiện lại (xoá báo cáo cũ) / `{ "hidden": 2 }` ẩn |
+| `DELETE /api/admin/reviews/<id>` | Xoá hẳn |
+
+**Bật trên production (một lần):**
+
+```bash
+# Token CLOUDFLARE_API_TOKEN cần quyền D1:Edit (hoặc `npx wrangler login`).
+npx wrangler d1 create tramsac-reviews          # chép database_id vào wrangler.jsonc (đang là id giả 0000…)
+npx wrangler d1 migrations apply tramsac-reviews --remote
+npx wrangler secret put REVIEW_PEPPER           # chuỗi ngẫu nhiên dài, ĐỪNG đổi sau này (đổi = mất quyền sửa bài cũ)
+npx wrangler secret put ADMIN_TOKEN
+# Turnstile (khuyên bật): dashboard Cloudflare → Turnstile → Add widget, hostname charging.cangao.asia.
+npx wrangler secret put TURNSTILE_SECRET        # Secret key
+VITE_TURNSTILE_SITEKEY=<Site key> npm run deploy  # site key nhúng lúc build
+```
+
+Chưa có `TURNSTILE_SECRET` thì Worker không bắt token (chỉ còn rate limit + lọc nội dung). Có secret mà build thiếu
+`VITE_TURNSTILE_SITEKEY` thì mọi lần ghi bị 403 — đặt cả hai. Local: chép `.dev.vars.example` thành `.dev.vars`,
+`npx wrangler d1 migrations apply tramsac-reviews --local`, `npx wrangler dev --local`.
+
+Duyệt bài bị báo cáo:
+
+```bash
+curl -H "Authorization: Bearer $ADMIN_TOKEN" https://charging.cangao.asia/api/admin/reviews?hidden=1
+curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"hidden":0}' https://charging.cangao.asia/api/admin/reviews/<id>
+```
 
 ## Chạy local
 

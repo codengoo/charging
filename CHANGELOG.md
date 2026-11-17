@@ -2,6 +2,13 @@
 
 Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app).
 
+## [0.10.0] — 2026-11-17 — Kế hoạch sạc, ghi chú & đánh giá trạm
+
+- Tự lên kế hoạch dừng sạc: trong "Dọc đường", bấm "Lên kế hoạch sạc" để app chọn các trạm sạc nhanh cần ghé, ước tính thời gian sạc, giờ tới nơi và pin còn lại. Bản đồ chỉ hiện các điểm dừng.
+- Nhập mức tiêu thụ thực tế (đọc trên màn hình xe) cho mẫu xe đang chọn — mọi ước tính pin dùng số này.
+- Ghi chú riêng cho từng trạm ("cổng 2 hay lỗi", "đỗ tầng B2"…), lưu trên máy, hiện trong danh sách đã lưu và đi kèm khi sao lưu / chuyển máy.
+- Đánh giá sao và bình luận công khai cho từng trạm: điểm trung bình, phân bố sao, sửa / xoá đánh giá của mình, báo cáo bình luận không phù hợp.
+
 ## [0.9.0] — 2026-11-17 — % pin khi đến trạm
 
 - Chọn xe của bạn trong ⚙ Cài đặt (10 mẫu VinFast hoặc tự nhập dung lượng pin và mức tiêu thụ), kèm công tắc điều hoà.
