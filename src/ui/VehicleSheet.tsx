@@ -7,6 +7,7 @@ import {
 } from '@/components/ui/responsive-dialog'
 import { Segmented } from '@/components/ui/segmented'
 import { Input } from '@/components/ui/input'
+import { ResponsiveSelect } from '@/components/ui/responsive-select'
 import type { Settings } from '../data/settings'
 import { CUSTOM_ID, VEHICLES } from '../data/vehicles'
 import { LOCALE, pick } from '@/i18n'
@@ -44,6 +45,23 @@ const L = pick({
 
 export const fmtNum = (v: number) => v.toLocaleString(LOCALE, { maximumFractionDigits: 2 })
 
+/** Radix Select không nhận giá trị rỗng — "chưa chọn" dùng mã riêng, đổi về null khi lưu. */
+const NONE = 'none'
+
+const MODEL_OPTIONS = [
+  { value: NONE, label: L.noVehicle },
+  ...VEHICLES.map((v) => ({
+    value: v.id,
+    label: (
+      // Một span bọc ngoài: khung nhãn của ResponsiveSelect là flex có gap, tách rời các con.
+      <span>
+        {v.name} <span className="text-muted-foreground">· {fmtNum(v.kwh)} kWh</span>
+      </span>
+    ),
+  })),
+  { value: CUSTOM_ID, label: L.custom },
+]
+
 /** "VF 6 · 59,6 kWh" / "Tuỳ chỉnh · 60 kWh" / null khi chưa chọn — dòng tóm tắt trong Cài đặt. */
 export function vehicleSummary(s: Settings): string | null {
   if (!s.vehicleId) return null
@@ -75,21 +93,13 @@ export function VehicleSheet({ open, settings, onChange, onClose, nested = false
         <div className="mt-3 flex flex-col gap-4 pb-2 sm:mt-0">
           <section className="flex flex-col gap-1.5">
             <h3 className="text-sm font-semibold">{L.model}</h3>
-            <select
-              value={settings.vehicleId ?? ''}
+            <ResponsiveSelect
+              title={L.model}
+              value={settings.vehicleId ?? NONE}
               // Số tiêu thụ đọc trên xe cũ không còn đúng cho mẫu mới.
-              onChange={(e) => onChange({ vehicleId: e.target.value || null, usageOverride: null })}
-              aria-label={L.model}
-              className="h-10 w-full rounded-xl bg-muted px-2.5 text-sm outline-none focus-visible:ring-3 focus-visible:ring-brand/35"
-            >
-              <option value="">{L.noVehicle}</option>
-              {VEHICLES.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.name} · {fmtNum(v.kwh)} kWh
-                </option>
-              ))}
-              <option value={CUSTOM_ID}>{L.custom}</option>
-            </select>
+              onChange={(v) => onChange({ vehicleId: v === NONE ? null : v, usageOverride: null })}
+              options={MODEL_OPTIONS}
+            />
             {settings.vehicleId === CUSTOM_ID && (
               <div className="flex gap-2">
                 <NumberField

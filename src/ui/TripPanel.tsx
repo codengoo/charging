@@ -233,33 +233,40 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, kw
             </Button>
           </form>
 
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">{L.fromRoute}</span>
-            {TRIP_RADII.map((km) => (
-              <Chip key={km} size="sm" selected={trip.radiusKm === km} onClick={() => onRadius(km)}>
-                {km} km
-              </Chip>
-            ))}
-          </div>
+          {/* Cấu hình tìm trạm: hộp riêng, cách hẳn ô link. Chip nền trắng để nổi trên nền xám. */}
+          <div className="mt-2 flex flex-col gap-3 rounded-xl bg-muted/70 p-3">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs text-muted-foreground">{L.fromRoute}</span>
+              <div className="flex flex-wrap gap-1.5">
+                {TRIP_RADII.map((km) => (
+                  <Chip key={km} size="sm" variant="outline" selected={trip.radiusKm === km} onClick={() => onRadius(km)}>
+                    {km} km
+                  </Chip>
+                ))}
+              </div>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={L.power}>
-            <span className="text-xs text-muted-foreground">{L.power}</span>
-            {KW_BANDS.map((b) => (
-              <Chip key={b} size="sm" selected={shownBands.includes(b)} onClick={() => toggleBand(b)}>
-                {KW_BAND_LABEL[b]}
-              </Chip>
-            ))}
-          </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs text-muted-foreground">{L.power}</span>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label={L.power}>
+                {KW_BANDS.map((b) => (
+                  <Chip key={b} size="sm" variant="outline" selected={shownBands.includes(b)} onClick={() => toggleBand(b)}>
+                    {KW_BAND_LABEL[b]}
+                  </Chip>
+                ))}
+              </div>
+            </div>
 
-          {estimates && (
-            <>
-              <BatteryControl reading={battery} stale={batteryStale} onChange={onBattery} compact />
-              <Chip size="sm" selected={planOn} onClick={onTogglePlan} className="self-start">
-                <Zap />
-                {L.plan}
-              </Chip>
-            </>
-          )}
+            {estimates && (
+              <>
+                <BatteryControl reading={battery} stale={batteryStale} onChange={onBattery} compact />
+                <Chip size="sm" variant="outline" selected={planOn} onClick={onTogglePlan} className="self-start">
+                  <Zap />
+                  {L.plan}
+                </Chip>
+              </>
+            )}
+          </div>
 
           {planOn && plan && <PlanView plan={plan} onPick={onPick} />}
 
