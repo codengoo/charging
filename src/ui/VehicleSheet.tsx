@@ -3,7 +3,8 @@ import { Segmented } from '@/components/ui/segmented'
 import { Input } from '@/components/ui/input'
 import { ResponsiveSelect } from '@/components/ui/responsive-select'
 import type { Settings } from '../data/settings'
-import { CUSTOM_ID, VEHICLES } from '../data/vehicles'
+import { CUSTOM_ID, VEHICLES, vehicleOf } from '../data/vehicles'
+import { ChargeCurveChart } from './ChargeCurveChart'
 import { RESERVE_MAX, RESERVE_MIN, RESERVE_OPTIONS } from '../data/battery'
 import { LOCALE, pick } from '@/i18n'
 import { AppSheet } from './AppSheet'
@@ -86,6 +87,7 @@ interface Props {
 /** Drawer riêng chọn xe + điều hoà; đổi là lưu ngay như Cài đặt. */
 export function VehicleSheet({ open, settings, onChange, onClose, nested = false }: Props) {
   const model = VEHICLES.find((v) => v.id === settings.vehicleId)
+  const car = vehicleOf(settings.vehicleId, settings.customKwh, settings.customKwhPer100, settings.usageOverride)
   return (
     <AppSheet
       nested={nested}
@@ -147,6 +149,8 @@ export function VehicleSheet({ open, settings, onChange, onClose, nested = false
             </label>
           )}
         </section>
+
+        {car && <ChargeCurveChart vehicle={car} />}
 
         {settings.vehicleId && (
           <section className="flex flex-col gap-1.5">

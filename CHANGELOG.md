@@ -2,6 +2,10 @@
 
 Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app).
 
+## [0.15.1] — 2026-11-17 — Đường cong sạc
+
+- Xem đường cong sạc nhanh của xe trong Xe của bạn.
+
 ## [0.15.0] — 2026-11-17 — Địa điểm hay dùng
 
 - Lưu Nhà, Công ty và địa điểm hay đi — bấm là tìm đường kèm trạm dọc đường.

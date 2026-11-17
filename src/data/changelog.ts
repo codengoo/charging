@@ -11,6 +11,14 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.15.1',
+    date: '2026-11-17',
+    title: 'Đường cong sạc',
+    changes: ["Xem đường cong sạc nhanh của xe trong Xe của bạn."],
+    titleEn: 'Charging curve',
+    changesEn: ["See your car's fast-charging curve in Your car."],
+  },
+  {
     version: '0.15.0',
     date: '2026-11-17',
     title: 'Địa điểm hay dùng',
