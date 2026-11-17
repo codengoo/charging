@@ -27,3 +27,11 @@
 ```
 refactor(app): tách đồng bộ URL, trạng thái sheet, kế hoạch sạc, context pin khỏi App; lớp bản đồ ra map/layers.ts
 ```
+
+## 4. Kết quả (ghi lúc thực hiện)
+
+- `src/app/useUrlSync.ts` (deep link trạm / `/trip` / `#import`, đồng bộ URL + tiêu đề tab; effect mở trip đứng trước effect URL như cũ), `useTripPlan.ts` (kế hoạch sạc + lớp tuyến cho bản đồ), `useSheets.ts` (9 cờ bảng + luật đóng bảng con), `MapChips.tsx`.
+- `src/map/layers.ts`: hằng nguồn/lớp, dựng GeoJSON, `addAppLayers`, `bindLayerEvents`, `ensurePinImages`, `pointFilter`. MapView thêm `styleimagemissing` → nạp lại ảnh ghim (gộp một lượt).
+- Dòng: `App.tsx` 512 → ~378, `MapView.tsx` 506 → ~220. **App chưa xuống < 300**: phần còn lại chủ yếu là JSX truyền prop cho 10 bảng; tách thêm (vd. `StationSheets`) chỉ chuyển prop qua một tầng nữa. **Không làm `BatteryContext`**: đổi chữ ký prop của StationSheet / TripPanel / BatteryControl — đúng mấy file phiên khác đang sửa liên tục trên main; để đợt sau.
+- Playwright: `/station/28704-x` → URL chuẩn `…-dai-ly-o-to-vinfast-phuc-thanh` + tiêu đề tab; `/en/station/28704` → tiêu đề EN; `/trip?link=…` giữ `/trip?link=`, đóng Dọc đường → `/`; nền tối 4 ảnh ghim đủ; `/#import=zzz` → hash bị xoá + hộp "Không đọc được bản sao lưu"; số trạm / 3 tuyến trùng khớp bản main. Không lỗi JS.
+- Escape lần hai không đóng Đã lưu sau khi đóng Sao lưu — **có sẵn ở main**, không do refactor (đã đối chiếu).
