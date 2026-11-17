@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState, type FormEvent } from 'react'
-import { ChevronUp, ClipboardPaste, Loader2, Route, X, Zap } from 'lucide-react'
+import { ChevronDown, ChevronUp, ClipboardPaste, Loader2, Route, X, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { Input } from '@/components/ui/input'
@@ -62,6 +62,13 @@ const L = pick({
     googleHint: (n: number) => `Trên Google bạn chọn tuyến thứ ${n} — chạm tuyến khớp bên dưới hoặc trên bản đồ.`,
     avoid: 'Tránh',
     avoidOpt: { toll: 'Thu phí', highway: 'Cao tốc', ferry: 'Phà' },
+    options: 'Tuỳ chọn',
+    optsShow: 'Mở tuỳ chọn',
+    optsHide: 'Thu tuỳ chọn',
+    allPower: 'mọi công suất',
+    noAvoid: 'không tránh',
+    avoidSum: (s: string) => `tránh ${s.toLowerCase()}`,
+    planOn: 'kế hoạch sạc',
   },
   en: {
     title: 'Along route',
@@ -107,6 +114,13 @@ const L = pick({
     googleHint: (n: number) => `In Google Maps you picked route ${n} — tap the matching one below or on the map.`,
     avoid: 'Avoid',
     avoidOpt: { toll: 'Tolls', highway: 'Highways', ferry: 'Ferries' },
+    options: 'Options',
+    optsShow: 'Show options',
+    optsHide: 'Hide options',
+    allPower: 'all power levels',
+    noAvoid: 'no avoids',
+    avoidSum: (s: string) => `avoid ${s.toLowerCase()}`,
+    planOn: 'charging plan',
   },
 })
 
@@ -152,6 +166,14 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
   useEffect(() => {
     if (stationOpen) setExpanded(false)
   }, [stationOpen])
+
+  const [optsOpen, setOptsOpen] = useState(readOptsOpen)
+  function toggleOpts() {
+    setOptsOpen((v) => {
+      saveOptsOpen(!v)
+      return !v
+    })
+  }
 
   const shownBands = kwActive(kwBands) ? kwBands : KW_BANDS
   function toggleBand(b: KwBand) {
@@ -253,56 +275,80 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
             <RoutePicker trip={trip} totals={routeTotals} onSelect={onSelectRoute} />
           )}
 
-          {/* Cấu hình tìm trạm: hộp riêng, cách hẳn ô link. Chip nền trắng để nổi trên nền xám. */}
+          {/* Cấu hình tìm trạm: hộp riêng, cách hẳn ô link. Chip nền trắng để nổi trên nền xám.
+              Thu lại được (nhớ trên máy) — thu thì chỉ còn một dòng tóm tắt. */}
           <div className="mt-2 flex flex-col gap-3 rounded-xl bg-muted/70 p-3">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs text-muted-foreground">{L.fromRoute}</span>
-              <div className="flex flex-wrap gap-1.5">
-                {TRIP_RADII.map((km) => (
-                  <Chip key={km} size="sm" variant="outline" selected={trip.radiusKm === km} onClick={() => onRadius(km)}>
-                    {km} km
-                  </Chip>
-                ))}
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={toggleOpts}
+              aria-expanded={optsOpen}
+              aria-label={optsOpen ? L.optsHide : L.optsShow}
+              className="-m-1 flex items-center gap-2 rounded-lg p-1 text-left"
+            >
+              <span className="text-xs font-semibold text-foreground">{L.options}</span>
+              {!optsOpen && (
+                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                  {optsSummary(trip, shownBands, estimates ? startPct : null, planOn)}
+                </span>
+              )}
+              <ChevronDown
+                className={`ml-auto size-4 shrink-0 text-muted-foreground transition-transform ${optsOpen ? 'rotate-180' : ''}`}
+                aria-hidden
+              />
+            </button>
 
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs text-muted-foreground">{L.avoid}</span>
-              <div className="flex flex-wrap gap-1.5" role="group" aria-label={L.avoid}>
-                {AVOID_KEYS.map((k) => (
-                  <Chip
-                    key={k}
-                    size="sm"
-                    variant="outline"
-                    selected={trip.avoid[k]}
-                    disabled={busy}
-                    aria-pressed={trip.avoid[k]}
-                    onClick={() => onAvoid({ ...trip.avoid, [k]: !trip.avoid[k] })}
-                  >
-                    {L.avoidOpt[k]}
-                  </Chip>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs text-muted-foreground">{L.power}</span>
-              <div className="flex flex-wrap gap-1.5" role="group" aria-label={L.power}>
-                {KW_BANDS.map((b) => (
-                  <Chip key={b} size="sm" variant="outline" selected={shownBands.includes(b)} onClick={() => toggleBand(b)}>
-                    {KW_BAND_LABEL[b]}
-                  </Chip>
-                ))}
-              </div>
-            </div>
-
-            {estimates && (
+            {optsOpen && (
               <>
-                <BatteryControl reading={battery} stale={batteryStale} onChange={onBattery} compact />
-                <Chip size="sm" variant="outline" selected={planOn} onClick={onTogglePlan} className="self-start">
-                  <Zap />
-                  {L.plan}
-                </Chip>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs text-muted-foreground">{L.fromRoute}</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TRIP_RADII.map((km) => (
+                      <Chip key={km} size="sm" variant="outline" selected={trip.radiusKm === km} onClick={() => onRadius(km)}>
+                        {km} km
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs text-muted-foreground">{L.avoid}</span>
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label={L.avoid}>
+                    {AVOID_KEYS.map((k) => (
+                      <Chip
+                        key={k}
+                        size="sm"
+                        variant="outline"
+                        selected={trip.avoid[k]}
+                        disabled={busy}
+                        aria-pressed={trip.avoid[k]}
+                        onClick={() => onAvoid({ ...trip.avoid, [k]: !trip.avoid[k] })}
+                      >
+                        {L.avoidOpt[k]}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs text-muted-foreground">{L.power}</span>
+                  <div className="flex flex-wrap gap-1.5" role="group" aria-label={L.power}>
+                    {KW_BANDS.map((b) => (
+                      <Chip key={b} size="sm" variant="outline" selected={shownBands.includes(b)} onClick={() => toggleBand(b)}>
+                        {KW_BAND_LABEL[b]}
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+
+                {estimates && (
+                  <>
+                    <BatteryControl reading={battery} stale={batteryStale} onChange={onBattery} compact />
+                    <Chip size="sm" variant="outline" selected={planOn} onClick={onTogglePlan} className="self-start">
+                      <Zap />
+                      {L.plan}
+                    </Chip>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -354,6 +400,37 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
 }
 
 const AVOID_KEYS = ['toll', 'highway', 'ferry'] as const
+
+/** Hộp tuỳ chọn đang mở hay thu — tiện ích riêng từng máy, lỗi storage thì mặc định mở. */
+const OPTS_KEY = 'tramsac.tripOpts'
+function readOptsOpen(): boolean {
+  try {
+    return localStorage.getItem(OPTS_KEY) !== '0'
+  } catch {
+    return true
+  }
+}
+function saveOptsOpen(open: boolean) {
+  try {
+    localStorage.setItem(OPTS_KEY, open ? '1' : '0')
+  } catch {
+    // chế độ riêng tư chặn localStorage — chỉ mất phần nhớ
+  }
+}
+
+/** "2 km · tránh thu phí · ≥ 120 kW, 60–119 kW · 55%" — dòng tóm tắt khi hộp tuỳ chọn thu lại. */
+function optsSummary(trip: TripState, bands: KwBand[], pct: number | null, planOn: boolean): string {
+  const avoided = AVOID_KEYS.filter((k) => trip.avoid[k]).map((k) => L.avoidOpt[k])
+  return [
+    `${trip.radiusKm} km`,
+    avoided.length ? L.avoidSum(avoided.join(', ')) : L.noAvoid,
+    bands.length === KW_BANDS.length ? L.allPower : bands.map((b) => KW_BAND_LABEL[b]).join(', '),
+    pct === null ? null : `${pct}%`,
+    planOn ? L.planOn : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
 
 /**
  * Các tuyến HERE gợi ý (khi đi thẳng 2 điểm). Thứ tự khác Google nên chỉ gợi ý bằng chữ
