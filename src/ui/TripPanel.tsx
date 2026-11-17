@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState, type FormEvent } from 'react'
-import { ChevronUp, ClipboardPaste, Loader2, Route, X } from 'lucide-react'
+import { ChevronUp, ClipboardPaste, Loader2, Route, X, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { Input } from '@/components/ui/input'
@@ -12,7 +12,9 @@ import { TIER_COLORS } from '../map/pins'
 import { pick } from '../i18n'
 import { RESERVE_PCT, arrivalPct, avgKmh, type ArrivalEstimate, type BatteryReading } from '../data/battery'
 import type { Vehicle } from '../data/vehicles'
-import { BatteryControl, pctOf, pctTone } from './BatteryControl'
+import { BatteryControl, fmtRange, pctOf, pctTone } from './BatteryControl'
+import { PLAN_MIN_DC_KW, type ChargePlan } from '../data/chargePlan'
+import { fmtMinutes } from '../data/drive'
 
 const L = pick({
   vi: {
@@ -43,6 +45,17 @@ const L = pick({
     lastReachable: `Trạm cuối còn kịp (còn ≥ ${RESERVE_PCT}% pin)`,
     noneReachable: (p: number) => `Với ${p}% pin, không trạm nào chắc chắn tới được (còn ≥ ${RESERVE_PCT}%)`,
     pctAria: (p: number) => `còn khoảng ${p}% pin khi tới`,
+    plan: 'Lên kế hoạch sạc',
+    planAria: 'Các điểm dừng sạc theo kế hoạch',
+    stop: (n: number) => `Dừng ${n}`,
+    stopLine: (arrive: string, to: number, charge: string | null, kw: string) =>
+      `tới ${arrive}` + (charge ? ` · sạc lên ${to}% ~${charge} (${kw} kW)` : ` · ${kw} kW`),
+    noStop: (arrive: string) => `Không cần dừng sạc — tới nơi còn ${arrive}.`,
+    planOk: (n: number, charge: string, total: string, arrive: string) =>
+      `${n} điểm dừng · sạc ~${charge} · tới nơi sau ~${total}, còn ${arrive}.`,
+    planFail: (km: number) =>
+      `Không đủ trạm sạc nhanh (DC ≥ ${PLAN_MIN_DC_KW} kW) sau km ${km} — thử mở rộng hành lang, bỏ lọc công suất hoặc xuất phát với nhiều pin hơn.`,
+    planNote: 'Ước tính: ghé trạm xa nhất còn ≥ 10% pin, sạc lên 80% (điểm cuối sạc vừa đủ tới nơi).',
   },
   en: {
     title: 'Along route',
@@ -72,6 +85,17 @@ const L = pick({
     lastReachable: `Last station you can reach (≥ ${RESERVE_PCT}% battery left)`,
     noneReachable: (p: number) => `With ${p}% battery, no station is safely reachable (≥ ${RESERVE_PCT}% left)`,
     pctAria: (p: number) => `about ${p}% battery left on arrival`,
+    plan: 'Plan charging stops',
+    planAria: 'Planned charging stops',
+    stop: (n: number) => `Stop ${n}`,
+    stopLine: (arrive: string, to: number, charge: string | null, kw: string) =>
+      `arrive ${arrive}` + (charge ? ` · charge to ${to}% ~${charge} (${kw} kW)` : ` · ${kw} kW`),
+    noStop: (arrive: string) => `No charging stop needed — you'll arrive with ${arrive}.`,
+    planOk: (n: number, charge: string, total: string, arrive: string) =>
+      `${n} ${n === 1 ? 'stop' : 'stops'} · ~${charge} charging · arrive in ~${total} with ${arrive}.`,
+    planFail: (km: number) =>
+      `Not enough fast chargers (DC ≥ ${PLAN_MIN_DC_KW} kW) after km ${km} — try a wider corridor, fewer power filters or more starting battery.`,
+    planNote: 'Estimate: stop at the farthest station with ≥ 10% left, charge to 80% (just enough at the last stop).',
   },
 })
 
@@ -94,6 +118,10 @@ interface Props {
   battery: BatteryReading | null
   batteryStale: boolean
   onBattery: (pct: number) => void
+  /** Kế hoạch dừng sạc (App tính khi bật — bản đồ cũng chỉ vẽ điểm dừng). */
+  planOn: boolean
+  plan: ChargePlan | null
+  onTogglePlan: () => void
 }
 
 /**
@@ -101,7 +129,7 @@ interface Props {
  * tuyến, và bảng chi tiết trạm mở đè lên được. Điện thoại: dải dưới đáy, bấm tay cầm để thu/mở.
  * Màn rộng: thẻ nổi góc trái.
  */
-export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, kwBands, onKwBands, onPick, onClose, vehicle, climate, battery, batteryStale, onBattery }: Props) {
+export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, kwBands, onKwBands, onPick, onClose, vehicle, climate, battery, batteryStale, onBattery, planOn, plan, onTogglePlan }: Props) {
   const [text, setText] = useState(trip.link ?? '')
   const [expanded, setExpanded] = useState(true)
   // Link đổi từ ngoài (mở /trip?link=…, share target) → ô nhập theo.
@@ -223,9 +251,19 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, kw
             ))}
           </div>
 
-          {estimates && <BatteryControl reading={battery} stale={batteryStale} onChange={onBattery} compact />}
+          {estimates && (
+            <>
+              <BatteryControl reading={battery} stale={batteryStale} onChange={onBattery} compact />
+              <Chip size="sm" selected={planOn} onClick={onTogglePlan} className="self-start">
+                <Zap />
+                {L.plan}
+              </Chip>
+            </>
+          )}
 
-          {hits.items.length > 0 && (
+          {planOn && plan && <PlanView plan={plan} onPick={onPick} />}
+
+          {!(planOn && plan) && hits.items.length > 0 && (
             <ul className="-mx-4 min-h-0 flex-1 overflow-y-auto px-4" aria-label={L.listAria}>
               {estimates && lastOk === -1 && <ReachDivider text={L.noneReachable(startPct)} />}
               {hits.items.map(({ station, atKm, offsetKm }, i) => {
@@ -266,6 +304,43 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, kw
         </div>
       )}
     </section>
+  )
+}
+
+/** Tóm tắt kế hoạch + danh sách điểm dừng (thay danh sách trạm khi bật). */
+function PlanView({ plan, onPick }: { plan: ChargePlan; onPick: (st: Station) => void }) {
+  const head = !plan.ok
+    ? L.planFail(Math.round(plan.stuckAtKm))
+    : plan.stops.length === 0
+      ? L.noStop(fmtRange(plan.arriveDest))
+      : L.planOk(plan.stops.length, fmtMinutes(plan.chargeMin * 60), fmtDuration(plan.totalSeconds), fmtRange(plan.arriveDest))
+  return (
+    <>
+      <p className={`rounded-xl px-3 py-2 text-sm ${plan.ok ? 'bg-brand/10 text-foreground' : 'bg-destructive/10 text-destructive'}`}>
+        {head}
+        <span className="mt-0.5 block text-[11px] text-muted-foreground">{L.planNote}</span>
+      </p>
+      {plan.stops.length > 0 && (
+        <ol className="-mx-4 min-h-0 flex-1 overflow-y-auto px-4" aria-label={L.planAria}>
+          {plan.stops.map((s, i) => (
+            <li key={s.item.station.entityId} className="border-b border-border/60 last:border-b-0">
+              <button type="button" onClick={() => onPick(s.item.station)} className="flex w-full items-center gap-3 py-2.5 text-left">
+                <span className="flex w-14 shrink-0 flex-col text-sm font-semibold tabular-nums text-brand">
+                  <span>{L.stop(i + 1)}</span>
+                  <span className="text-xs font-normal text-muted-foreground">km {Math.round(s.item.atKm)}</span>
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="line-clamp-2 text-[15px] leading-snug">{s.item.station.name}</span>
+                  <span className={`text-xs ${pctTone(s.arrive.low)}`}>
+                    {L.stopLine(fmtRange(s.arrive), s.toPct, s.chargeMin === null ? null : fmtMinutes(s.chargeMin * 60), fmtKw(s.kw))}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ol>
+      )}
+    </>
   )
 }
 

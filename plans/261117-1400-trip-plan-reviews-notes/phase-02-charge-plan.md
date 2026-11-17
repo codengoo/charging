@@ -9,6 +9,7 @@
 | `src/data/chargePlan.ts` | CREATE — `planCharging(...)` thuần |
 | `src/ui/TripPanel.tsx` | MODIFY — nút bật/tắt kế hoạch, thẻ tóm tắt, nhãn "Dừng n" |
 | `src/App.tsx` | MODIFY — state bật/tắt + kết quả kế hoạch; `TripLayer.stationIds` chỉ còn điểm dừng khi bật |
+| `src/data/battery.ts` | MODIFY — `chargeMinutes(..., toPct)`: điểm dừng cuối chỉ sạc vừa đủ tới đích (thêm khi làm) |
 
 ## 2. `planCharging`
 

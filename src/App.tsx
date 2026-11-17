@@ -15,7 +15,8 @@ import { VehicleSheet } from './ui/VehicleSheet'
 import { useDriveDistance, useStableOrigin } from './data/drive'
 import { useLiveStatus } from './data/live'
 import { filtersFrom, useSettings, type Settings } from './data/settings'
-import { useBattery } from './data/battery'
+import { DEFAULT_PCT, useBattery } from './data/battery'
+import { planCharging } from './data/chargePlan'
 import { vehicleOf } from './data/vehicles'
 import { useResolvedTheme } from './lib/theme'
 import { ImportDialog, pendingImport, type PendingImport } from './ui/ImportDialog'
@@ -188,18 +189,32 @@ export function App() {
     else tripCtl.show()
   }, [index, tripLink, tripCtl])
 
+  // Kế hoạch dừng sạc: chỉ tính khi bật, có xe và tuyến đã sẵn sàng. Đóng hành trình thì tắt.
+  const [planOn, setPlanOn] = useState(false)
+  useEffect(() => {
+    if (trip.status === 'closed') setPlanOn(false)
+  }, [trip.status])
+  const chargePlan = useMemo(
+    () =>
+      planOn && vehicle && trip.route && trip.status === 'ready'
+        ? planCharging(hits.items, power, trip.route, battery.reading?.pct ?? DEFAULT_PCT, vehicle, settings.climate)
+        : null,
+    [planOn, vehicle, trip.route, trip.status, hits, power, battery.reading, settings.climate],
+  )
+
   // Lớp tuyến cho bản đồ. Chừa chỗ cho bảng hành trình: điện thoại là dải dưới, màn rộng là thẻ trái.
   const tripLayer = useMemo<TripLayer | null>(() => {
     if (!trip.route) return null
     return {
       path: trip.route.points,
-      stationIds: new Set(hits.items.map((h) => h.station.entityId)),
+      // Đang bật kế hoạch sạc: chỉ vẽ ghim các điểm dừng.
+      stationIds: new Set((chargePlan ? chargePlan.stops.map((s) => s.item) : hits.items).map((h) => h.station.entityId)),
       bounds: routeBounds(trip.route.points),
       padding: isMobile
         ? { top: 130, bottom: Math.round(window.innerHeight * 0.55), left: 30, right: 30 }
         : { top: 130, bottom: 60, left: 420, right: 60 },
     }
-  }, [trip.route, hits, isMobile])
+  }, [trip.route, hits, chargePlan, isMobile])
 
   // Generation mới (dữ liệu làm mới hằng ngày): trạm đang mở trỏ sang bản ghi mới cùng id.
   useEffect(() => {
@@ -330,6 +345,9 @@ export function App() {
           battery={battery.reading}
           batteryStale={battery.stale}
           onBattery={battery.set}
+          planOn={planOn}
+          plan={chargePlan}
+          onTogglePlan={() => setPlanOn((v) => !v)}
         />
       )}
 

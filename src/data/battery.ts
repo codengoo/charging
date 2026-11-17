@@ -69,14 +69,14 @@ export function chargePort(power: StationPower | undefined, live: LivePorts[] | 
 }
 
 /**
- * Phút sạc từ `fromPct` lên 80%. DC: xe giữ trung bình ~75% công suất đỉnh dưới 80%; AC gần
- * như phẳng (~90%). Đã ≥ 80% → null.
+ * Phút sạc từ `fromPct` lên `toPct` (mặc định 80%). DC: xe giữ trung bình ~75% công suất đỉnh
+ * dưới 80%; AC gần như phẳng (~90%). Đã đủ → null.
  */
-export function chargeMinutes(fromPct: number, port: ChargePort, v: Vehicle): number | null {
-  if (fromPct >= TARGET_PCT) return null
+export function chargeMinutes(fromPct: number, port: ChargePort, v: Vehicle, toPct = TARGET_PCT): number | null {
+  if (fromPct >= toPct) return null
   const kw = port.dc ? Math.min(port.kw, v.dcKw) * 0.75 : Math.min(port.kw, v.acKw) * 0.9
   if (kw <= 0) return null
-  const kwh = ((TARGET_PCT - Math.max(0, fromPct)) / 100) * v.kwh
+  const kwh = ((toPct - Math.max(0, fromPct)) / 100) * v.kwh
   return (kwh / kw) * 60
 }
 
