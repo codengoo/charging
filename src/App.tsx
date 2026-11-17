@@ -22,6 +22,7 @@ import { useResolvedTheme } from './lib/theme'
 import { ImportDialog, pendingImport, type PendingImport } from './ui/ImportDialog'
 import { IMPORT_HASH, decodeBackup } from './data/backup'
 import { useNotes } from './data/notes'
+import { useReviews } from './data/reviews'
 import { TripPanel } from './ui/TripPanel'
 import { useTrip } from './data/useTrip'
 import { routeBounds } from './data/routeCorridor'
@@ -87,6 +88,7 @@ export function App() {
   // Chi tiết VinFast chỉ gọi khi có trạm được chọn; giữ theo sheetStation để còn ảnh lúc trôi xuống.
   const detail = useStationDetail(sheetStation?.entityId ?? null)
   // Số cổng trống + lịch sử 24h (EVCS) — chỉ khi bảng trạm đang mở.
+  const reviews = useReviews(sheetStation?.entityId ?? null, selected !== null)
   const live = useLiveStatus(sheetStation?.storeId ?? null, selected !== null)
   const [grouping, setGrouping] = useState(false)
   const [sharing, setSharing] = useState(false)
@@ -383,6 +385,8 @@ export function App() {
           onPickCar={() => setPickingCar(true)}
           note={notes.notes[sheetStation.entityId]}
           onNote={(text) => notes.set(sheetStation.entityId, text)}
+          reviews={reviews}
+          theme={theme}
           onOpenGroups={() => setGrouping(true)}
           onShare={() => setSharing(true)}
           onClose={() => {

@@ -21,6 +21,7 @@ import type { LiveState } from '../data/live'
 import { HistoryBox, PortsBox } from './LiveSection'
 import { BatteryBox } from './BatteryControl'
 import { NoteBox } from './NoteBox'
+import { ReviewsSection } from './ReviewsSection'
 import type { Note } from '../data/notes'
 import type { BatteryReading } from '../data/battery'
 import type { Vehicle } from '../data/vehicles'
@@ -89,6 +90,9 @@ interface Props {
   onPickCar: () => void
   /** Ghi chú cá nhân (localStorage); onNote('') = xoá. */
   note?: Note
+  /** Đánh giá + bình luận công khai (useReviews ở App, chỉ tải khi bảng mở). */
+  reviews: Parameters<typeof ReviewsSection>[0]['reviews']
+  theme: 'light' | 'dark'
   onNote: (text: string) => void
   onOpenGroups: () => void
   onShare: () => void
@@ -105,7 +109,7 @@ const STATUS_BG = {
   planned: 'bg-[#64748B]',
 } as const
 
-export function StationSheet({ open, station, book, power, powerLoading, detail, detailLoading, drive, live, vehicle, climate, battery, batteryStale, onBattery, onPickCar, note, onNote, onOpenGroups, onShare, onClose, children }: Props) {
+export function StationSheet({ open, station, book, power, powerLoading, detail, detailLoading, drive, live, vehicle, climate, battery, batteryStale, onBattery, onPickCar, note, onNote, reviews, theme, onOpenGroups, onShare, onClose, children }: Props) {
   const gmapsDir = `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}`
   const groups = groupsOf(book, station.entityId)
     .map((id) => group(book, id))
@@ -207,6 +211,8 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
             Hotline {detail.hotline}
           </a>
         )}
+
+        <ReviewsSection key={station.entityId} reviews={reviews} theme={theme} />
 
         <ResponsiveDialogFooter className="flex-row">
           <Button
