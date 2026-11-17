@@ -12,7 +12,7 @@ import { TIER_COLORS } from '../map/pins'
 import { pick } from '../i18n'
 import { arrivalPct, avgKmh, type ArrivalEstimate, type BatteryReading } from '../data/battery'
 import type { Vehicle } from '../data/vehicles'
-import { BatteryControl, fmtRange, pctOf, pctTone } from './BatteryControl'
+import { BatteryControl, DANGER_PCT, fmtRange, pctOf, pctTone } from './BatteryControl'
 import { PLAN_MIN_DC_KW, type ChargePlan } from '../data/chargePlan'
 import { fmtMinutes } from '../data/drive'
 import type { Avoid } from '../lib/mapsLink'
@@ -199,6 +199,9 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
       : null
   let lastOk = -1
   if (estimates) for (let i = 0; i < estimates.length; i++) if (estimates[i].low >= reservePct) lastOk = i
+  // Từ trạm đầu tiên SAU vạch còn kịp mà pin bi quan < DANGER_PCT (chữ đỏ) trở xuống: nền đỏ.
+  let dangerFrom = -1
+  if (estimates) dangerFrom = estimates.findIndex((e, i) => i > lastOk && e.low < DANGER_PCT)
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -363,16 +366,24 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
 
           {!(planOn && plan) && hits.items.length > 0 && (
             <ul className="-mx-4 px-4" aria-label={L.listAria}>
-              {estimates && lastOk === -1 && <ReachDivider text={L.noneReachable(startPct, reservePct)} />}
+              {estimates && lastOk === -1 && <ZoneEdge tone="warn" text={L.noneReachable(startPct, reservePct)} />}
               {hits.items.map(({ station, atKm, offsetKm, viaExit }, i) => {
                 const p = power?.get(station.entityId)
                 const est = estimates?.[i]
                 return (
                   <Fragment key={station.entityId}>
+                    {i === dangerFrom && <ZoneEdge tone="danger" under="warn" />}
                     <li
-                      className={`border-b border-border/60 last:border-b-0 ${
-                        // Vùng không chắc tới được: nền vàng tràn hết bề ngang, nối liền với vạch răng cưa.
-                        estimates && i > lastOk ? `-mx-4 px-4 ${WARN_BG}` : ''
+                      className={`${
+                        // Ngay trên mép răng cưa thì bỏ kẻ dưới — răng cưa đã là ranh giới.
+                        i === lastOk || i === dangerFrom - 1 ? '' : 'border-b border-border/60 last:border-b-0'
+                      } ${
+                        // Vùng không chắc / dễ hết pin: nền tràn hết bề ngang, nối liền với mép răng cưa.
+                        dangerFrom >= 0 && i >= dangerFrom
+                          ? `-mx-4 px-4 ${ZONE_BG.danger}`
+                          : estimates && i > lastOk
+                            ? `-mx-4 px-4 ${ZONE_BG.warn}`
+                            : ''
                       }`}
                     >
                       <button
@@ -398,7 +409,7 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
                         {est && <ArrivalPct est={est} />}
                       </button>
                     </li>
-                    {i === lastOk && i < hits.items.length - 1 && <ReachDivider text={L.lastReachable(reservePct)} />}
+                    {i === lastOk && i < hits.items.length - 1 && <ZoneEdge tone="warn" text={L.lastReachable(reservePct)} />}
                   </Fragment>
                 )
               })}
@@ -529,23 +540,29 @@ function ArrivalPct({ est }: { est: ArrivalEstimate }) {
 }
 
 /** Vạch ngăn giữa trạm còn kịp và trạm có thể không tới được. */
-/** Nền vùng "không chắc tới được" — vạch răng cưa và các trạm phía sau dùng chung. */
-const WARN_BG = 'bg-[#F0A500]/12'
-/** Mép răng cưa: mask SVG (răng nhọn lên) trên nền WARN_BG, nên màu ăn theo giao diện sáng/tối. */
+/** Nền vùng "không chắc tới được" (vàng) và "dễ hết pin" (đỏ) — mép răng cưa và các trạm phía sau dùng chung. */
+const ZONE_BG = { warn: 'bg-[#F0A500]/12', danger: 'bg-destructive/10' } as const
+/** Mép răng cưa: mask SVG (răng nhọn lên) trên nền của vùng, nên màu ăn theo giao diện sáng/tối. */
 const ZIGZAG_MASK = `url("data:image/svg+xml,${encodeURIComponent(
   "<svg xmlns='http://www.w3.org/2000/svg' width='14' height='7' viewBox='0 0 14 7'><path d='M0 7 7 0 14 7Z'/></svg>",
 )}")`
 
-/** Ranh giới trạm còn kịp / không chắc kịp: từ đây trở xuống nền vàng, mép trên răng cưa. */
-function ReachDivider({ text }: { text: string }) {
+/**
+ * Mép trên của một vùng: từ đây trở xuống nền vàng (không chắc kịp) hoặc đỏ (dễ hết pin), mép
+ * răng cưa. Vùng vàng kèm một dòng chữ; vùng đỏ chỉ có mép — chữ % đỏ đã nói đủ.
+ */
+function ZoneEdge({ tone, text, under }: { tone: keyof typeof ZONE_BG; text?: string; under?: keyof typeof ZONE_BG }) {
   return (
-    <li role="separator" className="-mx-4 mt-1">
+    // `under`: nền vùng phía trên (lộ ra giữa các răng) — mép đỏ luôn nằm ngay sau vùng vàng.
+    <li role="separator" aria-label={text} className={`-mx-4 ${under ? `pt-1 ${ZONE_BG[under]}` : 'mt-1'}`}>
       <div
         aria-hidden
-        className={`h-[7px] ${WARN_BG}`}
+        className={`h-[7px] ${ZONE_BG[tone]}`}
         style={{ maskImage: ZIGZAG_MASK, WebkitMaskImage: ZIGZAG_MASK, maskSize: '14px 7px', WebkitMaskSize: '14px 7px', maskRepeat: 'repeat-x', WebkitMaskRepeat: 'repeat-x' }}
       />
-      <div className={`px-4 pt-1.5 pb-1 text-xs font-medium text-[#B45309] dark:text-[#F0A500] ${WARN_BG}`}>{text}</div>
+      {text && (
+        <div className={`px-4 pt-1.5 pb-1 text-xs font-medium text-[#B45309] dark:text-[#F0A500] ${ZONE_BG[tone]}`}>{text}</div>
+      )}
     </li>
   )
 }

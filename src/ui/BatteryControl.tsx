@@ -49,9 +49,12 @@ const L = pick({
 
 const clock = (t: number) => new Date(t).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' })
 
-/** Màu chữ theo % pin bi quan khi đến: dưới 5% đỏ, dưới 15% cam. */
+/** Dưới mức này (ước tính bi quan) là dễ hết pin: chữ đỏ, và Dọc đường tô nền đỏ từ trạm đầu tiên như vậy. */
+export const DANGER_PCT = 5
+
+/** Màu chữ theo % pin bi quan khi đến: dưới DANGER_PCT đỏ, dưới 15% cam. */
 export function pctTone(low: number): string {
-  if (low < 5) return 'text-destructive'
+  if (low < DANGER_PCT) return 'text-destructive'
   if (low < 15) return 'text-[#B45309] dark:text-[#F0A500]'
   return 'text-foreground'
 }
