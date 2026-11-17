@@ -13,6 +13,7 @@ import type { LivePorts } from '../data/live'
 import type { StationPower } from '../data/types'
 import type { Vehicle } from '../data/vehicles'
 import { fmtKw } from '@/lib/format'
+import { Slider } from '@/components/ui/slider'
 import { LOCALE, pick } from '@/i18n'
 
 const L = pick({
@@ -83,23 +84,22 @@ export function BatteryControl({
   const label = compact ? L.start : L.battery
   return (
     <div data-vaul-no-drag className="flex flex-col gap-0.5">
-      <label className="flex items-center gap-2 text-sm">
+      <div className="flex items-center gap-2 text-sm">
         <BatteryMedium className="size-4 shrink-0 text-brand" aria-hidden />
         <span className="shrink-0">{label}</span>
-        <input
-          type="range"
+        <Slider
           min={0}
           max={100}
           step={1}
-          value={pct}
-          onChange={(e) => onChange(Number(e.target.value))}
-          aria-label={label}
-          className="h-6 min-w-0 flex-1 cursor-pointer accent-brand"
+          value={[pct]}
+          onValueChange={([v]) => onChange(v)}
+          thumbLabel={label}
+          className="h-6 min-w-0 flex-1"
         />
         <span className={`w-10 shrink-0 text-right font-semibold tabular-nums ${reading && !stale ? '' : 'text-muted-foreground'}`}>
           {pct}%
         </span>
-      </label>
+      </div>
       {hint && (
         <span className={`pl-6 text-xs ${stale ? 'text-[#B45309] dark:text-[#F0A500]' : 'text-muted-foreground'}`}>{hint}</span>
       )}
