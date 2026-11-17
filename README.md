@@ -46,7 +46,7 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   bỏ trạm bên kia dải phân cách cao tốc, trạm sát cao tốc mà không phải trạm dừng nghỉ cùng chiều (phải
   > 150 m hoặc bên trái) gắn `viaExit` — kế hoạch sạc chỉ dùng ở chặng không còn trạm vào thẳng nào, cộng quãng vòng ước tính `EXIT_ACCESS_KM` (2,5 km) mỗi chiều, trần 400 trạm theo độ lệch), xếp theo km gặp trên đường.
   URL `/trip?link=…` mở lại hành trình. Cần secret `HERE_API_KEY` (xem "API proxy HERE").
-- **% pin khi đến trạm** (`src/data/battery.ts`, `src/data/vehicles.ts`, `src/ui/BatteryControl.tsx`): chọn xe
+- **% pin khi đến trạm** (`src/data/battery.ts`, `src/data/useBattery.ts`, `src/data/vehicles.ts`, `src/ui/BatteryControl.tsx`): chọn xe
   trong Cài đặt (10 mẫu VinFast hoặc Tuỳ chỉnh, công tắc điều hoà ×1,08), kéo % pin hiện tại (localStorage
   `tramsac.battery`, cũ sau 2 giờ). Bảng trạm hiện "Còn ~X–Y% khi tới" theo quãng đường lái (`/api/drive`; đường
   chim bay × 1,3 khi lỗi) và thời gian sạc lên 80% ở cổng mạnh nhất còn trống; Dọc đường hiện % tại từng trạm
@@ -70,9 +70,10 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
 ### Dữ liệu ở client (`src/data/useStationData.ts`)
 
 - `GET /data/manifest.json` với `cache: 'no-cache'` (luôn hỏi lại, thường chỉ 304) →
-  `base-<gen>.json` (vẽ bản đồ) → `power-<gen>.json` tải ngầm, căn theo thứ tự hàng của base.
-- Tab để mở lâu: quay lại tab (sau ≥ 30 phút) thì hỏi manifest; generation mới → tải lại và
-  thay chỉ mục **không dựng lại bản đồ**. Trạm đang mở và nhóm đã lưu giữ nguyên (cùng `entityId`).
+  `base-<gen>-<hash>.json` (vẽ bản đồ) → `power-<gen>-<hash>.json` tải ngầm, căn theo thứ tự hàng của base.
+- Tab để mở lâu: quay lại tab (sau ≥ 30 phút) thì hỏi manifest; tên file base/power đổi (`dataKey`
+  trong `src/data/format.ts`) → tải lại và thay chỉ mục **không dựng lại bản đồ**. Trạm đang mở và
+  nhóm đã lưu giữ nguyên (cùng `entityId`).
 
 ## Link trạm & chia sẻ
 
@@ -163,6 +164,42 @@ npm run dev        # http://localhost:5173 — /data/* proxy sang https://chargi
 npm run build      # ra thư mục dist/
 ```
 
+## Kiểm tra
+
+```bash
+npm run typecheck  # tsc cho src/ + worker/ (workers-types, không DOM) + builder/ (.mjs, @ts-check)
+npm test           # Vitest, logic thuần (env node) — script đã cố định --maxWorkers=2
+```
+
+Luôn chạy test với **tối đa 2 worker** (`npm test` / `npm run test:watch` đã gắn sẵn
+`--maxWorkers=2`; gọi `npx vitest` trực tiếp thì tự thêm) — chạy full core làm treo máy.
+CI (`.github/workflows/ci.yml`) chạy typecheck + test + build trên mỗi push / PR vào `main`.
+Test nằm cạnh file (`*.test.ts`); test chưa phủ hook / component React.
+
+## Cấu trúc mã
+
+```
+src/
+  App.tsx            ghép trạng thái + bảng; logic tách ra src/app/
+  app/               useUrlSync (deep link trạm / hành trình / sao lưu, URL + tiêu đề tab),
+                     useTripPlan (kế hoạch sạc + lớp tuyến), useSheets (cờ mở bảng), MapChips
+  map/               MapView (vòng đời MapLibre), layers.ts (nguồn / lớp / sự kiện / ảnh ghim), pins.ts
+  ui/                các bảng (AppSheet = khung chung), StationRow, useQrCanvas (QR / chép / nháy)
+  components/ui/     primitive shadcn (dialog, drawer, responsive-dialog, …)
+  data/              miền + hook: stations, groups, trip (mạng) / here (đọc body HERE) / tripTypes /
+                     routeCorridor / chargePlan / battery (thuần) + useTrip / useBattery / useSettings…
+                     format.ts = định dạng file R2 dùng chung builder ↔ Worker ↔ client
+  lib/               storage (localStorage an toàn), http (fetchJson + HttpError), geo (GeoPoint,
+                     distanceKm, getPosition), text (bỏ dấu, base64url), format, mapsLink, stationUrl…
+worker/              index.ts (bảng ROUTES + guard), http.ts (json / fail / sameSite / checkGuard),
+                     manifest.ts (cache manifest + tra shard SEO), api / locator / evcs / reviews
+builder/             ETL Node thuần (.mjs, @ts-check), check.mjs chặn upload bản build hỏng
+```
+
+Quy ước: `localStorage` chỉ qua `src/lib/storage.ts`, `fetch` JSON chỉ qua `src/lib/http.ts`,
+`navigator.geolocation` chỉ qua `src/lib/geo.ts` (bản đồ theo dõi vị trí bằng GeolocateControl).
+Module thuần trong `src/data/` không import React — hook để file `use*.ts` riêng.
+
 Thử cả Worker (`/data/*` từ R2 giả lập + preview `/station/*`):
 
 ```bash
@@ -251,8 +288,9 @@ GitHub Action (.github/workflows/build-data.yml), cron 0 19 * * * (02:00 VN):
     1. GET locators-meta.json → generation
     2. STREAM snapshot + 2 KML My Maps (streaming, không load nguyên khối)
     3. Lọc type=2444, trộn enrich theo toạ độ (lệch → để trống), charging_status → cột status
-    4. ghi builder/out/{base,power}-{gen}.json, seo-{gen}/*.json (preview /station), manifest.json
-  → wrangler r2 object put … (JSON THÔ)
+    4. ghi builder/out/{base,power}-{gen}-{hash}.json, seo-{gen}/*.json (preview /station), manifest.json
+  node builder/check.mjs   (< 20.000 trạm / < 50% có số cổng / tụt > 5% so bản đang chạy → dừng)
+  → wrangler r2 object put … (JSON THÔ, manifest đẩy sau cùng)
 R2 "tramsac-data" → Worker (worker/index.ts) phục vụ /data/* → Cloudflare auto-nén (zstd/gzip)
 ```
 
@@ -260,9 +298,10 @@ R2 "tramsac-data" → Worker (worker/index.ts) phục vụ /data/* → Cloudflar
 động / 1 bảo trì / 2 ngừng / 3 chưa khai trương (`BUSY` gộp vào 0 — build chỉ chạy mỗi ngày). Client
 đọc base v2 cũ (8 cột) thì coi mọi trạm là hoạt động.
 
-Client: `GET /data/manifest.json` (con trỏ latest) → `base-{gen}` (render ngay) →
-`power-{gen}` (lười, bật lọc công suất + hiện số cổng). File mang `generation` nên cache
-vĩnh viễn, đổi gen tự cache-bust. **Lưu R2 dạng JSON thô** — Cloudflare tự nén trên đường
+Client: `GET /data/manifest.json` (con trỏ latest) → `base-{gen}-{hash}` (render ngay) →
+`power-{gen}-{hash}` (lười, bật lọc công suất + hiện số cổng). Tên file mang generation **và** 8 ký tự
+hash nội dung nên cache vĩnh viễn được: chỉ My Maps đổi trong ngày (generation VinFast giữ nguyên) cũng
+ra tên mới, không bao giờ ghi đè file đang cache `immutable`. **Lưu R2 dạng JSON thô** — Cloudflare tự nén trên đường
 truyền; không tự gzip vì Workers runtime strip `Content-Encoding` set thủ công.
 
 Enrich từ **Google My Maps** (2 KML public): `Cổng sạc` → số cổng + kW + DC/AC. Ghép theo

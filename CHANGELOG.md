@@ -2,6 +2,12 @@
 
 Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app).
 
+## [0.13.0] — 2026-11-17 — Dọn mã, ổn định hơn
+
+- Các bảng dùng chung một kiểu tiêu đề.
+- Dữ liệu trạm cập nhật đúng cả khi chỉ số cổng thay đổi trong ngày.
+- Bản dữ liệu hỏng không còn được đẩy lên.
+
 ## [0.12.1] — 2026-11-17 — Sửa lỗi & bảo vệ máy chủ
 
 - Không còn kẹt lỗi "không có ảnh" ở trạm sau một lần tải lỗi.

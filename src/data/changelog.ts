@@ -11,6 +11,22 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.13.0',
+    date: '2026-11-17',
+    title: "Dọn mã, ổn định hơn",
+    changes: [
+      "Các bảng dùng chung một kiểu tiêu đề.",
+      "Dữ liệu trạm cập nhật đúng cả khi chỉ số cổng thay đổi trong ngày.",
+      "Bản dữ liệu hỏng không còn được đẩy lên.",
+    ],
+    titleEn: "Code cleanup, more stable",
+    changesEn: [
+      "All panels share one header style.",
+      "Station data refreshes even when only port counts change during the day.",
+      "Broken data builds are no longer published.",
+    ],
+  },
+  {
     version: '0.12.1',
     date: '2026-11-17',
     title: "Sửa lỗi & bảo vệ máy chủ",
