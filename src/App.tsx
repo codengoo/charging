@@ -22,8 +22,11 @@ import { vehicleOf } from './data/vehicles'
 import { useResolvedTheme } from './lib/theme'
 import { ImportDialog, pendingImport, type PendingImport } from './ui/ImportDialog'
 import { useNotes } from './data/notes'
-import { placeName, usePlaces } from './data/places'
-import { PlacesSheet, type PlaceDraft } from './ui/PlacesSheet'
+import { newPlaceId, placeName, usePlaces } from './data/places'
+import { PlacesSheet } from './ui/PlacesSheet'
+import { PlaceEditorPanel, type PlaceEditTarget } from './ui/PlaceEditorPanel'
+import { reverse, type PlaceHit } from './data/trip'
+import type { SheetName } from './app/useSheets'
 import { PointSheet } from './ui/PointSheet'
 import { directionsLink } from './lib/mapsLink'
 import { useReviews } from './data/reviews'
@@ -110,12 +113,34 @@ export function App() {
   const { trip, hits } = tripCtl
   // Giữ lần nhập cuối để hộp xác nhận còn nội dung lúc trôi xuống.
   const [pending, setPending] = useState<PendingImport | null>(null)
-  // Bảng địa điểm: mở thường (danh sách) hoặc với điểm có sẵn (chạm giữ bản đồ). Từ Cài đặt thì mở
-  // CHỒNG lên Cài đặt (bản `settingsPlaces`, nested) — bảng cha lùi ra sau.
-  const [placeDraft, setPlaceDraft] = useState<PlaceDraft | null>(null)
-  function openPlaces(draft: PlaceDraft | null) {
-    setPlaceDraft(draft)
-    sheets.open('places')
+  // Đặt địa điểm: bảng nổi không chặn bản đồ (PlaceEditorPanel) — TẠM ẨN các bảng đang xếp chồng
+  // (đóng rồi mở lại khi xong: giữ chúng mở thì Radix chặn bấm bản đồ và giữ focus), chạm bản đồ để chọn.
+  const [editTarget, setEditTarget] = useState<PlaceEditTarget | null>(null)
+  const [editPin, setEditPin] = useState<{ lat: number; lng: number } | null>(null)
+  const [mapPick, setMapPick] = useState<PlaceHit | null>(null)
+  const restoreSheets = useRef<SheetName[]>([])
+  function startPlaceEdit(t: PlaceEditTarget) {
+    restoreSheets.current = (['settings', 'settingsPlaces', 'places'] as const).filter((n) => sheets.is(n))
+    sheets.close('settings', 'settingsPlaces', 'places', 'point', 'nearby')
+    setSelected(null)
+    setMapPick(null)
+    setEditTarget(t)
+  }
+  function endPlaceEdit() {
+    setEditTarget(null)
+    setEditPin(null)
+    setMapPick(null)
+    for (const n of restoreSheets.current) sheets.open(n)
+    restoreSheets.current = []
+  }
+  /** Chạm bản đồ khi đang đặt: ghim ngay (toạ độ), tên chỗ hỏi HERE rồi điền sau. */
+  function pickOnMap(pt: { lat: number; lng: number }) {
+    const coords = `${pt.lat.toFixed(5)}, ${pt.lng.toFixed(5)}`
+    setMapPick({ label: coords, address: '', ...pt })
+    setEditPin(pt)
+    void reverse(pt, new AbortController().signal)
+      .then((label) => label && setMapPick((cur) => (cur && cur.lat === pt.lat && cur.lng === pt.lng ? { ...cur, label } : cur)))
+      .catch(() => {})
   }
 
   // Chạm giữ bản đồ / bấm ghim địa điểm → bảng "Chỗ này".
@@ -216,7 +241,7 @@ export function App() {
         power={power}
         selected={selected}
         flyTo={flyTo}
-        onSelect={pick}
+        onSelect={(st) => (editTarget ? undefined : pick(st))}
         onLocate={setUserPos}
         onMoveEnd={(v) => {
           mapCenter.current = { lat: v.lat, lng: v.lng }
@@ -228,8 +253,9 @@ export function App() {
           const pl = places.places.find((x) => x.id === id)
           if (pl) openPoint({ lat: pl.lat, lng: pl.lng }, id)
         }}
-        onLongPress={(pt) => openPoint(pt, null)}
-        pinAt={sheets.is('point') && point && !point.placeId ? point.at : null}
+        onLongPress={(pt) => (editTarget ? pickOnMap(pt) : openPoint(pt, null))}
+        pinAt={editTarget ? editPin : sheets.is('point') && point && !point.placeId ? point.at : null}
+        onMapClick={editTarget ? pickOnMap : undefined}
       />
 
       {/* Status bar trong suốt (PWA iOS): chữ giờ/pin luôn trắng — dải mờ tối cho đọc được trên nền bản đồ sáng.
@@ -262,7 +288,7 @@ export function App() {
 
       {tripMounted && (
         <TripPanel
-          visible={tripOpen}
+          visible={tripOpen && !editTarget}
           trip={trip}
           hits={hits}
           power={power}
@@ -277,7 +303,7 @@ export function App() {
           onPick={pick}
           places={places.places}
           onRouteTo={(to, from) => tripCtl.open(directionsLink(to, from))}
-          onManagePlaces={() => openPlaces(null)}
+          onManagePlaces={() => sheets.open('places')}
           onClose={tripCtl.close}
           vehicle={vehicle}
           climate={settings.climate}
@@ -439,20 +465,15 @@ export function App() {
         onChange={changeSettings}
         onClose={() => sheets.close('settings')}
         placesSummary={places.places.length ? places.places.map(placeName).join(' · ') : null}
-        onOpenPlaces={() => {
-          setPlaceDraft(null)
-          sheets.open('settingsPlaces')
-        }}
+        onOpenPlaces={() => sheets.open('settingsPlaces')}
       >
         <PlacesSheet
           nested
           open={sheets.is('settingsPlaces')}
           onClose={() => sheets.close('settingsPlaces')}
           places={places.places}
-          onSave={places.save}
           onRemove={places.remove}
-          near={userPos ?? mapCenter.current}
-          draft={null}
+          onEdit={startPlaceEdit}
         />
       </SettingsSheet>
 
@@ -460,11 +481,28 @@ export function App() {
         open={sheets.is('places')}
         onClose={() => sheets.close('places')}
         places={places.places}
-        onSave={places.save}
         onRemove={places.remove}
-        near={userPos ?? mapCenter.current}
-        draft={placeDraft}
+        onEdit={startPlaceEdit}
       />
+
+      {editTarget && (
+        <PlaceEditorPanel
+          key={editTarget.id}
+          target={editTarget}
+          near={userPos ?? mapCenter.current}
+          mapPick={mapPick}
+          onChosen={(hit, fly) => {
+            setEditPin(hit ? { lat: hit.lat, lng: hit.lng } : null)
+            if (fly && hit) setFlyTo({ lat: hit.lat, lng: hit.lng, zoom: 16 })
+          }}
+          onSave={(t) => {
+            const hit = t.hit!
+            places.save({ id: t.id, kind: t.kind, name: t.name.trim(), lat: hit.lat, lng: hit.lng, address: hit.address ? `${hit.label}, ${hit.address}` : hit.label })
+            endPlaceEdit()
+          }}
+          onCancel={endPlaceEdit}
+        />
+      )}
 
       <PointSheet
         open={sheets.is('point')}
@@ -485,12 +523,12 @@ export function App() {
         onSave={(kind, pt, label) => {
           sheets.close('point')
           // Nhà / Công ty lưu luôn; địa điểm khác cần đặt tên → màn đặt địa điểm.
-          if (kind === 'custom') openPlaces({ kind, lat: pt.lat, lng: pt.lng, label })
+          if (kind === 'custom') startPlaceEdit({ id: newPlaceId(), kind, name: '', hit: { label, address: '', lat: pt.lat, lng: pt.lng }, isNew: true })
           else places.save({ id: kind, kind, name: '', lat: pt.lat, lng: pt.lng, address: label })
         }}
         onEditPlaces={() => {
           sheets.close('point')
-          openPlaces(null)
+          sheets.open('places')
         }}
       />
 

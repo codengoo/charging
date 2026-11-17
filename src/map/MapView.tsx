@@ -58,21 +58,23 @@ interface Props {
   onPlaceClick?: (id: string) => void
   /** Chạm giữ (điện thoại) / chuột phải (máy tính) trên bản đồ. */
   onLongPress?: (p: { lat: number; lng: number }) => void
-  /** Ghim tạm ở điểm vừa chạm giữ (đang mở bảng "Chỗ này"). */
+  /** Ghim tạm ở điểm vừa chạm giữ (đang mở bảng "Chỗ này") / điểm đang chọn khi đặt địa điểm. */
   pinAt?: { lat: number; lng: number } | null
+  /** Chạm (click) bản đồ — chỉ truyền khi đang chọn chỗ (đặt địa điểm). */
+  onMapClick?: (p: { lat: number; lng: number }) => void
 }
 
 /** Giữ ngón tay chừng này (ms) không di chuyển quá LONG_PRESS_SLOP px thì coi là chạm giữ. */
 const LONG_PRESS_MS = 550
 const LONG_PRESS_SLOP = 10
 
-export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate, onMoveEnd, trip = null, onPickRoute, theme = 'light', places = [], onPlaceClick, onLongPress, pinAt = null }: Props) {
+export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate, onMoveEnd, trip = null, onPickRoute, theme = 'light', places = [], onPlaceClick, onLongPress, pinAt = null, onMapClick }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const loadedRef = useRef(false)
   // Giá trị mới nhất cho các handler đăng ký một lần trong lúc khởi tạo.
-  const latest = useRef({ index, filters, book, power, selected, onSelect, onLocate, onMoveEnd, trip, onPickRoute, onPlaceClick, onLongPress })
-  latest.current = { index, filters, book, power, selected, onSelect, onLocate, onMoveEnd, trip, onPickRoute, onPlaceClick, onLongPress }
+  const latest = useRef({ index, filters, book, power, selected, onSelect, onLocate, onMoveEnd, trip, onPickRoute, onPlaceClick, onLongPress, onMapClick })
+  latest.current = { index, filters, book, power, selected, onSelect, onLocate, onMoveEnd, trip, onPickRoute, onPlaceClick, onLongPress, onMapClick }
   const placeMarkers = useRef<ReturnType<typeof createPlaceMarkers> | null>(null)
   const pinMarker = useRef<maplibregl.Marker | null>(null)
 
@@ -145,6 +147,7 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
     map.on('touchend', cancelPress)
     map.on('touchcancel', cancelPress)
     map.on('contextmenu', (e) => fireLongPress(e.lngLat))
+    map.on('click', (e) => latest.current.onMapClick?.({ lat: e.lngLat.lat, lng: e.lngLat.lng }))
 
     map.on('moveend', () => {
       const c = map.getCenter()
