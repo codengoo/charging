@@ -61,9 +61,26 @@ export type ChargePort = Omit<PortGroup, 'count'>
 
 /** Live chỉ có kW: trên mức này coi là DC khi không tra được nhóm cổng. */
 const AC_MAX_KW = 22
-/** DC: xe giữ trung bình ~75% công suất đỉnh dưới 80%; AC gần như phẳng (~90%). */
-const DC_CURVE = 0.75
+/** Xe không có đường cong DC: phẳng 75% công suất đỉnh (mức trung bình dưới 80%). AC gần như phẳng (~90%). */
+const DC_FLAT = 0.75
 const AC_CURVE = 0.9
+/** Bước tích phân đường cong sạc (% pin). */
+const CURVE_STEP = 0.5
+
+/** Công suất DC xe nhận ở `soc`% — nội suy tuyến tính trên `dcCurve`. */
+export function dcCurveKw(v: Vehicle, soc: number): number {
+  const c = v.dcCurve
+  if (!c || c.length === 0) return v.dcKw * DC_FLAT
+  if (soc <= c[0][0]) return c[0][1]
+  for (let i = 1; i < c.length; i++) {
+    const [s1, k1] = c[i]
+    if (soc <= s1) {
+      const [s0, k0] = c[i - 1]
+      return k0 + ((k1 - k0) * (soc - s0)) / (s1 - s0)
+    }
+  }
+  return c[c.length - 1][1]
+}
 
 /**
  * Cổng sẽ cắm: mạnh nhất còn trống theo live nếu có, không thì nhóm cổng mạnh nhất (ưu tiên DC).
@@ -78,13 +95,22 @@ export function chargePort(power: StationPower | undefined, live: LivePorts[] | 
 }
 
 /**
- * Phút sạc từ `fromPct` lên `toPct` (mặc định 80%). DC: xe giữ trung bình ~75% công suất đỉnh
- * dưới 80%; AC gần như phẳng (~90%). Đã đủ → null.
+ * Phút sạc từ `fromPct` lên `toPct` (mặc định 80%). DC: tích phân theo đường cong của xe, mỗi bước
+ * lấy min(đường cong, cổng trạm). AC: gần như phẳng (~90% min(cổng, bộ sạc xe)). Đã đủ → null.
  */
 export function chargeMinutes(fromPct: number, port: ChargePort, v: Vehicle, toPct = TARGET_PCT): number | null {
-  if (fromPct >= toPct) return null
-  const kw = port.dc ? Math.min(port.kw, v.dcKw) * DC_CURVE : Math.min(port.kw, v.acKw) * AC_CURVE
-  if (kw <= 0) return null
-  const kwh = ((toPct - Math.max(0, fromPct)) / 100) * v.kwh
-  return (kwh / kw) * 60
+  const from = Math.max(0, fromPct)
+  if (from >= toPct || port.kw <= 0) return null
+  if (!port.dc) {
+    const kw = Math.min(port.kw, v.acKw) * AC_CURVE
+    return kw > 0 ? ((((toPct - from) / 100) * v.kwh) / kw) * 60 : null
+  }
+  let hours = 0
+  for (let s = from; s < toPct; s += CURVE_STEP) {
+    const step = Math.min(CURVE_STEP, toPct - s)
+    const kw = Math.min(port.kw, dcCurveKw(v, s + step / 2))
+    if (kw <= 0) return null
+    hours += ((step / 100) * v.kwh) / kw
+  }
+  return hours * 60
 }

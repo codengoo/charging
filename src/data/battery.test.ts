@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arrivalPct, avgKmh, chargeMinutes, chargePort, speedFactor } from '@/data/battery'
+import { arrivalPct, avgKmh, chargeMinutes, chargePort, dcCurveKw, speedFactor } from '@/data/battery'
 import type { StationPower } from '@/data/types'
 import { CUSTOM_ID, VEHICLES, vehicleOf, type Vehicle } from '@/data/vehicles'
 
@@ -72,6 +72,27 @@ describe('chargeMinutes', () => {
     expect(chargeMinutes(10, { kw: 0, dc: true }, V)).toBeNull()
     expect(chargeMinutes(-5, { kw: 150, dc: true }, V, 10)).toBeCloseTo((10 / 112.5) * 60, 9)
   })
+
+  const curved: Vehicle = { ...V, dcCurve: [[0, 50], [50, 100], [100, 20]] }
+  it('đường cong: nội suy tuyến tính, ngoài đầu mút giữ giá trị mút', () => {
+    expect(dcCurveKw(curved, 25)).toBeCloseTo(75, 9)
+    expect(dcCurveKw(curved, 75)).toBeCloseTo(60, 9)
+    expect(dcCurveKw(curved, 120)).toBe(20)
+    expect(dcCurveKw(V, 40)).toBeCloseTo(112.5, 9) // không có đường cong → phẳng 75% dcKw
+  })
+  it('đường cong: tích phân từng bước, công suất bị cổng trạm giới hạn', () => {
+    // 50→60%, cổng 40 kW (thấp hơn mọi điểm trên đoạn này) → phẳng 40 kW: 10 kWh / 40 kW.
+    expect(chargeMinutes(50, { kw: 40, dc: true }, curved, 60)).toBeCloseTo((10 / 40) * 60, 6)
+    // 0→50%: P = 50 + s (kW); tích phân ∫ 1/(50+s) ds × kWh/100 = ln(100/50) giờ.
+    expect(chargeMinutes(0, { kw: 500, dc: true }, curved, 50)!).toBeCloseTo(Math.log(2) * 60, 1)
+  })
+  it('từng mẫu: 10→70% khớp thời gian hãng công bố (±10%)', () => {
+    const official: Record<string, number> = { vf3: 36, minio: 30, vf5: 32, vfe34: 27, vf6: 25, limo: 30, vf7eco: 25, vf7plus: 28, vf8: 31, vf9: 35 }
+    for (const v of VEHICLES) {
+      const min = chargeMinutes(10, { kw: 250, dc: true }, v, 70)!
+      expect(Math.abs(min - official[v.id]) / official[v.id], v.id).toBeLessThan(0.1)
+    }
+  })
 })
 
 describe('vehicleOf', () => {
@@ -80,7 +101,8 @@ describe('vehicleOf', () => {
     expect(vehicleOf('vf8', 0, 0, 25)).toMatchObject({ id: 'vf8', kwh: 87.7, kwhPer100: 25, dcKw: 150 })
   })
   it('tuỳ chỉnh; id lạ / null → null', () => {
-    expect(vehicleOf(CUSTOM_ID, 60, 16)).toEqual({ id: 'custom', name: 'Tuỳ chỉnh', kwh: 60, kwhPer100: 16, dcKw: 150, acKw: 11 })
+    expect(vehicleOf(CUSTOM_ID, 60, 16)).toMatchObject({ id: 'custom', name: 'Tuỳ chỉnh', kwh: 60, kwhPer100: 16, dcKw: 150, acKw: 11 })
+    expect(vehicleOf(CUSTOM_ID, 60, 16)?.dcCurve?.length).toBeGreaterThan(2)
     expect(vehicleOf('xyz', 60, 16)).toBeNull()
     expect(vehicleOf(null, 60, 16)).toBeNull()
   })
