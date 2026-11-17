@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type FormEvent } from 'react'
+import { Fragment, useEffect, useState, type CSSProperties, type FormEvent } from 'react'
 import { ChevronDown, ChevronUp, ClipboardPaste, Loader2, Route, X, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
@@ -16,6 +16,7 @@ import { BatteryControl, DANGER_PCT, fmtRange, pctOf, pctTone } from './BatteryC
 import { PLAN_MIN_DC_KW, type ChargePlan } from '../data/chargePlan'
 import { fmtMinutes } from '../data/drive'
 import type { Avoid } from '../lib/mapsLink'
+import { SHEET_COMPACT, SHEET_EXPANDED, SHEET_TRANSITION, useExpandOnScroll } from '../lib/useExpandOnScroll'
 
 const L = pick({
   vi: {
@@ -171,6 +172,8 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
     if (stationOpen) setExpanded(false)
   }, [stationOpen])
 
+  // Điện thoại: cuộn thân bảng thì nâng gần full, cuộn ngược tới top thì về 60dvh. Màn rộng giữ sm:max-h.
+  const sheet = useExpandOnScroll()
   const [optsOpen, setOptsOpen] = useState(readOptsOpen)
   function toggleOpts() {
     setOptsOpen((v) => {
@@ -226,7 +229,8 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
   return (
     <section
       aria-label={L.title}
-      className="absolute inset-x-0 bottom-0 z-[6] flex max-h-[60dvh] flex-col rounded-t-2xl pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0 bg-card shadow-[0_-8px_30px_rgba(0,0,0,0.12)] sm:inset-x-auto sm:bottom-14 sm:left-3 sm:max-h-[calc(100dvh-11rem)] sm:w-[380px] sm:rounded-2xl sm:shadow-xl"
+      style={{ '--sheet-max': sheet.expanded ? SHEET_EXPANDED : SHEET_COMPACT, transition: SHEET_TRANSITION } as CSSProperties}
+      className="absolute inset-x-0 bottom-0 z-[6] flex max-h-(--sheet-max) flex-col rounded-t-2xl pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-0 bg-card shadow-[0_-8px_30px_rgba(0,0,0,0.12)] sm:inset-x-auto sm:bottom-14 sm:left-3 sm:max-h-[calc(100dvh-11rem)] sm:w-[380px] sm:rounded-2xl sm:shadow-xl"
     >
       <button
         type="button"
@@ -262,7 +266,10 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, ro
         // Cả thân bảng cuộn chung: hộp cấu hình + thẻ tuyến đã cao, để riêng danh sách cuộn thì nó bị ép về 0.
         // overflow-x-hidden: overflow-y-auto kéo theo cuộn ngang, phần lề âm -mx-4 sẽ kéo lệch được.
         // pt-1: vùng cuộn cắt mọi thứ tràn ra — chừa chỗ cho viền focus (ring 3px) của ô link.
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pt-1 pb-3 [&>*]:shrink-0">
+        <div
+          {...sheet.bind}
+          className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pt-1 pb-3 [&>*]:shrink-0"
+        >
           <form onSubmit={submit} className="flex gap-2">
             <Input
               value={text}

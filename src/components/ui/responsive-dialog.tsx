@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/drawer'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { cn } from '@/lib/utils'
+import { SHEET_COMPACT, SHEET_EXPANDED, SHEET_TRANSITION, useExpandOnScroll } from '@/lib/useExpandOnScroll'
 
 interface ResponsiveDialogContextValue {
   isMobile: boolean
@@ -96,15 +97,24 @@ export function ResponsiveDialogContent({
   ...props
 }: ResponsiveDialogContentProps) {
   const { isMobile } = React.useContext(ResponsiveDialogContext)
+  // Cuộn nội dung thì drawer nâng gần full, cuộn ngược tới top thì về 60dvh (xem useExpandOnScroll).
+  const sheet = useExpandOnScroll()
 
   if (isMobile) {
     return (
       <DrawerContent
         showHandle={showHandle}
-        className={cn('max-h-[92dvh] p-0 !overflow-hidden', className, '!overflow-hidden')}
+        className={cn('p-0 !overflow-hidden', className, '!overflow-hidden')}
         {...props}
+        style={{
+          ...props.style,
+          maxHeight: sheet.expanded ? SHEET_EXPANDED : SHEET_COMPACT,
+          // Giữ transition transform của vaul (drawer bật về khi kéo tay cầm rồi thả) — style inline đè CSS của nó.
+          transition: `transform 0.5s cubic-bezier(0.32, 0.72, 0, 1), ${SHEET_TRANSITION}`,
+        }}
       >
         <div
+          {...sheet.bind}
           data-vaul-no-drag
           className="sheet-stagger flex-1 min-h-0 overflow-y-auto overflow-x-hidden no-scrollbar px-5 pb-[max(2.5rem,env(safe-area-inset-bottom))] touch-pan-y"
         >
