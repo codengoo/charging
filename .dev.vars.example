@@ -1,2 +1,7 @@
 # Chép thành .dev.vars (đã gitignore) cho `wrangler dev`. Production: npx wrangler secret put HERE_API_KEY
 HERE_API_KEY=
+# Đánh giá (worker/reviews.ts). Production: npx wrangler secret put <TÊN>
+REVIEW_PEPPER=
+ADMIN_TOKEN=
+# Để trống = không bắt Turnstile (chỉ còn rate limit + lọc nội dung).
+TURNSTILE_SECRET=

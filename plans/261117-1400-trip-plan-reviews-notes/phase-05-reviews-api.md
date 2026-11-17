@@ -11,6 +11,7 @@
 | `worker/reviews.ts` | CREATE — `serveReviews(req, url, env)` |
 | `worker/index.ts` | MODIFY — `/api/reviews/*`, `/api/admin/*` đi tới `serveReviews` TRƯỚC `serveApi` (serveApi chỉ nhận GET) |
 | `.dev.vars.example` | MODIFY — `REVIEW_PEPPER`, `ADMIN_TOKEN`, `TURNSTILE_SECRET` |
+| `worker/api.ts` | MODIFY — export `sameSite` để reviews.ts dùng lại (thêm khi làm) |
 
 ## 2. Quy tắc
 
@@ -30,6 +31,8 @@ npx wrangler d1 migrations apply tramsac-reviews --remote
 npx wrangler secret put REVIEW_PEPPER
 npx wrangler secret put ADMIN_TOKEN
 ```
+
+**Thực tế 2026-11-17:** `wrangler d1 create` lỗi `Authentication error [code: 10000]` — token `CLOUDFLARE_API_TOKEN` thiếu quyền D1. `wrangler.jsonc` để `database_id` giả (toàn số 0); người dùng cấp quyền D1:Edit (hoặc `wrangler login`) rồi chạy các lệnh trên và thay id trước khi deploy.
 
 ## 4. Acceptance criteria
 

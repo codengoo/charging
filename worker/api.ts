@@ -58,7 +58,7 @@ export async function serveApi(req: Request, url: URL, env: ApiEnv): Promise<Res
  * `Sec-Fetch-Site` trước, rồi mới tới Origin/Referer (trình duyệt cũ).
  * Script tự làm giả được — rate limit mới là hàng rào thật.
  */
-function sameSite(req: Request): boolean {
+export function sameSite(req: Request): boolean {
   const site = req.headers.get('Sec-Fetch-Site')
   if (site) return site === 'same-origin'
   const from = req.headers.get('Origin') ?? req.headers.get('Referer')

@@ -6,9 +6,10 @@
 import { SITE_URL, STATION_PREFIX, parseStationId, stationPath } from '../src/lib/stationUrl'
 import { serveStationDetail } from './locator'
 import { serveApi, type ApiEnv } from './api'
+import { serveReviews, type ReviewsEnv } from './reviews'
 import { langFromPath, pickFor, stripLang, withLang, type Lang } from '../src/i18n'
 
-interface Env extends ApiEnv {
+interface Env extends ApiEnv, ReviewsEnv {
   DATA: R2Bucket
   ASSETS: Fetcher
 }
@@ -33,6 +34,8 @@ export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url)
     if (url.pathname.startsWith('/api/station/')) return serveStationDetail(url, env.DATA, ctx, req.cf?.colo as string | undefined)
+    // Đánh giá nhận cả PUT/POST/DELETE — đi trước serveApi (chỉ nhận GET).
+    if (url.pathname.startsWith('/api/reviews/') || url.pathname.startsWith('/api/admin/')) return serveReviews(req, url, env)
     if (url.pathname.startsWith('/api/')) return serveApi(req, url, env)
     if (url.pathname.startsWith('/data/')) return serveData(url, env)
     // Path cũ (QR đã in, link đã gửi) -> path tiếng Anh. 301 để trình duyệt/bot nhớ luôn.
