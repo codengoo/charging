@@ -197,23 +197,26 @@ function MyReview({ review, onEdit, onRemove }: { review: Review; onEdit: () => 
         <Button variant="ghost" size="sm" onClick={onEdit}>
           {L.edit}
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-destructive"
-          onBlur={() => setArming(false)}
-          onClick={async () => {
-            if (!arming) return setArming(true)
-            try {
-              await onRemove()
-            } catch (e) {
-              setError((e as Error).message)
-              setArming(false)
-            }
-          }}
-        >
-          {arming ? L.confirmRemove : L.remove}
-        </Button>
+        {/* Bài đang bị ẩn không xoá được (server trả 409) — xoá rồi đăng lại sẽ lách được việc ẩn. */}
+        {!review.hidden && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive"
+            onBlur={() => setArming(false)}
+            onClick={async () => {
+              if (!arming) return setArming(true)
+              try {
+                await onRemove()
+              } catch (e) {
+                setError((e as Error).message)
+                setArming(false)
+              }
+            }}
+          >
+            {arming ? L.confirmRemove : L.remove}
+          </Button>
+        )}
       </div>
     </div>
   )

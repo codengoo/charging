@@ -1,8 +1,8 @@
 // Đánh giá sao + bình luận công khai cho từng trạm, lưu ở D1 (migrations/0001_reviews.sql).
 //
-//   GET    /api/reviews/<entityId>[?before=<updatedAt>]   điểm TB, phân bố, bài của tôi, 20 bài mới nhất
+//   GET    /api/reviews/<entityId>[?before=<next>]        điểm TB, phân bố, bài của tôi, 20 bài mới nhất
 //   PUT    /api/reviews/<entityId>                        viết / sửa bài của tôi { rating, body, nickname, turnstile? }
-//   DELETE /api/reviews/<entityId>                        xoá bài của tôi
+//   DELETE /api/reviews/<entityId>                        xoá bài của tôi (409 nếu bài đang bị ẩn)
 //   POST   /api/reviews/report/<reviewId>                 báo cáo { turnstile? } — đủ 3 thiết bị thì tự ẩn
 //   GET    /api/admin/reviews?hidden=1|2|all              (Bearer ADMIN_TOKEN) bài bị ẩn / tất cả
 //   POST   /api/admin/reviews/<id>                        { hidden: 0 | 2 } hiện lại / ẩn
@@ -12,6 +12,7 @@
 // Chống spam: REVIEW_LIMIT theo IP cho mọi lần ghi, lọc link / email / số điện thoại, Turnstile
 // khi có TURNSTILE_SECRET (chưa có thì bỏ qua — xem README).
 
+import { STATION_ID_RE } from '../src/lib/stationUrl'
 import { sameSite } from './api'
 
 export interface ReviewsEnv {
@@ -46,7 +47,6 @@ const REPORT_HIDE = 3
 const BODY_MAX = 500
 const NICK_MIN = 2
 const NICK_MAX = 30
-const STATION_ID = /^\d{1,12}$/
 const DEVICE = /^[0-9a-f]{32}$/
 /** Link, tên miền, email, số điện thoại (≥ 9 chữ số, cho phép cách bằng dấu cách / chấm / gạch). */
 const BLOCKED = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(com|vn|net|org|info|xyz|io|me|top|link|site)\b|[\w.+-]+@[\w-]+\.\w|(?:\d[\s.-]?){9,})/i
@@ -123,14 +123,21 @@ async function timingSafeEqual(a: string, b: string): Promise<boolean> {
 
 // ------------------------------------------------------------ công khai
 
-async function list(db: D1Database, stationId: string, mine: string | null, before: number | null): Promise<Response> {
+/** Con trỏ trang `<updatedAt>_<id>` (dạng cũ chỉ `<updatedAt>` vẫn nhận). Hai bài cùng updated_at không bị bỏ sót. */
+export function parseCursor(raw: string | null): { at: number; id: number } | null {
+  const m = raw ? /^(\d{1,16})(?:_(\d{1,16}))?$/.exec(raw) : null
+  if (!m) return null
+  return { at: Number(m[1]), id: m[2] === undefined ? Number.MAX_SAFE_INTEGER : Number(m[2]) }
+}
+
+async function list(db: D1Database, stationId: string, mine: string | null, before: { at: number; id: number } | null): Promise<Response> {
   const page = db
     .prepare(
       `SELECT id, nickname, rating, body, created_at, updated_at, hidden FROM reviews
-       WHERE station_id = ?1 AND hidden = 0 AND device_hash != ?2 AND updated_at < ?3
+       WHERE station_id = ?1 AND hidden = 0 AND device_hash != ?2 AND (updated_at < ?3 OR (updated_at = ?3 AND id < ?4))
        ORDER BY updated_at DESC, id DESC LIMIT ${PAGE + 1}`,
     )
-    .bind(stationId, mine ?? '', before ?? Number.MAX_SAFE_INTEGER)
+    .bind(stationId, mine ?? '', before?.at ?? Number.MAX_SAFE_INTEGER, before?.id ?? Number.MAX_SAFE_INTEGER)
   const stats = db
     .prepare(
       `SELECT COUNT(*) AS n, AVG(rating) AS avg,
@@ -153,7 +160,7 @@ async function list(db: D1Database, stationId: string, mine: string | null, befo
     dist: [st.r1 ?? 0, st.r2 ?? 0, st.r3 ?? 0, st.r4 ?? 0, st.r5 ?? 0],
     mine: mineRow ? toReview(mineRow, true) : null,
     items: items.map((r) => toReview(r)),
-    next: more ? items[items.length - 1].updated_at : null,
+    next: more ? `${items[items.length - 1].updated_at}_${items[items.length - 1].id}` : null,
   })
 }
 
@@ -253,10 +260,14 @@ async function admin(req: Request, url: URL, env: ReviewsEnv, db: D1Database): P
 export async function serveReviews(req: Request, url: URL, env: ReviewsEnv): Promise<Response> {
   const db = env.REVIEWS
   if (!db) return fail(503, 'Chưa bật đánh giá')
-  if (url.pathname.startsWith('/api/admin/reviews')) return admin(req, url, env, db)
+  const ip = req.headers.get('CF-Connecting-IP') ?? 'unknown'
+  // Admin cũng qua limiter (trước khi so token) — không cho dò token không giới hạn.
+  if (url.pathname.startsWith('/api/admin/reviews')) {
+    if (!(await env.REVIEW_LIMIT.limit({ key: `admin:${ip}` })).success) return fail(429, 'Too many requests')
+    return admin(req, url, env, db)
+  }
 
   if (!sameSite(req)) return fail(403, 'Không cho phép')
-  const ip = req.headers.get('CF-Connecting-IP') ?? 'unknown'
   const isWrite = req.method !== 'GET'
   const limiter = isWrite ? env.REVIEW_LIMIT : env.API_LIMIT
   if (!(await limiter.limit({ key: ip })).success) return fail(429, 'Thao tác quá nhanh, thử lại sau ít phút')
@@ -271,18 +282,29 @@ export async function serveReviews(req: Request, url: URL, env: ReviewsEnv): Pro
       if (req.method !== 'POST' || !Number.isInteger(id) || id <= 0) return fail(400, 'Yêu cầu không hợp lệ')
       return await report(req, env, db, id, device!, ip)
     }
-    const stationId = decodeURIComponent(rest)
-    if (!STATION_ID.test(stationId)) return fail(400, 'Mã trạm không hợp lệ')
+    // Chỉ là chữ số — không cần decodeURIComponent (vốn ném lỗi với %-mã hỏng → 500).
+    const stationId = rest
+    if (!STATION_ID_RE.test(stationId)) return fail(400, 'Mã trạm không hợp lệ')
     switch (req.method) {
-      case 'GET': {
-        const before = Number(url.searchParams.get('before'))
-        return await list(db, stationId, device, Number.isFinite(before) && before > 0 ? before : null)
-      }
+      case 'GET':
+        return await list(db, stationId, device, parseCursor(url.searchParams.get('before')))
       case 'PUT':
         return await upsert(req, env, db, stationId, device!, ip)
-      case 'DELETE':
-        await db.prepare('DELETE FROM reviews WHERE station_id = ?1 AND device_hash = ?2').bind(stationId, device!).run()
+      case 'DELETE': {
+        // Bài đang bị ẩn (báo cáo / admin) không xoá được: xoá rồi đăng lại sẽ thành bài mới hidden=0.
+        const del = await db
+          .prepare('DELETE FROM reviews WHERE station_id = ?1 AND device_hash = ?2 AND hidden = 0')
+          .bind(stationId, device!)
+          .run()
+        if (!del.meta.changes) {
+          const held = await db
+            .prepare('SELECT 1 FROM reviews WHERE station_id = ?1 AND device_hash = ?2')
+            .bind(stationId, device!)
+            .first()
+          if (held) return fail(409, 'Bài đang bị ẩn, không xoá được')
+        }
         return new Response(null, { status: 204 })
+      }
       default:
         return fail(405, 'Method not allowed')
     }

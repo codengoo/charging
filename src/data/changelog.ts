@@ -11,6 +11,22 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.12.1',
+    date: '2026-11-17',
+    title: "Sửa lỗi & bảo vệ máy chủ",
+    changes: [
+      "Không còn kẹt lỗi \"không có ảnh\" ở trạm sau một lần tải lỗi.",
+      "Đánh giá: \"Xem thêm\" không bỏ sót bài; bài đang bị ẩn không xoá được.",
+      "Chặn quét dữ liệu trạm hàng loạt.",
+    ],
+    titleEn: "Fixes & server protection",
+    changesEn: [
+      "A station no longer stays stuck without photos after one failed load.",
+      "Reviews: \"Show more\" no longer skips posts; hidden posts can't be deleted.",
+      "Blocks bulk scraping of station data.",
+    ],
+  },
+  {
     version: '0.12.0',
     date: '2026-11-17',
     title: "Pin dự phòng, trạm trên cao tốc & bảng gọn hơn",

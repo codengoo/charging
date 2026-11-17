@@ -5,13 +5,14 @@
 // vì Workers Free plan giới hạn 10ms CPU, không đủ cho parse 72MB snapshot.
 import { SITE_URL, STATION_PREFIX, parseStationId, stationPath } from '../src/lib/stationUrl'
 import { serveStationDetail } from './locator'
-import { serveApi, type ApiEnv } from './api'
+import { sameSite, serveApi, type ApiEnv } from './api'
 import { serveReviews, type ReviewsEnv } from './reviews'
 import { langFromPath, pickFor, stripLang, withLang, type Lang } from '../src/i18n'
 
 interface Env extends ApiEnv, ReviewsEnv {
   DATA: R2Bucket
   ASSETS: Fetcher
+  STATION_LIMIT: RateLimit
 }
 
 /** Phần manifest Worker cần — xem builder/run-local.mjs. */
@@ -33,10 +34,18 @@ const NOINDEX = 'noindex, nofollow, noarchive'
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url)
-    if (url.pathname.startsWith('/api/station/')) return serveStationDetail(url, env.DATA, ctx, req.cf?.colo as string | undefined)
+    if (url.pathname.startsWith('/api/station/')) {
+      // Mỗi lần trượt cache tốn tới 6 lượt gọi VinFast — không cho người ngoài quét id.
+      if (!sameSite(req)) return Response.json({ error: 'forbidden' }, { status: 403, headers: { 'Cache-Control': 'no-store' } })
+      const ip = req.headers.get('CF-Connecting-IP') ?? 'unknown'
+      if (!(await env.STATION_LIMIT.limit({ key: ip })).success) {
+        return Response.json({ error: 'rate limited' }, { status: 429, headers: { 'Cache-Control': 'no-store' } })
+      }
+      return serveStationDetail(url, env.DATA, ctx, req.cf?.colo as string | undefined)
+    }
     // Đánh giá nhận cả PUT/POST/DELETE — đi trước serveApi (chỉ nhận GET).
     if (url.pathname.startsWith('/api/reviews/') || url.pathname.startsWith('/api/admin/')) return serveReviews(req, url, env)
-    if (url.pathname.startsWith('/api/')) return serveApi(req, url, env)
+    if (url.pathname.startsWith('/api/')) return serveApi(req, url, env, ctx)
     if (url.pathname.startsWith('/data/')) return serveData(url, env)
     // Path cũ (QR đã in, link đã gửi) -> path tiếng Anh. 301 để trình duyệt/bot nhớ luôn.
     if (url.pathname === '/tram' || url.pathname.startsWith('/tram/')) {

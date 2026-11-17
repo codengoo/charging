@@ -34,9 +34,12 @@ export function stationPath(st: { entityId: string; name: string }, lang: Lang =
   return withLang(`${STATION_PREFIX}${st.entityId}${slug ? `-${slug}` : ''}`, lang)
 }
 
+/** entityId hợp lệ — dùng chung cho đường dẫn trạm, `/api/station/*`, `/api/reviews/*`. */
+export const STATION_ID_RE = /^\d{1,12}$/
+
 /** Lấy entityId từ pathname `[/en]/station/<id>-<slug>`. Không khớp thì null. */
 export function parseStationId(pathname: string): string | null {
-  const m = /^\/station\/(\d+)(?:-[^/]*)?\/?$/.exec(stripLang(pathname))
+  const m = /^\/station\/(\d{1,12})(?:-[^/]*)?\/?$/.exec(stripLang(pathname))
   return m ? m[1] : null
 }
 

@@ -2,6 +2,7 @@
 // Client gọi thẳng không được (CORS + Cloudflare của VinFast chặn UA lạ), nên đi qua Worker,
 // rút gọn còn vài trăm byte và cache ở edge. Chỉ gọi khi người dùng mở MỘT trạm.
 import type { PortGroup, StationDetail } from '../src/data/types'
+import { STATION_ID_RE } from '../src/lib/stationUrl'
 
 const SITE = 'https://vinfastauto.com/vn_vi'
 const PAGE = `${SITE}/tim-kiem-showroom-tram-sac`
@@ -69,7 +70,7 @@ export async function serveStationDetail(
 ): Promise<Response> {
   const id = url.pathname.slice('/api/station/'.length)
   // entityId là số; chặn mọi thứ khác để Worker không thành proxy mở tới VinFast.
-  if (!/^\d{1,9}$/.test(id)) return json({ error: 'bad id' }, 400, 0)
+  if (!STATION_ID_RE.test(id)) return json({ error: 'bad id' }, 400, 0)
 
   const t0 = Date.now()
   const trace: Trace = { evt: 'detail', id, colo, calls: [] }
@@ -84,7 +85,7 @@ export async function serveStationDetail(
   const hit = await cache.match(key)
   if (hit) {
     done('hit')
-    return hit
+    return forBrowser(hit)
   }
 
   let res: Response
@@ -114,13 +115,19 @@ export async function serveStationDetail(
     }
   }
   ctx.waitUntil(cache.put(key, res.clone()))
-  // Trình duyệt KHÔNG được giữ lỗi: zone đặt Browser Cache TTL 4h, đè max-age=60 của ta thành
-  // 14400 — một lần bị chặn sẽ kẹt "không ảnh" cả buổi. no-store thì Cloudflare để nguyên.
-  if (res.status !== 200 || res.headers.has('X-Detail-Stale')) {
-    res = new Response(res.body, res)
-    res.headers.set('Cache-Control', 'no-store')
-  }
-  return res
+  return forBrowser(res)
+}
+
+/**
+ * Trình duyệt KHÔNG được giữ lỗi: zone đặt Browser Cache TTL 4h, đè max-age=60 của ta thành
+ * 14400 — một lần bị chặn sẽ kẹt "không ảnh" cả buổi. no-store thì Cloudflare để nguyên.
+ * Áp cho cả bản trúng cache edge (lỗi/bản cũ vẫn nằm đó tới 60 s).
+ */
+function forBrowser(res: Response): Response {
+  if (res.status === 200 && !res.headers.has('X-Detail-Stale')) return res
+  const out = new Response(res.body, res)
+  out.headers.set('Cache-Control', 'no-store')
+  return out
 }
 
 /**

@@ -20,7 +20,9 @@
   "ratelimits": [
     { "name": "API_LIMIT", "namespace_id": "1001", "simple": { "limit": 30, "period": 60 } },
     // Ghi đánh giá / bình luận / báo cáo (worker/reviews.ts): 5 lần mỗi phút mỗi IP.
-    { "name": "REVIEW_LIMIT", "namespace_id": "1002", "simple": { "limit": 5, "period": 60 } }
+    { "name": "REVIEW_LIMIT", "namespace_id": "1002", "simple": { "limit": 5, "period": 60 } },
+    // Chi tiết trạm /api/station/* (worker/locator.ts): mở trạm liên tục vẫn dư, quét id thì chặn.
+    { "name": "STATION_LIMIT", "namespace_id": "1003", "simple": { "limit": 60, "period": 60 } }
   ],
   // D1 đánh giá + bình luận (tạo 2026-11-17, region APAC). Migration:
   // `npx wrangler d1 migrations apply tramsac-reviews --remote`. Local: `--local`.

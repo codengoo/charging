@@ -23,7 +23,8 @@ export interface ReviewsPage {
   dist: [number, number, number, number, number]
   mine: Review | null
   items: Review[]
-  next: number | null
+  /** Con trỏ trang kế (chuỗi mờ `<updatedAt>_<id>`), null khi hết. */
+  next: string | null
 }
 
 export interface ReviewInput {
@@ -87,7 +88,8 @@ export interface ReviewsState {
   page: ReviewsPage | null
   /** Các trang "Xem thêm" đã tải, nối sau `page.items`. */
   more: Review[]
-  next: number | null
+  /** Con trỏ trang kế (chuỗi mờ `<updatedAt>_<id>`), null khi hết. */
+  next: string | null
   loading: boolean
   loadingMore: boolean
   /** Lỗi tải; null khi ổn. `disabled` = server chưa bật đánh giá (503) — ẩn cả khối. */

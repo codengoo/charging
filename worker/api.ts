@@ -26,7 +26,7 @@ const MAX_BODY = 256 * 1024
 
 const COORD = /^-?\d{1,3}(?:\.\d+)?,-?\d{1,3}(?:\.\d+)?$/
 
-export async function serveApi(req: Request, url: URL, env: ApiEnv): Promise<Response> {
+export async function serveApi(req: Request, url: URL, env: ApiEnv, ctx: ExecutionContext): Promise<Response> {
   if (req.method !== 'GET') return fail(405, 'Chỉ nhận GET')
   if (!sameSite(req)) return fail(403, 'Không cho phép')
   const ip = req.headers.get('CF-Connecting-IP') ?? 'unknown'
@@ -34,7 +34,7 @@ export async function serveApi(req: Request, url: URL, env: ApiEnv): Promise<Res
   if (!success) return fail(429, 'Gọi quá nhanh, thử lại sau ít phút')
 
   try {
-    if (url.pathname.startsWith('/api/live')) return await serveLive(url)
+    if (url.pathname.startsWith('/api/live')) return await serveLive(url, ctx)
     switch (url.pathname) {
       case '/api/route':
         return await route(url, env)

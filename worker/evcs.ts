@@ -37,6 +37,8 @@ const TTL_HISTORY = 120
 
 /** Token ở cấp phiên, không gắn theo trạm. Sống theo isolate — đủ để đỡ phần lớn lượt xin. */
 let tokens: { charge: string; api: string; at: number } | null = null
+/** Lượt xin token đang chạy — nhiều request cùng lúc lúc token hết hạn chỉ xin một lần. */
+let tokensPending: Promise<{ charge: string; api: string }> | null = null
 
 const pageOf = (storeId: string) => `${SITE}/tram-sac-vinfast-x-${storeId.toLowerCase()}.html`
 const browser = (referer: string): Record<string, string> => ({
@@ -63,8 +65,15 @@ const failJson = (status: number, error: string) => json(JSON.stringify({ error 
  * POST vào một trang trạm với `X-Partial: user` → chargeToken + apiToken. Phần chữ trong
  * đường dẫn không quan trọng, server chỉ đọc hậu tố storeId. Không cần cookie.
  */
-async function getTokens(storeId: string): Promise<{ charge: string; api: string }> {
-  if (tokens && Date.now() - tokens.at < TOKEN_TTL_MS) return tokens
+function getTokens(storeId: string): Promise<{ charge: string; api: string }> {
+  if (tokens && Date.now() - tokens.at < TOKEN_TTL_MS) return Promise.resolve(tokens)
+  tokensPending ??= fetchTokens(storeId).finally(() => {
+    tokensPending = null
+  })
+  return tokensPending
+}
+
+async function fetchTokens(storeId: string): Promise<{ charge: string; api: string }> {
   const page = pageOf(storeId)
   const res = await fetch(page, { method: 'POST', headers: { ...browser(page), 'X-Partial': 'user' } })
   const text = await res.text()
@@ -185,27 +194,37 @@ async function history(storeId: string): Promise<Response> {
 }
 
 /** Bọc Cache API: trúng cache thì không đụng EVCS; chỉ lưu kết quả 200. */
-async function cached(key: string, run: () => Promise<Response>): Promise<Response> {
+async function cached(key: string, run: () => Promise<Response>, ctx: ExecutionContext): Promise<Response> {
   const cache = caches.default
   const req = new Request(`https://evcs-cache.internal/${key}`)
   const hit = await cache.match(req)
   if (hit) return hit
   const res = await run()
-  if (res.status === 200) await cache.put(req, res.clone())
+  // Ghi cache sau khi trả lời — không bắt người dùng chờ.
+  if (res.status === 200) ctx.waitUntil(cache.put(req, res.clone()))
   return res
 }
 
-export async function serveLive(url: URL): Promise<Response> {
+/** %-mã hỏng (`%E0%A4`) làm decodeURIComponent ném lỗi — coi là input sai (400), không phải lỗi mạng. */
+function safeDecode(s: string): string | null {
+  try {
+    return decodeURIComponent(s)
+  } catch {
+    return null
+  }
+}
+
+export async function serveLive(url: URL, ctx: ExecutionContext): Promise<Response> {
   const p = url.pathname
   if (p.startsWith('/api/live/')) {
-    const id = decodeURIComponent(p.slice('/api/live/'.length)).toUpperCase()
+    const id = safeDecode(p.slice('/api/live/'.length))?.toUpperCase() ?? ''
     if (!STORE_ID.test(id)) return failJson(400, 'storeId không hợp lệ')
-    return cached(`live/${id}`, () => live(id))
+    return cached(`live/${id}`, () => live(id), ctx)
   }
   if (p.startsWith('/api/live-history/')) {
-    const id = decodeURIComponent(p.slice('/api/live-history/'.length)).toUpperCase()
+    const id = safeDecode(p.slice('/api/live-history/'.length))?.toUpperCase() ?? ''
     if (!STORE_ID.test(id)) return failJson(400, 'storeId không hợp lệ')
-    return cached(`history/${id}`, () => history(id))
+    return cached(`history/${id}`, () => history(id), ctx)
   }
   return failJson(404, 'Not found')
 }
