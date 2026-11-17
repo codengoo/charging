@@ -111,7 +111,11 @@ của EVCS. Khách vãng lai, không cần đăng nhập.
 
 - Chỉ gọi `/live` + `/live-history` khi người dùng MỞ một trạm; huy hiệu gọi lại khi tâm bản đồ
   dịch > 1 km hoặc số cũ quá 2 phút. EVCS tự cache ~5 phút và chặn nhịp — gọi dày hơn vô ích.
-- Lỗi tạm (503, trả HTML) thử lại 2 lần (700 ms, 1,8 s); token hết hạn trên socket (`44`) xin lại một lần.
+- EVCS (Cloudflare) chặn `/charging` và `/search` khi gọi từ Worker (403). Trình duyệt cũng không gọi
+  thẳng được: `/charging` đòi `Referer` thuộc `evcs.vn`, `/search` không trả `Access-Control-Allow-Origin`.
+  Bị chặn thì bảng trạm ước tính cổng trống từ điểm cuối lịch sử 24h (dùng khi điểm cuối ≤ 3 giờ —
+  EVCS chỉ ghi điểm khi số xe đổi).
+- 403 trả ngay, không thử lại. Lỗi tạm khác (503, trả HTML) thử lại 2 lần (700 ms, 1,8 s); token hết hạn trên socket (`44`) xin lại một lần.
 - Dự báo "xe sắp sạc xong" (`ticker`) hiện bị khoá cho khách vãng lai (cần EVCS Go) — client vẫn
   đọc nếu có.
 

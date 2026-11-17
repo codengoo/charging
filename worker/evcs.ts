@@ -82,8 +82,10 @@ async function liveOnce(storeId: string): Promise<string> {
   if (res.status === 503) throw new Transient('http 503')
   const text = await res.text()
   // HTML thay vì JSON = Cloudflare chặn hoặc phiên chết: vứt token để lần thử sau xin mới.
+  // 403 là chặn IP Worker — thử lại vẫn 403, chỉ làm người dùng chờ thêm ~3 s.
   if (!text.startsWith('{')) {
     tokens = null
+    if (res.status === 403) throw new Error('charging http 403')
     throw new Transient(`charging http ${res.status}`)
   }
   // {"ok":false,…} đi kèm mã 200 — bận, không phải "trạm không có số liệu".
@@ -96,7 +98,7 @@ async function live(storeId: string): Promise<Response> {
     try {
       return json(await liveOnce(storeId), 200, TTL_LIVE)
     } catch (e) {
-      if (attempt >= BACKOFF_MS.length) {
+      if (!(e instanceof Transient) || attempt >= BACKOFF_MS.length) {
         return failJson(e instanceof Transient ? 503 : 502, `EVCS đang bận (${e instanceof Error ? e.message : 'lỗi'})`)
       }
       await sleep(BACKOFF_MS[attempt])

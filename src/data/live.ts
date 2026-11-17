@@ -135,8 +135,11 @@ export async function fetchHistory(storeId: string, signal?: AbortSignal): Promi
   return { all: points(j.all), byKw }
 }
 
-/** Điểm lịch sử cuối cũ hơn mức này thì không dùng để ước tính "lúc này". */
-const ESTIMATE_MAX_AGE_MS = 30 * 60_000
+/**
+ * Điểm lịch sử cuối cũ hơn mức này thì không dùng để ước tính "lúc này". EVCS chỉ ghi điểm
+ * khi số xe ĐỔI — trạm đứng yên (thường về đêm) có điểm cuối cũ cả tiếng mà vẫn đúng.
+ */
+const ESTIMATE_MAX_AGE_MS = 3 * 60 * 60_000
 
 /**
  * Dự phòng khi `/charging` không lấy được (EVCS chặn request từ Cloudflare Worker bằng trang
@@ -170,7 +173,8 @@ export function estimateFromHistory(
       return { kw: g.kw, free: g.count - busy, total: g.count }
     })
     .sort((a, b) => b.kw - a.kw)
-  return { ports, charging: lastAll.cars, at: lastAll.at }
+  // Số không đổi từ điểm cuối tới lúc lấy lịch sử (cache ≤ 2') — tính là số của lúc này.
+  return { ports, charging: lastAll.cars, at: now }
 }
 
 // ------------------------------------------------------------ thống kê 24h
