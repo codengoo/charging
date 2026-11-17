@@ -4,18 +4,17 @@ Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app
 
 ## [0.12.0] — 2026-11-17 — Pin dự phòng, trạm trên cao tốc & bảng gọn hơn
 
-- Chọn mức pin dự phòng tối thiểu (10 / 15 / 20 / 30% hoặc tự nhập) trong "Xe của bạn" — kế hoạch sạc và vạch "Trạm cuối còn kịp" dùng mức này thay cho 10% cố định.
-- Kế hoạch sạc không chọn trạm sát cao tốc mà phải ra nút giao mới vào được; trạm dừng nghỉ chiều ngược vẫn bị loại. Danh sách ghi rõ "phải ra cao tốc".
-- Bảng Dọc đường: thu gọn hộp tuỳ chọn (còn một dòng tóm tắt), cả bảng cuộn được, vùng trạm không chắc kịp có nền vàng.
-- "Trạm gần bạn" có nút "Dùng vị trí của tôi" khi chưa bật định vị.
-- PWA trên iPhone: status bar trong suốt, bản đồ tràn hết màn hình.
+- Tự đặt mức pin dự phòng khi lên kế hoạch sạc.
+- Kế hoạch sạc bỏ trạm phải ra khỏi cao tốc hoặc ở chiều ngược.
+- Bảng Dọc đường gọn hơn: thu gọn tuỳ chọn, cuộn mượt.
+- Nút "Dùng vị trí của tôi" trong Trạm gần bạn.
+- iPhone: status bar trong suốt.
 
 ## [0.11.0] — 2026-11-17 — Chọn tuyến đường
 
-- Đi thẳng hai điểm: xem tối đa 3 tuyến, mỗi tuyến ghi thời gian, km và số trạm; chạm thẻ hoặc đường xám trên bản đồ để chọn — danh sách trạm, % pin và kế hoạch sạc theo tuyến đã chọn.
-- Link có kéo tuyến trên Google Maps (máy tính): app đi đúng qua các điểm đã kéo.
-- Tuỳ chọn tránh thu phí / cao tốc / phà trong link được giữ nguyên, và bật/tắt được ngay trong bảng.
-- Sửa: link có kéo tuyến từng làm sai vị trí điểm đến; link chia sẻ từ Google Maps trên iPhone không mở được.
+- Xem tối đa 3 tuyến và chọn tuyến muốn đi.
+- Tránh thu phí / cao tốc / phà.
+- Đọc đúng link có kéo tuyến và link chia sẻ từ iPhone.
 
 ## [0.10.0] — 2026-11-17 — Kế hoạch sạc, ghi chú & đánh giá trạm
 
