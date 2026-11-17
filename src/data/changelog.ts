@@ -11,6 +11,24 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.14.0',
+    date: '2026-11-17',
+    title: 'Quét QR, kế hoạch sạc thông minh hơn, dùng khi mất sóng',
+    changes: [
+      "Quét mã QR trên thẻ trạm để mở trạm ngay.",
+      "Kế hoạch sạc chọn ít lần sạc nhất, rồi sạc nhanh nhất.",
+      "Thời gian sạc tính theo đường cong của từng mẫu xe.",
+      "Mất sóng vẫn mở được bản đồ, trạm và hành trình vừa xem.",
+    ],
+    titleEn: 'QR scan, smarter charging plan, offline',
+    changesEn: [
+      "Scan a station card QR code to open the station.",
+      "The charging plan picks the fewest stops, then the fastest charging.",
+      "Charging time follows each car model's charging curve.",
+      "Works without signal: map, stations and your last trip stay available.",
+    ],
+  },
+  {
     version: '0.13.0',
     date: '2026-11-17',
     title: "Dọn mã, ổn định hơn",

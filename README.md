@@ -44,7 +44,7 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   `!5iN` (chỉ để gợi ý). Link iOS `maps.google.com/?saddr=…&daddr=…&geocode=…` cũng đọc được. Client giải mã flexible polyline
   (`src/lib/flexiblePolyline.ts`), lọc hành lang 2/5/10 km (`src/data/routeCorridor.ts`: đo phẳng,
   bỏ trạm bên kia dải phân cách cao tốc, trạm sát cao tốc mà không phải trạm dừng nghỉ cùng chiều (phải
-  > 150 m hoặc bên trái) gắn `viaExit` — kế hoạch sạc chỉ dùng ở chặng không còn trạm vào thẳng nào, cộng quãng vòng ước tính `EXIT_ACCESS_KM` (2,5 km) mỗi chiều, trần 400 trạm theo độ lệch), xếp theo km gặp trên đường.
+  > 150 m hoặc bên trái) gắn `viaExit` — kế hoạch sạc cộng quãng vòng ước tính `EXIT_ACCESS_KM` (2,5 km) mỗi chiều, trần 400 trạm theo độ lệch), xếp theo km gặp trên đường.
   URL `/trip?link=…` mở lại hành trình. Cần secret `HERE_API_KEY` (xem "API proxy HERE").
 - **% pin khi đến trạm** (`src/data/battery.ts`, `src/data/useBattery.ts`, `src/data/vehicles.ts`, `src/ui/BatteryControl.tsx`): chọn xe
   trong Cài đặt (10 mẫu VinFast hoặc Tuỳ chỉnh, công tắc điều hoà ×1,08), kéo % pin hiện tại (localStorage
@@ -56,9 +56,20 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   lượng ÷ NEDC × 0,8), không phải số hãng công bố.
 - **Ghi đè tiêu thụ:** VehicleSheet có ô "Tiêu thụ thực tế" (`Settings.usageOverride`) — giữ pin / công suất sạc
   của mẫu, chỉ thay kWh/100 km. Đổi mẫu thì xoá.
-- **Kế hoạch dừng sạc** (`src/data/chargePlan.ts`): chip "Lên kế hoạch sạc" trong Dọc đường. Tham lam "đi xa
-  nhất": ghé trạm DC ≥ 50 kW xa nhất còn ≥ mức dự phòng (`Settings.reservePct`, mặc định 10%, ước tính bi quan), sạc lên 80%; điểm dừng cuối chỉ sạc vừa đủ
-  tới đích. Tính trên danh sách trạm dọc đường đang hiện (theo bộ lọc công suất), không gọi thêm API. Bật thì bản
+- **Kế hoạch dừng sạc** (`src/data/chargePlan.ts`): chip "Lên kế hoạch sạc" trong Dọc đường. Thứ tự ưu tiên:
+  (1) ít lần sạc nhất → (2) tổng phút sạc ngắn nhất (chênh < 1 phút coi như bằng) → (3) tổng km vòng khỏi tuyến ít nhất.
+  Duyệt theo lớp số lần sạc trên trạng thái (trạm DC ≥ 50 kW, % pin khi tới làm tròn 1%); mỗi lần dừng thử "vừa đủ
+  tới trạm kế" và 50/60/70/80%, lần cuối vừa đủ tới đích; an toàn = ước tính bi quan khi tới ≥ mức dự phòng
+  (`Settings.reservePct`, mặc định 10%). ≤ 20 ms với 400 trạm.
+- **Đường cong sạc** (`src/data/vehicles.ts` `dcCurve`, `src/data/battery.ts` `chargeMinutes`): mỗi mẫu một đường
+  [% pin, kW], hình dạng suy luận theo loại pin, co cho 10→70% khớp thời gian hãng công bố; thời gian sạc tích phân
+  bước 0,5%, mỗi bước min(đường cong, cổng trạm).
+- **Quét QR** (`src/ui/QrScanSheet.tsx`, nút cạnh ⚙): `qr-scanner` nạp lười, nhận link `/station/<id>` và `/tram/<id>`
+  cũ của đúng host app (`stationIdFromQr`).
+- **Offline** (`vite.config.ts`, vite-plugin-pwa): precache app shell; `/data/base|power-*` CacheFirst,
+  `manifest.json` NetworkFirst; ô bản đồ OpenFreeMap StaleWhileRevalidate (4000 mục, 30 ngày); `/api/route|maps-link|
+  geocode|revgeocode|drive` NetworkFirst (7 ngày) → mở lại hành trình vừa xem khi mất sóng; live / đánh giá không
+  cache. Nhãn "Đang offline" (`src/ui/OfflineBadge.tsx`). `sw.js` no-cache trong `public/_headers`. Tính trên danh sách trạm dọc đường đang hiện (theo bộ lọc công suất), không gọi thêm API. Bật thì bản
   đồ chỉ vẽ ghim các điểm dừng.
 - **Ghi chú cá nhân** (`src/data/notes.ts`, `src/ui/NoteBox.tsx`): localStorage `tramsac.notes`, ≤ 1.000 ký tự;
   sao lưu mang trường `notes` (gộp giữ bản sửa sau).
@@ -337,7 +348,7 @@ nên **client không phải đổi gì**. Kích hoạt khi một Worker streamin
 
 - **Phase 2:** ~~chi tiết trạm từ `get-locator` qua Worker proxy~~ (xong); status refresh +
   EVCS real-time.
-- **Phase 3:** chỉ đường, PWA offline, chia sẻ URL `?station=`.
+- **Phase 3:** chỉ đường, ~~PWA offline~~ (xong 0.14.0), ~~chia sẻ link trạm~~ (xong).
 - **Đánh giá:** siết "mỗi thiết bị một đánh giá" — xem "Hạn chế đã biết" trong mục Đánh giá & bình luận.
 - **Tiện ích quanh trạm** (cà phê, WC…): đã bỏ ở 0.10.0 vì Overpass công cộng chặn client tự động (406) và chập
   chờn. Nếu làm lại: tính sẵn từ bản OSM Việt Nam (Geofabrik) trong GitHub Action → shard R2, hoặc HERE Browse.

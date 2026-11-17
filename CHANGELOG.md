@@ -2,6 +2,13 @@
 
 Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app).
 
+## [0.14.0] — 2026-11-17 — Quét QR, kế hoạch sạc thông minh hơn, dùng khi mất sóng
+
+- Quét mã QR trên thẻ trạm để mở trạm ngay.
+- Kế hoạch sạc chọn ít lần sạc nhất, rồi sạc nhanh nhất.
+- Thời gian sạc tính theo đường cong của từng mẫu xe.
+- Mất sóng vẫn mở được bản đồ, trạm và hành trình vừa xem.
+
 ## [0.13.0] — 2026-11-17 — Dọn mã, ổn định hơn
 
 - Các bảng dùng chung một kiểu tiêu đề.
