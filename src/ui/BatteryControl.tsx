@@ -112,7 +112,7 @@ const DETOUR = 1.3
 
 /**
  * Hộp "pin khi tới" trong bảng trạm: thanh trượt, % ước tính khi đến, thời gian sạc lên 80%.
- * Chưa chọn xe → chỉ một link mở Cài đặt.
+ * Chưa chọn xe → chỉ một link mở drawer chọn xe.
  */
 export function BatteryBox({
   vehicle,
@@ -123,7 +123,7 @@ export function BatteryBox({
   drive,
   power,
   live,
-  onOpenSettings,
+  onPickCar,
 }: {
   vehicle: Vehicle | null
   climate: boolean
@@ -133,13 +133,13 @@ export function BatteryBox({
   drive?: DriveState
   power?: StationPower
   live: LivePorts[] | null
-  onOpenSettings: () => void
+  onPickCar: () => void
 }) {
   if (!vehicle) {
     return (
       <button
         type="button"
-        onClick={onOpenSettings}
+        onClick={onPickCar}
         className="mt-2 flex items-center gap-1.5 self-start text-sm text-brand hover:underline"
       >
         <BatteryMedium className="size-4 shrink-0" aria-hidden />

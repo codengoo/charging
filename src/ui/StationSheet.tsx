@@ -84,7 +84,7 @@ interface Props {
   battery: BatteryReading | null
   batteryStale: boolean
   onBattery: (pct: number) => void
-  onOpenSettings: () => void
+  onPickCar: () => void
   onOpenGroups: () => void
   onShare: () => void
   onClose: () => void
@@ -100,7 +100,7 @@ const STATUS_BG = {
   planned: 'bg-[#64748B]',
 } as const
 
-export function StationSheet({ open, station, book, power, powerLoading, detail, detailLoading, drive, live, vehicle, climate, battery, batteryStale, onBattery, onOpenSettings, onOpenGroups, onShare, onClose, children }: Props) {
+export function StationSheet({ open, station, book, power, powerLoading, detail, detailLoading, drive, live, vehicle, climate, battery, batteryStale, onBattery, onPickCar, onOpenGroups, onShare, onClose, children }: Props) {
   const gmapsDir = `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}`
   const groups = groupsOf(book, station.entityId)
     .map((id) => group(book, id))
@@ -186,7 +186,7 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
           drive={drive}
           power={ports}
           live={live?.live?.ports ?? null}
-          onOpenSettings={onOpenSettings}
+          onPickCar={onPickCar}
         />
 
         {live && <HistoryBox live={live} power={ports} />}

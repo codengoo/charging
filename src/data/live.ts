@@ -268,6 +268,30 @@ export function analyseHistory(p: HistoryPoint[], totalPorts: number | null): Hi
   }
 }
 
+/** Các khoảng xem lịch sử (giờ gần nhất). */
+export const HISTORY_RANGES = [6, 12, 24] as const
+export type HistoryRange = (typeof HISTORY_RANGES)[number]
+
+/**
+ * Cắt chuỗi về `hours` giờ gần nhất để thống kê đúng khoảng đó. EVCS chỉ ghi điểm khi số xe
+ * ĐỔI nên: (1) thêm điểm ở mốc cắt mang giá trị đang có lúc đó, (2) kéo giá trị cuối tới
+ * "bây giờ" (nếu điểm cuối chưa quá cũ) — không thì đoạn yên nhất (thường là lúc này) bị bỏ.
+ */
+export function windowHistory(p: HistoryPoint[], hours: number, now = Date.now()): HistoryPoint[] {
+  if (!p.length) return p
+  const from = now - hours * 3600_000
+  const out: HistoryPoint[] = []
+  let before: HistoryPoint | null = null
+  for (const pt of p) {
+    if (pt.at < from) before = pt
+    else out.push(pt)
+  }
+  if (before) out.unshift({ at: from, cars: before.cars })
+  const last = out[out.length - 1]
+  if (last && last.at < now && now - last.at <= ESTIMATE_MAX_AGE_MS) out.push({ at: now, cars: last.cars })
+  return out
+}
+
 // ------------------------------------------------------------ hook bảng trạm
 
 export interface LiveState {

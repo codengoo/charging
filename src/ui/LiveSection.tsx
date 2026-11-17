@@ -1,10 +1,20 @@
 import { useMemo, useState } from 'react'
-import { BarChart3, Clock, PlugZap, RefreshCw, Wrench } from 'lucide-react'
+import { BarChart3, Clock, Info, PlugZap, RefreshCw, Wrench, Zap } from 'lucide-react'
 import { Chip } from '@/components/ui/chip'
 import { Button } from '@/components/ui/button'
 import { fmtKw } from '@/lib/format'
 import { LOCALE, pick } from '@/i18n'
-import { UNAVAILABLE, analyseHistory, estimateFromHistory, type HistoryStats, type LivePorts, type LiveState } from '../data/live'
+import {
+  HISTORY_RANGES,
+  UNAVAILABLE,
+  analyseHistory,
+  estimateFromHistory,
+  windowHistory,
+  type HistoryRange,
+  type HistoryStats,
+  type LivePorts,
+  type LiveState,
+} from '../data/live'
 import type { StationPower } from '../data/types'
 
 const L = pick({
@@ -27,17 +37,21 @@ const L = pick({
     forecast: (cars: number, kw: string, range: string) => `${cars} xe đang sạc trụ ${kw} kW sẽ xong sau ${range}`,
     minutes: (a: number, b: number) => (a === b ? `${a}p` : `${a}–${b}p`),
     forecastNote: 'Dự báo thống kê, không phải số đo.',
-    last24h: '24 giờ qua',
+    lastHours: (h: number) => `${h} giờ qua`,
+    range: 'Khoảng thời gian',
     all: 'Tất cả',
     noHistory: 'Trạm này không có lịch sử 24h.',
     historyFailed: (e: string) => `${e} — chưa lấy được lịch sử.`,
-    missing: (m: number) => `Thiếu ${m} phút dữ liệu trong 24h — đã loại khỏi thống kê.`,
+    missing: (m: number, h: number) => `Thiếu ${m} phút dữ liệu trong ${h}h — đã loại khỏi thống kê.`,
     chartLabel: (peak: number) => `Số xe đang sạc theo giờ, cao nhất ${peak} xe`,
     noData: (h: number) => `${h}h: không có dữ liệu`,
     hourAvg: (h: number, v: string) => `${h}h: ~${v} xe`,
     fill: 'Lấp đầy',
+    fillHint: 'Trung bình số xe đang sạc so với tổng số cổng trong khoảng này.',
     busiest: 'Đông nhất',
     quietest: 'Vắng nhất',
+    avgShort: (v: string) => `TB ${v} xe`,
+    cars: (v: string) => `${v} xe`,
   },
   en: {
     ports: (n: number) => `${n} port${n === 1 ? '' : 's'}`,
@@ -59,17 +73,21 @@ const L = pick({
       `${cars} car${cars === 1 ? '' : 's'} on ${kw} kW will finish in ${range}`,
     minutes: (a: number, b: number) => (a === b ? `${a} min` : `${a}–${b} min`),
     forecastNote: 'Statistical forecast, not a measurement.',
-    last24h: 'Last 24 hours',
+    lastHours: (h: number) => `Last ${h} hours`,
+    range: 'Time range',
     all: 'All',
     noHistory: 'No 24-hour history for this station.',
     historyFailed: (e: string) => `${e} — couldn't load history.`,
-    missing: (m: number) => `${m} minutes of data missing in 24h — excluded from stats.`,
+    missing: (m: number, h: number) => `${m} minutes of data missing in ${h}h — excluded from stats.`,
     chartLabel: (peak: number) => `Cars charging by hour, peak ${peak}`,
     noData: (h: number) => `${h}:00: no data`,
     hourAvg: (h: number, v: string) => `${h}:00: ~${v} cars`,
     fill: 'Occupancy',
+    fillHint: 'Average cars charging versus total ports over this period.',
     busiest: 'Busiest',
     quietest: 'Quietest',
+    avgShort: (v: string) => `avg ${v}`,
+    cars: (v: string) => `${v} car${v === '1' ? '' : 's'}`,
   },
 })
 
@@ -148,7 +166,11 @@ export function PortsBox({
 
       {live && (
         <div className="mt-1.5 flex flex-col gap-1 text-xs text-muted-foreground">
-          {status && <span>{status}</span>}
+          {status && (
+            <span className="flex items-center gap-1">
+              <Clock className="size-3" aria-hidden /> {status}
+            </span>
+          )}
           {st?.maintenance && (
             <span className="flex items-center gap-1.5 text-sm font-medium text-destructive">
               <Wrench className="size-4" aria-hidden /> {L.maintenance}
@@ -204,12 +226,23 @@ export function kwColor(kw: number, dc: boolean | null): string {
 }
 
 /**
- * Chip = thanh tiến độ: phần ĐANG CẮM tô màu đặc, phần còn trống là nền pastel cùng màu.
- * Chưa có số realtime thì chỉ có nền pastel "× N". Đầy (hết cổng trống) chuyển đỏ.
+ * Chip = thanh tiến độ: phần ĐANG CẮM là viên màu đặc (chuyển sắc), phần còn trống là nền pastel
+ * cùng màu. Chưa có số realtime thì chỉ có nền pastel "× N". Đầy (hết cổng trống) chuyển đỏ.
  * Chữ vẽ hai lớp: lớp dưới chữ đậm trên nền pastel, lớp trên chữ trắng trên nền đặc, cắt
  * theo đúng phần đã tô (bo tròn cả đầu thanh) — chữ vắt qua mép thanh vẫn đủ tương phản.
  */
 const FULL_RED = '#E53935'
+/** Khoảng hở giữa thanh tô màu và mép track (px). */
+const FILL_GAP = 3
+
+/**
+ * Cắt lớp tô màu (phủ kín chip) thành viên nằm trong track, hở FILL_GAP mỗi phía: dài
+ * (W − 2·gap)·p tính từ mép trái trong. Mép phải cách lề chip W·(1−p) + gap·(2p − 1).
+ */
+function fillClip(pct: number): string {
+  const p = pct / 100
+  return `inset(${FILL_GAP}px calc(${100 - pct}% + ${FILL_GAP * (2 * p - 1)}px) ${FILL_GAP}px ${FILL_GAP}px round 9999px)`
+}
 
 function PortChip({ row: r, approx }: { row: Row; approx: boolean }) {
   const hasLive = r.free !== null && r.total !== null && r.total > 0
@@ -218,27 +251,34 @@ function PortChip({ row: r, approx }: { row: Row; approx: boolean }) {
   const full = hasLive && used >= r.total!
   // Hết cổng trống: cả chip chuyển đỏ, bất kể màu của mức kW — nhìn lướt là biết "đầy".
   const color = full ? FULL_RED : kwColor(r.kw, r.dc)
-  // Nền đặc đậm hơn màu gốc một chút để chữ trắng đọc được (xanh lá gốc quá sáng).
-  const solid = `color-mix(in srgb, ${color} 80%, #000)`
-  const track = `color-mix(in srgb, ${color} 16%, var(--card))`
+  // Đầu đậm (chữ trắng đọc được) → cuối sáng dần về màu gốc.
+  const solid = `linear-gradient(90deg, color-mix(in srgb, ${color} 78%, #000), ${color})`
+  const track = `color-mix(in srgb, ${color} 15%, var(--card))`
   const ink = `color-mix(in srgb, ${color} 75%, var(--foreground))`
   const content = (onSolid: boolean) => (
     <>
-      <span className="font-semibold" style={{ color: onSolid ? '#fff' : ink }}>
+      <span className="flex items-center gap-1 font-semibold" style={{ color: onSolid ? '#fff' : ink }}>
+        <Zap className="size-3.5" fill="currentColor" strokeWidth={0} aria-hidden />
         {fmtKw(r.kw)} kW
       </span>
       {hasLive ? (
-        <span className={onSolid ? 'text-white/85' : 'text-muted-foreground'}>
+        <span className={onSolid ? 'text-white/90' : 'text-foreground/80'}>
           {L.inUse} {approx && '~'}
-          <span className={onSolid ? 'font-semibold text-white' : 'font-semibold text-foreground'}>{used}</span>/{r.total}
+          <span className={onSolid ? 'font-bold text-white' : 'font-bold text-foreground'}>
+            {used}/{r.total}
+          </span>
         </span>
       ) : (
-        <span className="text-muted-foreground">× {r.count}</span>
+        <span className="text-foreground/80">× {r.count}</span>
       )}
-      {r.dc !== null && <span className={onSolid ? 'text-white/85' : 'text-muted-foreground'}>· {r.dc ? 'DC' : 'AC'}</span>}
+      {r.dc !== null && (
+        <span className="font-semibold" style={{ color: onSolid ? '#fff' : ink }}>
+          {r.dc ? 'DC' : 'AC'}
+        </span>
+      )}
     </>
   )
-  const box = 'inline-flex h-7 items-center gap-1.5 px-3 text-xs whitespace-nowrap'
+  const box = 'inline-flex h-8 items-center gap-2 pr-3.5 pl-3 text-xs whitespace-nowrap'
   return (
     <span
       className={`relative shrink-0 overflow-hidden rounded-full ${box}`}
@@ -253,7 +293,7 @@ function PortChip({ row: r, approx }: { row: Row; approx: boolean }) {
         <span
           aria-hidden
           className={`absolute inset-0 transition-[clip-path] duration-500 ${box}`}
-          style={{ background: solid, clipPath: `inset(0 ${100 - pct}% 0 0 round 9999px)` }}
+          style={{ background: solid, clipPath: fillClip(pct) }}
         >
           {content(true)}
         </span>
@@ -262,28 +302,48 @@ function PortChip({ row: r, approx }: { row: Row; approx: boolean }) {
   )
 }
 
-/** Khối riêng "24 giờ qua": biểu đồ số xe theo giờ + các ô thống kê. */
+/** Khối "N giờ qua": vòng lấp đầy + biểu đồ theo giờ (kèm đường trung bình), dưới là giờ đông/vắng. */
 export function HistoryBox({ live, power }: { live: LiveState; power?: StationPower }) {
   const { history, historyLoading, historyError } = live
+  const [range, setRange] = useState<HistoryRange>(24)
   const portsByKw = useMemo(() => new Map((power?.groups ?? []).map((g) => [g.kw, g.count])), [power])
-  const statsAll = useMemo(() => (history ? analyseHistory(history.all, power?.portCount ?? null) : null), [history, power])
+  const statsAll = useMemo(
+    () => (history ? analyseHistory(windowHistory(history.all, range), power?.portCount ?? null) : null),
+    [history, power, range],
+  )
   const statsByKw = useMemo(() => {
     const out: Array<[number, HistoryStats]> = []
     for (const [kw, pts] of history?.byKw ?? []) {
-      const s = analyseHistory(pts, portsByKw.get(kw) ?? null)
+      const s = analyseHistory(windowHistory(pts, range), portsByKw.get(kw) ?? null)
       if (s) out.push([kw, s])
     }
     return out.sort((a, b) => b[0] - a[0])
-  }, [history, portsByKw])
+  }, [history, portsByKw, range])
   const [pickedKw, setPickedKw] = useState<number | null>(null)
   const shown = (pickedKw !== null && statsByKw.find(([kw]) => kw === pickedKw)?.[1]) || statsAll
 
   if (!historyLoading && !shown && !historyError) return null
   return (
-    <section className="mt-3 rounded-xl bg-muted px-3 py-2.5" aria-label={L.last24h}>
+    <section className="mt-3 rounded-xl bg-muted px-3 py-3" aria-label={L.lastHours(range)}>
       <div className="flex items-center gap-2 text-sm">
         <BarChart3 className="size-4 shrink-0 text-brand" aria-hidden />
-        <span className="font-semibold">{L.last24h}</span>
+        <span className="font-semibold">{L.lastHours(range)}</span>
+        <div role="radiogroup" aria-label={L.range} className="ml-auto flex rounded-full bg-background/70 p-0.5">
+          {HISTORY_RANGES.map((h) => (
+            <button
+              key={h}
+              type="button"
+              role="radio"
+              aria-checked={range === h}
+              onClick={() => setRange(h)}
+              className={`h-6 rounded-full px-2.5 text-xs font-medium tabular-nums outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand/50 ${
+                range === h ? 'bg-brand text-brand-foreground' : 'text-muted-foreground'
+              }`}
+            >
+              {h}h
+            </button>
+          ))}
+        </div>
       </div>
       {statsByKw.length >= 2 && (
         <div data-vaul-no-drag className="mt-2 flex gap-1.5 overflow-x-auto no-scrollbar">
@@ -298,67 +358,142 @@ export function HistoryBox({ live, power }: { live: LiveState; power?: StationPo
         </div>
       )}
       {/* Giữ sẵn chiều cao: biểu đồ về sau (WebSocket) không làm bảng giật lên. */}
-      <div className="min-h-[148px]">
+      <div className="min-h-[176px]">
         {shown ? (
           <>
-            <HourChart stats={shown} />
-            <StatRow stats={shown} />
-            {shown.coverage < 0.95 && <p className="mt-1 text-xs text-amber-600">{L.missing(shown.deadMinutes)}</p>}
+            <div className="mt-3 flex items-end gap-3">
+              {shown.fillRate !== null && <FillRing rate={shown.fillRate} />}
+              <HourChart stats={shown} range={range} />
+            </div>
+            <BottomStats stats={shown} />
+            {shown.coverage < 0.95 && <p className="mt-1 text-xs text-amber-600">{L.missing(shown.deadMinutes, range)}</p>}
           </>
         ) : historyError ? (
           <p className="mt-2 text-sm text-muted-foreground">
             {historyError === UNAVAILABLE ? L.noHistory : L.historyFailed(historyError)}
           </p>
         ) : (
-          <div className="mt-2 h-[92px] animate-pulse rounded-lg bg-background/60" />
+          <div className="mt-3 h-[160px] animate-pulse rounded-lg bg-background/60" />
         )}
       </div>
     </section>
   )
 }
 
-/** Cột theo giờ (giờ Việt Nam): trung bình số xe đang sạc trong giờ đó. */
-function HourChart({ stats }: { stats: HistoryStats }) {
-  const max = Math.max(1, ...stats.byHour.map((s) => s.avg ?? 0))
-  const nowHour = new Date(Date.now() + 7 * 3600_000).getUTCHours()
+/** Vòng lấp đầy: cung brand mảnh trên nền nhạt, số % ở giữa — vòng mảnh + bán kính lớn để lòng vòng rộng. */
+function FillRing({ rate }: { rate: number }) {
+  const pct = Math.round(Math.min(1, rate) * 100)
+  const r = 37
+  const c = 2 * Math.PI * r
   return (
-    <div className="mt-2" role="img" aria-label={L.chartLabel(stats.peak)}>
-      <div className="flex h-[72px] items-end gap-[2px]">
-        {stats.byHour.map((s) => (
-          <div
-            key={s.hour}
-            title={s.avg === null ? L.noData(s.hour) : L.hourAvg(s.hour, s.avg.toFixed(1))}
-            className={`flex-1 rounded-t-[2px] ${
-              s.avg === null ? 'bg-foreground/10' : s.hour === nowHour ? 'bg-brand' : 'bg-brand/45'
-            }`}
-            style={{ height: s.avg === null ? 3 : `${Math.max(4, (s.avg / max) * 100)}%` }}
-          />
-        ))}
-      </div>
-      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground tabular-nums">
-        <span>0h</span>
-        <span>6h</span>
-        <span>12h</span>
-        <span>18h</span>
-        <span>23h</span>
+    <div className="relative size-[108px] shrink-0">
+      <svg viewBox="0 0 84 84" className="size-full -rotate-90" aria-hidden>
+        <circle cx="42" cy="42" r={r} fill="none" strokeWidth="6" className="stroke-brand/15" />
+        <circle
+          cx="42"
+          cy="42"
+          r={r}
+          fill="none"
+          strokeWidth="6"
+          strokeLinecap="round"
+          strokeDasharray={`${(c * pct) / 100} ${c}`}
+          className="stroke-brand transition-[stroke-dasharray] duration-500"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl leading-none font-bold tabular-nums">{pct}%</span>
+        <span className="mt-1 flex items-center gap-0.5 text-[11px] text-muted-foreground" title={L.fillHint}>
+          {L.fill} <Info className="size-3" aria-label={L.fillHint} />
+        </span>
       </div>
     </div>
   )
 }
 
-function StatRow({ stats }: { stats: HistoryStats }) {
-  const items: Array<[string, string]> = []
-  if (stats.fillRate !== null) items.push([L.fill, `${Math.round(Math.min(1, stats.fillRate) * 100)}%`])
-  if (stats.peakHour !== null) items.push([L.busiest, `${stats.peakHour}h`])
-  if (stats.quietHour !== null) items.push([L.quietest, `${stats.quietHour}h`])
-  if (!items.length) return null
-  // Tối đa 3 ô trên một hàng, chia đều — nhãn ngắn, không xuống dòng.
+/**
+ * Cột theo giờ (giờ Việt Nam): trung bình số xe đang sạc trong giờ đó. 24h xếp 0h→23h; 6h/12h
+ * xếp theo thời gian, kết thúc ở giờ hiện tại. Cột giờ đông nhất tô đậm, kèm nhãn số xe.
+ */
+function HourChart({ stats, range }: { stats: HistoryStats; range: HistoryRange }) {
+  const nowHour = new Date(Date.now() + 7 * 3600_000).getUTCHours()
+  const slots =
+    range === 24
+      ? stats.byHour
+      : Array.from({ length: range }, (_, i) => stats.byHour[(nowHour - range + 1 + i + 24) % 24])
+  const max = Math.max(1, ...slots.map((s) => s.avg ?? 0))
+  const avgPct = Math.min(100, (stats.avg / max) * 100)
+  const ticks =
+    range === 24
+      ? ['0h', '6h', '12h', '18h', '23h']
+      : [slots[0], slots[Math.floor(slots.length / 2)], slots[slots.length - 1]].map((s) => `${s.hour}h`)
   return (
-    <dl className="mt-2 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
-      {items.map(([k, v]) => (
-        <div key={k} className="min-w-0 rounded-lg bg-background/70 px-2 py-1.5 whitespace-nowrap">
-          <dt className="truncate text-[11px] text-muted-foreground">{k}</dt>
-          <dd className="text-sm font-semibold tabular-nums">{v}</dd>
+    <div className="min-w-0 flex-1" role="img" aria-label={L.chartLabel(stats.peak)}>
+      {/* pt chừa chỗ cho nhãn trên cột cao nhất. */}
+      <div className="h-[104px] pt-6">
+        <div className="relative flex h-full items-end gap-[2px]">
+          {/* Đường trung bình cả khoảng — cùng đơn vị với cột (xe trung bình); số ở đầu đường. */}
+          <div
+            className="pointer-events-none absolute inset-x-0 z-[1] flex items-center"
+            style={{ bottom: `${avgPct}%`, transform: 'translateY(50%)' }}
+          >
+            <span className="shrink-0 rounded-md bg-rose-500 px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap text-white tabular-nums">
+              {L.avgShort(stats.avg.toFixed(1))}
+            </span>
+            <span aria-hidden className="flex-1 border-t border-dashed border-rose-500" />
+          </div>
+          {slots.map((s, i) => {
+            const h = s.avg === null ? 0 : Math.max(4, (s.avg / max) * 100)
+            const isPeak = s.hour === stats.peakHour && s.avg !== null
+            // Nhãn ở mép thì neo vào mép, khỏi tràn khỏi khung.
+            const anchor = i < 2 ? 'left-0' : i > slots.length - 3 ? 'right-0' : 'left-1/2 -translate-x-1/2'
+            return (
+              <div key={s.hour} className="relative flex h-full flex-1 items-end">
+                {isPeak && (
+                  <span
+                    className={`absolute z-[2] rounded-md bg-brand px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap text-brand-foreground ${anchor}`}
+                    style={{ bottom: `calc(${h}% + 4px)` }}
+                  >
+                    {L.cars(s.avg!.toFixed(1))}
+                  </span>
+                )}
+                <div
+                  title={s.avg === null ? L.noData(s.hour) : L.hourAvg(s.hour, s.avg.toFixed(1))}
+                  className={`w-full rounded-t-[3px] ${
+                    s.avg === null ? 'bg-foreground/10' : isPeak ? 'bg-brand' : s.hour === nowHour ? 'bg-brand/70' : 'bg-brand/40'
+                  }`}
+                  style={{ height: s.avg === null ? 3 : `${h}%` }}
+                />
+              </div>
+            )
+          })}
+        </div>
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] text-muted-foreground tabular-nums">
+        {ticks.map((t, i) => (
+          <span key={i}>{t}</span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Hàng dưới: giờ đông nhất / vắng nhất, mỗi ô một icon. */
+function BottomStats({ stats }: { stats: HistoryStats }) {
+  const items = [
+    { solid: true, label: L.busiest, value: stats.peakHour !== null ? `${stats.peakHour}h` : '—' },
+    { solid: false, label: L.quietest, value: stats.quietHour !== null ? `${stats.quietHour}h` : '—' },
+  ]
+  return (
+    <dl className="mt-3 grid grid-cols-2 divide-x divide-border rounded-xl bg-background/70 py-2">
+      {items.map(({ solid, label, value }) => (
+        <div key={label} className="flex min-w-0 items-center gap-2.5 px-3 whitespace-nowrap">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/12 text-brand">
+            <Zap className="size-4" fill={solid ? 'currentColor' : 'none'} aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <dt className="truncate text-[11px] text-muted-foreground">{label}</dt>
+            <dd className="text-sm font-bold tabular-nums">{value}</dd>
+          </div>
         </div>
       ))}
     </dl>

@@ -11,6 +11,7 @@ import { PowerLegend } from './ui/PowerLegend'
 import { NearbySheet } from './ui/NearbySheet'
 import { BackupSheet } from './ui/BackupSheet'
 import { SettingsSheet } from './ui/SettingsSheet'
+import { VehicleSheet } from './ui/VehicleSheet'
 import { useDriveDistance, useStableOrigin } from './data/drive'
 import { useLiveStatus } from './data/live'
 import { filtersFrom, useSettings, type Settings } from './data/settings'
@@ -109,6 +110,8 @@ export function App() {
   const { settings, update: updateSettings } = useSettings()
   const theme = useResolvedTheme(settings.theme)
   const [showSettings, setShowSettings] = useState(false)
+  // Drawer chọn xe mở thẳng từ bảng trạm (link "chọn xe"), chồng lên bảng trạm.
+  const [pickingCar, setPickingCar] = useState(false)
   // Ước tính % pin khi đến: xe trong Cài đặt + % pin người dùng kéo (dùng chung bảng trạm / Dọc đường).
   const battery = useBattery()
   const vehicle = useMemo(
@@ -357,15 +360,23 @@ export function App() {
           battery={battery.reading}
           batteryStale={battery.stale}
           onBattery={battery.set}
-          onOpenSettings={() => setShowSettings(true)}
+          onPickCar={() => setPickingCar(true)}
           onOpenGroups={() => setGrouping(true)}
           onShare={() => setSharing(true)}
           onClose={() => {
             setSelected(null)
             setGrouping(false)
             setSharing(false)
+            setPickingCar(false)
           }}
         >
+          <VehicleSheet
+            nested
+            open={pickingCar}
+            settings={settings}
+            onChange={changeSettings}
+            onClose={() => setPickingCar(false)}
+          />
           <ShareSheet open={sharing} station={sheetStation} onClose={() => setSharing(false)} />
           <GroupsSheet
             open={grouping}
