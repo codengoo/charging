@@ -66,25 +66,4 @@ export interface StationDetail {
   updatedAt: string | null
 }
 
-/**
- * Con trỏ "bản mới nhất" do builder (GitHub Action, chạy mỗi ngày) ghi lên R2, phục vụ ở
- * `/data/manifest.json`. Tên file base/power mang generation nên cache vĩnh viễn được.
- */
-export interface DataManifest {
-  generation: number
-  builtAt: string
-  base: string
-  power: string
-  counts: { stations: number; enriched: number }
-  /** Shard tra cứu cho preview link /station/* (chỉ Worker dùng). */
-  seo?: { dir: string; shards: number }
-}
-
-/** `base-<gen>.json` / `power-<gen>.json`: hàng packed theo `fields`. */
-export interface DataBundle {
-  v: number
-  generation: number
-  builtAt: string
-  fields: string[]
-  rows: unknown[][]
-}
+export type { DataBundle, DataManifest } from './format'

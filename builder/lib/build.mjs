@@ -1,3 +1,4 @@
+// @ts-check
 // Lõi build: lấy version mới nhất, stream snapshot + KML, trộn enrich, đóng gói.
 // Portable (Node 18+ và Cloudflare Workers). Phần I/O (fetch/gzip) do caller cấp qua deps
 // để test được; mặc định dùng fetch + CompressionStream chuẩn.
@@ -60,8 +61,12 @@ export async function fetchMeta() {
   return res.json() // { generation, count, full, sc }
 }
 
-/** Gói kW thành chuỗi "kw:count:dc|…" (gộp theo kW, sắp giảm dần). */
-function packGroups(groups) {
+/**
+ * Gộp cổng theo (kW, DC), sắp kW giảm dần.
+ * @param {Array<[number, number, number]>} groups  [kw, count, dc 0|1]
+ * @returns {{ kw: number, count: number, dc: number }[]}
+ */
+export function packGroups(groups) {
   const byKw = new Map()
   for (const [kw, count, dc] of groups) {
     const k = `${kw}:${dc}`
@@ -73,6 +78,14 @@ function packGroups(groups) {
       return { kw: +kw, count, dc: +dc }
     })
     .sort((a, b) => b.kw - a.kw)
+}
+
+/**
+ * Chuỗi cột `groups` của power — client đọc bằng `parsePowerGroups` (src/data/format.ts).
+ * @param {{ kw: number, count: number, dc: number }[]} groups
+ */
+export function groupsString(groups) {
+  return groups.map((x) => `${x.kw}:${x.count}:${x.dc}`).join('|')
 }
 
 /**
@@ -105,6 +118,7 @@ function lookupPower(index, lat, lng, name) {
 /**
  * Chạy full pipeline. Trả về { manifest, base, power } đã sẵn sàng ghi.
  * @param {(msg:string)=>void} log
+ * @returns {Promise<{ manifest: import('../../src/data/format').DataManifest, base: import('../../src/data/format').DataBundle, power: import('../../src/data/format').DataBundle }>}
  */
 export async function buildData(log = () => {}) {
   const meta = await fetchMeta()
@@ -137,7 +151,7 @@ export async function buildData(log = () => {}) {
     const portCount = groups.reduce((s, g) => s + g.count, 0)
     const maxKw = groups.reduce((m, g) => Math.max(m, g.kw), 0)
     const dcCount = groups.filter((g) => g.dc).reduce((s, g) => s + g.count, 0)
-    const g = groups.map((x) => `${x.kw}:${x.count}:${x.dc}`).join('|')
+    const g = groupsString(groups)
     powerRows.push([portCount, maxKw, dcCount, g])
     matched++
   }

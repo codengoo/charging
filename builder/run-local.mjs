@@ -1,3 +1,4 @@
+// @ts-check
 // Chạy pipeline ETL, ghi JSON thô ra builder/out/. Dùng cho GitHub Action (rồi upload R2)
 // và để kiểm tra local. Chỉ cần Node (không npm dep).
 //   node builder/run-local.mjs
@@ -15,8 +16,9 @@ const out = (name) => new URL(`./out/${name}`, import.meta.url)
 // parse cả base vượt hạn 10 ms CPU của Workers Free plan.
 const SEO_SHARDS = 32
 const seoDir = `seo-${manifest.generation}`
+/** @type {Record<string, import('../src/data/format').SeoRow>[]} */
 const shards = Array.from({ length: SEO_SHARDS }, () => ({}))
-for (const r of base.rows) shards[Number(r[0]) % SEO_SHARDS][r[0]] = [r[2], r[3], r[6]]
+for (const r of base.rows) shards[Number(r[0]) % SEO_SHARDS][String(r[0])] = [String(r[2]), String(r[3]), Number(r[6])]
 await mkdir(out(`${seoDir}/`), { recursive: true })
 await Promise.all(shards.map((sh, i) => writeFile(out(`${seoDir}/${i}.json`), JSON.stringify(sh))))
 manifest.seo = { dir: seoDir, shards: SEO_SHARDS }

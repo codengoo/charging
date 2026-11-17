@@ -25,3 +25,11 @@
 ```
 refactor(worker): gom helper HTTP và bảng route có guard; định dạng dữ liệu dùng chung builder/worker/client
 ```
+
+## 4. Lệch so với kế hoạch (ghi lúc thực hiện)
+
+- Bảng route nằm ngay trong `worker/index.ts` (`ROUTES`) thay vì `worker/routes.ts` — handler `/data/*`, `/station/*` ở đó, tách ra chỉ thêm vòng import. Guard (`checkGuard`, `sameSite`) ở `worker/http.ts`.
+- Thêm `worker/manifest.ts` (`getManifest` cache theo isolate 60 s, `lookupSeoRow`).
+- Builder vẫn là `.mjs` chạy Node thuần nên KHÔNG gọi được hàm TS: chỉ `// @ts-check` + JSDoc `import()` type từ `src/data/format.ts`; `builder/tsconfig.json` + `tsc -p builder` trong `npm run typecheck`. Định dạng cột groups giữ khớp bằng test khứ hồi `src/data/format.test.ts` (import thẳng `builder/lib/build.mjs`).
+- Chưa chạy `node builder/run-local.mjs` thật (cần mạng tới VinFast) — thay đổi ở builder chỉ là ép kiểu `String()/Number()` trên giá trị vốn đã đúng kiểu và tách `groupsString`.
+- Shard SEO thiếu nhưng manifest có `seo`: trước trả 404, nay 200 (coi như chưa có chỉ mục). Chỉ xảy ra khi build hỏng.

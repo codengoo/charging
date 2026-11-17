@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "typecheck": "tsc -b && tsc -p worker",
+    "typecheck": "tsc -b && tsc -p worker && tsc -p builder",
     "test": "vitest run --maxWorkers=2",
     "test:watch": "vitest --maxWorkers=2",
     "preview": "vite preview",

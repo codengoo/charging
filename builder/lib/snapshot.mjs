@@ -1,3 +1,4 @@
+// @ts-check
 // Stream-parse snapshot locators của VinFast (gzip), chỉ yield trạm ô tô (type 2444).
 // Portable (Web Streams). KHÔNG giữ cả 72MB JSON — tách từng phần tử của mảng "data"
 // bằng một bộ quét tăng dần, parse từng object rồi thả ra ngay.

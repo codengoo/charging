@@ -4,6 +4,7 @@
 // (/api/station/* là proxy chi tiết VinFast, ở worker/locator.ts, không đi qua đây.)
 
 import { serveLive } from './evcs'
+import { fail, json, jsonText, NO_STORE } from './http'
 
 export interface ApiEnv {
   /** Secret: `npx wrangler secret put HERE_API_KEY`; local: `.dev.vars`. */
@@ -11,7 +12,6 @@ export interface ApiEnv {
   API_LIMIT: RateLimit
 }
 
-const SITE_HOSTS = new Set(['charging.cangao.asia', 'localhost', '127.0.0.1'])
 const SHORTENERS = new Set(['maps.app.goo.gl', 'goo.gl', 'g.co'])
 /** Host Google thật: chỉ đuôi .com, .vn, .com.vn, .co.uk… — `[a-z.]+` từng cho lọt google.evil.com. */
 const GOOGLE_HOST = /^(www\.|maps\.)?google\.(?:com|com?\.[a-z]{2}|[a-z]{2})$/
@@ -26,13 +26,9 @@ const MAX_BODY = 256 * 1024
 
 const COORD = /^-?\d{1,3}(?:\.\d+)?,-?\d{1,3}(?:\.\d+)?$/
 
+/** Guard (same-site + API_LIMIT) do bảng route ở worker/index.ts lo. */
 export async function serveApi(req: Request, url: URL, env: ApiEnv, ctx: ExecutionContext): Promise<Response> {
   if (req.method !== 'GET') return fail(405, 'Chỉ nhận GET')
-  if (!sameSite(req)) return fail(403, 'Không cho phép')
-  const ip = req.headers.get('CF-Connecting-IP') ?? 'unknown'
-  const { success } = await env.API_LIMIT.limit({ key: ip })
-  if (!success) return fail(429, 'Gọi quá nhanh, thử lại sau ít phút')
-
   try {
     if (url.pathname.startsWith('/api/live')) return await serveLive(url, ctx)
     switch (url.pathname) {
@@ -55,23 +51,6 @@ export async function serveApi(req: Request, url: URL, env: ApiEnv, ctx: Executi
   }
 }
 
-/**
- * Cùng origin. Trình duyệt KHÔNG gửi `Origin` cho fetch GET cùng origin, nên xét
- * `Sec-Fetch-Site` trước, rồi mới tới Origin/Referer (trình duyệt cũ).
- * Script tự làm giả được — rate limit mới là hàng rào thật.
- */
-export function sameSite(req: Request): boolean {
-  const site = req.headers.get('Sec-Fetch-Site')
-  if (site) return site === 'same-origin'
-  const from = req.headers.get('Origin') ?? req.headers.get('Referer')
-  if (!from) return false
-  try {
-    return SITE_HOSTS.has(new URL(from).hostname)
-  } catch {
-    return false
-  }
-}
-
 // ------------------------------------------------------------ HERE
 
 function hereKey(env: ApiEnv): string | null {
@@ -81,14 +60,8 @@ function hereKey(env: ApiEnv): string | null {
 /** Gọi HERE, trả nguyên body. Lỗi phía HERE → 502 nhưng vẫn giữ body để client đọc nếu cần. */
 async function passHere(target: URL, ttl: number): Promise<Response> {
   const res = await fetch(target.toString(), { headers: { Accept: 'application/json' } })
-  return new Response(res.body, {
-    status: res.ok ? 200 : 502,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      // private: tuyến/điểm của từng người, không cho CDN dùng chung.
-      'Cache-Control': res.ok ? `private, max-age=${ttl}` : 'no-store',
-    },
-  })
+  // private: tuyến/điểm của từng người, không cho CDN dùng chung.
+  return jsonText(res.body ?? '', res.ok ? 200 : 502, res.ok ? `private, max-age=${ttl}` : NO_STORE)
 }
 
 /** Tên tuỳ chọn tránh của app → `avoid[features]` của HERE. Chỉ nhận đúng các tên này. */
@@ -250,12 +223,4 @@ async function findMapsUrl(res: Response): Promise<string | null> {
   return isMapsUrl(found) ? found : null
 }
 
-// ------------------------------------------------------------ tiện ích
-
-function ok(body: unknown): Response {
-  return Response.json(body, { headers: { 'Cache-Control': 'private, max-age=3600' } })
-}
-
-function fail(status: number, error: string): Response {
-  return Response.json({ error }, { status, headers: { 'Cache-Control': 'no-store' } })
-}
+const ok = (body: unknown): Response => json(body, 200, 'private, max-age=3600')

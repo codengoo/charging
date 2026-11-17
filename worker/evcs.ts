@@ -10,6 +10,8 @@
 // Cache bằng Cache API theo trạm — nhiều người mở cùng một trạm chỉ tốn một lượt gọi EVCS,
 // và EVCS vốn đã cache phía họ ~5 phút, gọi dày hơn không tươi hơn mà dễ bị chặn nhịp.
 
+import { fail, jsonText, NO_STORE, safeDecode } from './http'
+
 const SITE = 'https://evcs.vn'
 /**
  * /charging gọi qua host phụ: Cloudflare của EVCS chặn đường này trên evcs.vn khi
@@ -50,16 +52,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 class Transient extends Error {}
 
-function json(body: BodyInit, status: number, ttl: number): Response {
-  return new Response(body, {
-    status,
-    headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': status === 200 ? `public, max-age=${ttl}` : 'no-store',
-    },
-  })
-}
-const failJson = (status: number, error: string) => json(JSON.stringify({ error }), status, 0)
+/** Body upstream trả nguyên văn (không parse — 10 ms CPU); 200 mới cho cache. */
+const json = (body: BodyInit, status: number, ttl: number): Response =>
+  jsonText(body, status, status === 200 ? `public, max-age=${ttl}` : NO_STORE)
 
 /**
  * POST vào một trang trạm với `X-Partial: user` → chargeToken + apiToken. Phần chữ trong
@@ -111,7 +106,7 @@ async function live(storeId: string): Promise<Response> {
       return json(await liveOnce(storeId), 200, TTL_LIVE)
     } catch (e) {
       if (!(e instanceof Transient) || attempt >= BACKOFF_MS.length) {
-        return failJson(e instanceof Transient ? 503 : 502, `EVCS đang bận (${e instanceof Error ? e.message : 'lỗi'})`)
+        return fail(e instanceof Transient ? 503 : 502, `EVCS đang bận (${e instanceof Error ? e.message : 'lỗi'})`)
       }
       await sleep(BACKOFF_MS[attempt])
     }
@@ -189,7 +184,7 @@ async function history(storeId: string): Promise<Response> {
     if (r.status === 401) r = await historyOnce(storeId)
     return json(r.body, r.status, TTL_HISTORY)
   } catch {
-    return failJson(502, 'Không nối được EVCS')
+    return fail(502, 'Không nối được EVCS')
   }
 }
 
@@ -205,26 +200,17 @@ async function cached(key: string, run: () => Promise<Response>, ctx: ExecutionC
   return res
 }
 
-/** %-mã hỏng (`%E0%A4`) làm decodeURIComponent ném lỗi — coi là input sai (400), không phải lỗi mạng. */
-function safeDecode(s: string): string | null {
-  try {
-    return decodeURIComponent(s)
-  } catch {
-    return null
-  }
-}
-
 export async function serveLive(url: URL, ctx: ExecutionContext): Promise<Response> {
   const p = url.pathname
   if (p.startsWith('/api/live/')) {
     const id = safeDecode(p.slice('/api/live/'.length))?.toUpperCase() ?? ''
-    if (!STORE_ID.test(id)) return failJson(400, 'storeId không hợp lệ')
+    if (!STORE_ID.test(id)) return fail(400, 'storeId không hợp lệ')
     return cached(`live/${id}`, () => live(id), ctx)
   }
   if (p.startsWith('/api/live-history/')) {
     const id = safeDecode(p.slice('/api/live-history/'.length))?.toUpperCase() ?? ''
-    if (!STORE_ID.test(id)) return failJson(400, 'storeId không hợp lệ')
+    if (!STORE_ID.test(id)) return fail(400, 'storeId không hợp lệ')
     return cached(`history/${id}`, () => history(id), ctx)
   }
-  return failJson(404, 'Not found')
+  return fail(404, 'Not found')
 }

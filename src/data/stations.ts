@@ -1,5 +1,6 @@
-import type { DataBundle, DataManifest, PortGroup, Station, StationPower, StationStatus } from './types'
+import type { DataBundle, DataManifest, Station, StationPower, StationStatus } from './types'
 import { pick } from '../i18n'
+import { parsePowerGroups, type PowerRow } from './format'
 
 const CELL_SIZE = 0.1
 
@@ -109,25 +110,16 @@ export async function loadPower(index: StationIndex): Promise<Map<string, Statio
   const out = new Map<string, StationPower>()
   const n = Math.min(bundle.rows.length, index.all.length)
   for (let i = 0; i < n; i++) {
-    const r = bundle.rows[i] as [number, number, number, string] | null
+    const r = bundle.rows[i] as PowerRow | null
     if (!r) continue
     out.set(index.all[i].entityId, {
       portCount: r[0],
       maxKw: r[1],
       dcCount: r[2],
-      groups: parseGroups(r[3]),
+      groups: parsePowerGroups(r[3]),
     })
   }
   return out
-}
-
-/** "250:2:1|60:4:1" -> [{kw:250,count:2,dc:true}, …] (builder đã sắp kW giảm dần). */
-function parseGroups(s: string): PortGroup[] {
-  if (!s) return []
-  return s.split('|').flatMap((part) => {
-    const [kw, count, dc] = part.split(':').map(Number)
-    return Number.isFinite(kw) && Number.isFinite(count) ? [{ kw, count, dc: dc === 1 }] : []
-  })
 }
 
 /** Lấy các trạm trong khung nhìn (theo các ô lưới phủ bbox). */

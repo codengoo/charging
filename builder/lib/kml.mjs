@@ -1,3 +1,4 @@
+// @ts-check
 // Stream-parse một Google My Maps KML, dựng index toạ độ → các placemark (tên + nhóm cổng sạc).
 // Portable: dùng Web Streams API (chạy cả Node 18+ lẫn Cloudflare Workers).
 // Chỉ giữ index nhỏ (~22k điểm × vài chục byte), KHÔNG buffer cả file 11–24MB.
@@ -37,7 +38,7 @@ const unescapeXml = (s) =>
  * @param {Map<string, Placemark[]>} index  gộp vào index có sẵn (nhiều map)
  */
 export async function indexKml(byteStream, index = new Map()) {
-  const reader = byteStream.pipeThrough(new TextDecoderStream()).getReader()
+  const reader = byteStream.pipeThrough(/** @type {TransformStream<Uint8Array, string>} */ (new TextDecoderStream())).getReader()
   let buf = ''
   let count = 0
   const flush = (block) => {

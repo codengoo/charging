@@ -3,6 +3,7 @@
 // rút gọn còn vài trăm byte và cache ở edge. Chỉ gọi khi người dùng mở MỘT trạm.
 import type { PortGroup, StationDetail } from '../src/data/types'
 import { STATION_ID_RE } from '../src/lib/stationUrl'
+import { json as toJson, jsonText, NO_STORE } from './http'
 
 const SITE = 'https://vinfastauto.com/vn_vi'
 const PAGE = `${SITE}/tim-kiem-showroom-tram-sac`
@@ -106,7 +107,7 @@ export async function serveStationDetail(
     const stale = await data.get(stashKey(id))
     if (stale) {
       // Bản cũ: cache edge ngắn để lần sau thử lấy bản mới; báo qua header để còn soi.
-      res = new Response(stale.body, { headers: headers(TTL_FAIL) })
+      res = jsonText(stale.body, 200, cacheFor(TTL_FAIL), ROBOTS)
       res.headers.set('X-Detail-Stale', stale.uploaded.toISOString())
       done('stale')
     } else {
@@ -264,14 +265,6 @@ function hoursOf(opening: Obj | undefined): string | null {
   return spans.size === 1 ? [...spans][0] : null
 }
 
-function headers(ttl: number): Headers {
-  return new Headers({
-    'Content-Type': 'application/json; charset=utf-8',
-    'Cache-Control': ttl ? `public, max-age=${ttl}` : 'no-store',
-    'X-Robots-Tag': 'noindex, nofollow',
-  })
-}
-
-function json(body: unknown, status: number, ttl: number): Response {
-  return new Response(JSON.stringify(body), { status, headers: headers(ttl) })
-}
+const ROBOTS = { 'X-Robots-Tag': 'noindex, nofollow' }
+const cacheFor = (ttl: number) => (ttl ? `public, max-age=${ttl}` : NO_STORE)
+const json = (body: unknown, status: number, ttl: number): Response => toJson(body, status, cacheFor(ttl), ROBOTS)

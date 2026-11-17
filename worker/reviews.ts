@@ -13,7 +13,8 @@
 // khi có TURNSTILE_SECRET (chưa có thì bỏ qua — xem README).
 
 import { STATION_ID_RE } from '../src/lib/stationUrl'
-import { sameSite } from './api'
+import { checkGuard, clientIp, fail, json } from './http'
+import { lookupSeoRow } from './manifest'
 
 export interface ReviewsEnv {
   /** D1 `tramsac-reviews`. Thiếu binding (chưa tạo DB) → 503. */
@@ -50,11 +51,6 @@ const NICK_MAX = 30
 const DEVICE = /^[0-9a-f]{32}$/
 /** Link, tên miền, email, số điện thoại (≥ 9 chữ số, cho phép cách bằng dấu cách / chấm / gạch). */
 const BLOCKED = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(com|vn|net|org|info|xyz|io|me|top|link|site)\b|[\w.+-]+@[\w-]+\.\w|(?:\d[\s.-]?){9,})/i
-
-function json(data: unknown, status = 200): Response {
-  return Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } })
-}
-const fail = (status: number, error: string) => json({ error }, status)
 
 function toReview(r: ReviewRow, withHidden = false) {
   return {
@@ -96,12 +92,8 @@ async function turnstileOk(token: unknown, ip: string, env: ReviewsEnv): Promise
  * R2 local trống) thì cho qua: thà nhận nhầm id lạ còn hơn chặn hết.
  */
 async function stationExists(id: string, env: ReviewsEnv): Promise<boolean> {
-  const m = await env.DATA.get('manifest.json')
-  const seo = m ? ((await m.json()) as { seo?: { dir: string; shards: number } }).seo : undefined
-  if (!seo) return true
-  const shard = await env.DATA.get(`${seo.dir}/${Number(id) % seo.shards}.json`)
-  if (!shard) return true
-  return id in ((await shard.json()) as Record<string, unknown>)
+  const { row, noIndex } = await lookupSeoRow(env.DATA, id)
+  return noIndex || row !== null
 }
 
 async function readBody(req: Request): Promise<Record<string, unknown> | null> {
@@ -260,17 +252,20 @@ async function admin(req: Request, url: URL, env: ReviewsEnv, db: D1Database): P
 export async function serveReviews(req: Request, url: URL, env: ReviewsEnv): Promise<Response> {
   const db = env.REVIEWS
   if (!db) return fail(503, 'Chưa bật đánh giá')
-  const ip = req.headers.get('CF-Connecting-IP') ?? 'unknown'
+  const ip = clientIp(req)
   // Admin cũng qua limiter (trước khi so token) — không cho dò token không giới hạn.
   if (url.pathname.startsWith('/api/admin/reviews')) {
     if (!(await env.REVIEW_LIMIT.limit({ key: `admin:${ip}` })).success) return fail(429, 'Too many requests')
     return admin(req, url, env, db)
   }
 
-  if (!sameSite(req)) return fail(403, 'Không cho phép')
   const isWrite = req.method !== 'GET'
-  const limiter = isWrite ? env.REVIEW_LIMIT : env.API_LIMIT
-  if (!(await limiter.limit({ key: ip })).success) return fail(429, 'Thao tác quá nhanh, thử lại sau ít phút')
+  const blocked = await checkGuard(req, {
+    site: true,
+    limit: isWrite ? env.REVIEW_LIMIT : env.API_LIMIT,
+    limitMsg: 'Thao tác quá nhanh, thử lại sau ít phút',
+  })
+  if (blocked) return blocked
 
   try {
     const device = await deviceHash(req, env)

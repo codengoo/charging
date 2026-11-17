@@ -4,25 +4,18 @@
 // Build dữ liệu KHÔNG ở đây — chạy bằng GitHub Action (.github/workflows/build-data.yml)
 // vì Workers Free plan giới hạn 10ms CPU, không đủ cho parse 72MB snapshot.
 import { SITE_URL, STATION_PREFIX, parseStationId, stationPath } from '../src/lib/stationUrl'
-import { serveStationDetail } from './locator'
-import { sameSite, serveApi, type ApiEnv } from './api'
-import { serveReviews, type ReviewsEnv } from './reviews'
 import { langFromPath, pickFor, stripLang, withLang, type Lang } from '../src/i18n'
+import { serveApi, type ApiEnv } from './api'
+import { checkGuard, type Guard } from './http'
+import { serveStationDetail } from './locator'
+import { lookupSeoRow } from './manifest'
+import { serveReviews, type ReviewsEnv } from './reviews'
 
 interface Env extends ApiEnv, ReviewsEnv {
   DATA: R2Bucket
   ASSETS: Fetcher
   STATION_LIMIT: RateLimit
 }
-
-/** Phần manifest Worker cần — xem builder/run-local.mjs. */
-interface Manifest {
-  generation: number
-  seo?: { dir: string; shards: number }
-}
-
-/** [name, address, flags] */
-type SeoRow = [string, string, number]
 
 /**
  * Trang trạm KHÔNG cho máy tìm kiếm lập chỉ mục — dữ liệu trạm là nội bộ, link chỉ để chia
@@ -31,22 +24,36 @@ type SeoRow = [string, string, number]
  */
 const NOINDEX = 'noindex, nofollow, noarchive'
 
+interface Route {
+  prefix: string
+  /** Guard chung (same-site, rate limit) chạy trước handler; reviews tự lo vì admin/ghi/đọc khác luật. */
+  guard?: (env: Env) => Guard
+  handle: (req: Request, url: URL, env: Env, ctx: ExecutionContext) => Promise<Response>
+}
+
+/** Xét theo thứ tự — tiền tố cụ thể đứng trước `/api/`. */
+const ROUTES: Route[] = [
+  {
+    // Mỗi lần trượt cache tốn tới 6 lượt gọi VinFast — không cho người ngoài quét id.
+    prefix: '/api/station/',
+    guard: (env) => ({ site: true, limit: env.STATION_LIMIT }),
+    handle: (req, url, env, ctx) => serveStationDetail(url, env.DATA, ctx, req.cf?.colo as string | undefined),
+  },
+  // Đánh giá nhận cả PUT/POST/DELETE — đi trước serveApi (chỉ nhận GET).
+  { prefix: '/api/reviews/', handle: (req, url, env) => serveReviews(req, url, env) },
+  { prefix: '/api/admin/', handle: (req, url, env) => serveReviews(req, url, env) },
+  { prefix: '/api/', guard: (env) => ({ site: true, limit: env.API_LIMIT }), handle: serveApi },
+  { prefix: '/data/', handle: (_req, url, env) => serveData(url, env) },
+]
+
 export default {
   async fetch(req: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(req.url)
-    if (url.pathname.startsWith('/api/station/')) {
-      // Mỗi lần trượt cache tốn tới 6 lượt gọi VinFast — không cho người ngoài quét id.
-      if (!sameSite(req)) return Response.json({ error: 'forbidden' }, { status: 403, headers: { 'Cache-Control': 'no-store' } })
-      const ip = req.headers.get('CF-Connecting-IP') ?? 'unknown'
-      if (!(await env.STATION_LIMIT.limit({ key: ip })).success) {
-        return Response.json({ error: 'rate limited' }, { status: 429, headers: { 'Cache-Control': 'no-store' } })
-      }
-      return serveStationDetail(url, env.DATA, ctx, req.cf?.colo as string | undefined)
+    const route = ROUTES.find((r) => url.pathname.startsWith(r.prefix))
+    if (route) {
+      const blocked = route.guard ? await checkGuard(req, route.guard(env)) : null
+      return blocked ?? route.handle(req, url, env, ctx)
     }
-    // Đánh giá nhận cả PUT/POST/DELETE — đi trước serveApi (chỉ nhận GET).
-    if (url.pathname.startsWith('/api/reviews/') || url.pathname.startsWith('/api/admin/')) return serveReviews(req, url, env)
-    if (url.pathname.startsWith('/api/')) return serveApi(req, url, env, ctx)
-    if (url.pathname.startsWith('/data/')) return serveData(url, env)
     // Path cũ (QR đã in, link đã gửi) -> path tiếng Anh. 301 để trình duyệt/bot nhớ luôn.
     if (url.pathname === '/tram' || url.pathname.startsWith('/tram/')) {
       const rest = url.pathname.slice('/tram'.length)
@@ -76,11 +83,6 @@ async function serveData(url: URL, env: Env): Promise<Response> {
   // Dữ liệu nội bộ: không lập chỉ mục file dữ liệu.
   headers.set('X-Robots-Tag', 'noindex, nofollow')
   return new Response(obj.body, { headers })
-}
-
-async function readJson<T>(env: Env, key: string): Promise<T | null> {
-  const obj = await env.DATA.get(key)
-  return obj ? ((await obj.json()) as T) : null
 }
 
 /** Meta trang chủ theo ngôn ngữ. Bản tiếng Việt nằm sẵn trong index.html; giữ hai bên khớp. */
@@ -188,12 +190,10 @@ async function serveStation(url: URL, env: Env, lang: Lang): Promise<Response> {
   const id = parseStationId(url.pathname)
   if (!id) return lang === 'en' ? serveShell(url, env, lang) : shellOf(url, env)
 
-  const manifest = await readJson<Manifest>(env, 'manifest.json')
-  const seo = manifest?.seo
-  const row = seo ? (await readJson<Record<string, SeoRow>>(env, `${seo.dir}/${Number(id) % seo.shards}.json`))?.[id] : undefined
+  const { row, noIndex } = await lookupSeoRow(env.DATA, id)
   if (!row) {
     // Trạm không còn (hoặc manifest cũ chưa có shard): vẫn mở app nhưng báo 404 cho bot.
-    return htmlResponse(await shellOf(url, env), seo ? 404 : 200, true)
+    return htmlResponse(await shellOf(url, env), noIndex ? 200 : 404, true)
   }
 
   const [name, address, flags] = row
