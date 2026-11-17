@@ -322,6 +322,11 @@ export function App() {
           onKwBands={(kwBands) => changeSettings({ kwBands })}
           onPick={pick}
           onClose={tripCtl.close}
+          vehicle={vehicle}
+          climate={settings.climate}
+          battery={battery.reading}
+          batteryStale={battery.stale}
+          onBattery={battery.set}
         />
       )}
 

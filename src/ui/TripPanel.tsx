@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { Fragment, useEffect, useState, type FormEvent } from 'react'
 import { ChevronUp, ClipboardPaste, Loader2, Route, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
@@ -10,6 +10,9 @@ import type { Station, StationPower } from '../data/types'
 import { KW_BANDS, KW_BAND_LABEL, kwActive, tierOf, type KwBand } from '../data/stations'
 import { TIER_COLORS } from '../map/pins'
 import { pick } from '../i18n'
+import { RESERVE_PCT, arrivalPct, avgKmh, type ArrivalEstimate, type BatteryReading } from '../data/battery'
+import type { Vehicle } from '../data/vehicles'
+import { BatteryControl, pctOf, pctTone } from './BatteryControl'
 
 const L = pick({
   vi: {
@@ -37,6 +40,9 @@ const L = pick({
     min: (m: number) => `${m} phút`,
     hr: (h: number) => `${h} giờ`,
     hrMin: (h: number, m: number) => `${h} giờ ${m} phút`,
+    lastReachable: `Trạm cuối còn kịp (còn ≥ ${RESERVE_PCT}% pin)`,
+    noneReachable: (p: number) => `Với ${p}% pin, không trạm nào chắc chắn tới được (còn ≥ ${RESERVE_PCT}%)`,
+    pctAria: (p: number) => `còn khoảng ${p}% pin khi tới`,
   },
   en: {
     title: 'Along route',
@@ -63,6 +69,9 @@ const L = pick({
     min: (m: number) => `${m} min`,
     hr: (h: number) => `${h} h`,
     hrMin: (h: number, m: number) => `${h} h ${m} min`,
+    lastReachable: `Last station you can reach (≥ ${RESERVE_PCT}% battery left)`,
+    noneReachable: (p: number) => `With ${p}% battery, no station is safely reachable (≥ ${RESERVE_PCT}% left)`,
+    pctAria: (p: number) => `about ${p}% battery left on arrival`,
   },
 })
 
@@ -79,6 +88,12 @@ interface Props {
   onKwBands: (bands: KwBand[]) => void
   onPick: (st: Station) => void
   onClose: () => void
+  /** Xe đã chọn (null = không ước tính pin) + % pin lúc xuất phát. */
+  vehicle: Vehicle | null
+  climate: boolean
+  battery: BatteryReading | null
+  batteryStale: boolean
+  onBattery: (pct: number) => void
 }
 
 /**
@@ -86,7 +101,7 @@ interface Props {
  * tuyến, và bảng chi tiết trạm mở đè lên được. Điện thoại: dải dưới đáy, bấm tay cầm để thu/mở.
  * Màn rộng: thẻ nổi góc trái.
  */
-export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, kwBands, onKwBands, onPick, onClose }: Props) {
+export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, kwBands, onKwBands, onPick, onClose, vehicle, climate, battery, batteryStale, onBattery }: Props) {
   const [text, setText] = useState(trip.link ?? '')
   const [expanded, setExpanded] = useState(true)
   // Link đổi từ ngoài (mở /trip?link=…, share target) → ô nhập theo.
@@ -103,6 +118,18 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, kw
   }
 
   const busy = trip.status === 'resolving' || trip.status === 'routing'
+
+  // % pin khi ngang qua từng trạm: rẽ vào rồi quay ra tuyến (2 × độ lệch), tốc độ trung bình cả tuyến.
+  const startPct = pctOf(battery)
+  const route = trip.route
+  const estimates: ArrivalEstimate[] | null =
+    vehicle && route && trip.status === 'ready'
+      ? hits.items.map((h) =>
+          arrivalPct(startPct, h.atKm + 2 * h.offsetKm, avgKmh(route.meters, route.seconds), vehicle, climate),
+        )
+      : null
+  let lastOk = -1
+  if (estimates) for (let i = 0; i < estimates.length; i++) if (estimates[i].low >= RESERVE_PCT) lastOk = i
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -196,34 +223,42 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, kw
             ))}
           </div>
 
+          {estimates && <BatteryControl reading={battery} stale={batteryStale} onChange={onBattery} compact />}
+
           {hits.items.length > 0 && (
             <ul className="-mx-4 min-h-0 flex-1 overflow-y-auto px-4" aria-label={L.listAria}>
-              {hits.items.map(({ station, atKm, offsetKm }) => {
+              {estimates && lastOk === -1 && <ReachDivider text={L.noneReachable(startPct)} />}
+              {hits.items.map(({ station, atKm, offsetKm }, i) => {
                 const p = power?.get(station.entityId)
+                const est = estimates?.[i]
                 return (
-                  <li key={station.entityId} className="border-b border-border/60 last:border-b-0">
-                    <button
-                      type="button"
-                      onClick={() => onPick(station)}
-                      className="flex w-full items-center gap-3 py-2.5 text-left"
-                    >
-                      <span className="w-14 shrink-0 text-sm font-semibold tabular-nums text-brand">
-                        km {Math.round(atKm)}
-                      </span>
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="line-clamp-2 text-[15px] leading-snug">{station.name}</span>
-                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <span
-                            className="size-2 shrink-0 rounded-full"
-                            style={{ background: TIER_COLORS[tierOf(p)] }}
-                            aria-hidden
-                          />
-                          {L.offRoute(fmtDistance(offsetKm))}
-                          {p ? L.maxKw(fmtKw(p.maxKw)) : ''}
+                  <Fragment key={station.entityId}>
+                    <li className="border-b border-border/60 last:border-b-0">
+                      <button
+                        type="button"
+                        onClick={() => onPick(station)}
+                        className="flex w-full items-center gap-3 py-2.5 text-left"
+                      >
+                        <span className="w-14 shrink-0 text-sm font-semibold tabular-nums text-brand">
+                          km {Math.round(atKm)}
                         </span>
-                      </span>
-                    </button>
-                  </li>
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="line-clamp-2 text-[15px] leading-snug">{station.name}</span>
+                          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span
+                              className="size-2 shrink-0 rounded-full"
+                              style={{ background: TIER_COLORS[tierOf(p)] }}
+                              aria-hidden
+                            />
+                            {L.offRoute(fmtDistance(offsetKm))}
+                            {p ? L.maxKw(fmtKw(p.maxKw)) : ''}
+                          </span>
+                        </span>
+                        {est && <ArrivalPct est={est} />}
+                      </button>
+                    </li>
+                    {i === lastOk && i < hits.items.length - 1 && <ReachDivider text={L.lastReachable} />}
+                  </Fragment>
                 )
               })}
             </ul>
@@ -231,6 +266,29 @@ export function TripPanel({ trip, hits, power, stationOpen, onOpen, onRadius, kw
         </div>
       )}
     </section>
+  )
+}
+
+/** Số giữa của khoảng ước tính; không tới được thì gạch đỏ. */
+function ArrivalPct({ est }: { est: ArrivalEstimate }) {
+  const mid = Math.round((est.low + est.high) / 2)
+  if (est.high < 0) return <span className="w-11 shrink-0 text-right text-sm font-semibold text-destructive">—</span>
+  return (
+    <span
+      className={`w-11 shrink-0 text-right text-sm font-semibold tabular-nums ${pctTone(est.low)}`}
+      aria-label={L.pctAria(Math.max(0, mid))}
+    >
+      ~{Math.max(0, mid)}%
+    </span>
+  )
+}
+
+/** Vạch ngăn giữa trạm còn kịp và trạm có thể không tới được. */
+function ReachDivider({ text }: { text: string }) {
+  return (
+    <li role="separator" className="flex items-center gap-2 border-y-2 border-[#F0A500]/60 bg-[#F0A500]/10 px-2 py-1.5 text-xs font-medium text-[#B45309] dark:text-[#F0A500]">
+      {text}
+    </li>
   )
 }
 
