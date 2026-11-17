@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
+import { Dialog as DialogPrimitive } from 'radix-ui'
 import type { StationIndex } from '../data/stations'
 import type { Station } from '../data/types'
 import { stationIdFromQr } from '@/lib/stationUrl'
 import { pick } from '../i18n'
-import { AppSheet } from './AppSheet'
 
 const L = pick({
   vi: {
     title: 'Quét mã trạm',
+    close: 'Đóng',
     hint: 'Hướng camera vào mã QR "Link trạm" (in trên thẻ trạm hoặc chia sẻ từ app).',
     starting: 'Đang mở camera…',
     denied: 'Trình duyệt đang chặn camera. Bật lại quyền Camera cho trang này trong cài đặt trình duyệt / điện thoại rồi mở lại.',
@@ -19,6 +20,7 @@ const L = pick({
   },
   en: {
     title: 'Scan station code',
+    close: 'Close',
     hint: 'Point the camera at a "Station link" QR code (printed on a station card or shared from the app).',
     starting: 'Opening camera…',
     denied: 'Camera access is blocked. Allow Camera for this site in your browser / phone settings, then reopen.',
@@ -100,24 +102,58 @@ export function QrScanSheet({ open, onClose, index, onFound }: Props) {
   const error = status === 'denied' ? L.denied : status === 'noCamera' ? L.noCamera : status === 'failed' ? L.failed : null
 
   return (
-    <AppSheet open={open} onClose={onClose} title={L.title} description={L.hint} autoFocus={false}>
-      <div className="relative mt-2 aspect-square w-full overflow-hidden rounded-2xl bg-black">
-        <video ref={setVideo} className="size-full object-cover" muted playsInline />
-        {status === 'starting' && (
-          <span className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-white/80">
-            <Loader2 className="size-4 animate-spin" aria-hidden /> {L.starting}
-          </span>
-        )}
-        {/* Khung ngắm */}
-        {status === 'scanning' && (
-          <span aria-hidden className="pointer-events-none absolute inset-[18%] rounded-2xl border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
-        )}
-      </div>
-      {(error || notice) && (
-        <p role="alert" className={`mt-2 text-sm ${error ? 'text-destructive' : 'text-warn'}`}>
-          {error ?? notice}
-        </p>
-      )}
-    </AppSheet>
+    // Hộp thoại (không phải drawer): điện thoại toàn màn hình nền đen, camera chiếm phần lớn khung;
+    // màn rộng là hộp thoại giữa màn hình.
+    <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/60 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
+        <DialogPrimitive.Content
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          className="fixed inset-0 z-50 flex flex-col bg-black pt-[env(safe-area-inset-top)] pb-[max(1rem,env(safe-area-inset-bottom))] text-white outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:bg-popover sm:p-5 sm:text-popover-foreground sm:shadow-xl"
+        >
+          <div className="flex items-start gap-3 px-4 pt-3 sm:px-0 sm:pt-0">
+            <div className="min-w-0 flex-1">
+              <DialogPrimitive.Title className="text-lg font-semibold">{L.title}</DialogPrimitive.Title>
+              <DialogPrimitive.Description className="mt-0.5 text-sm text-white/70 sm:text-muted-foreground">
+                {L.hint}
+              </DialogPrimitive.Description>
+            </div>
+            <DialogPrimitive.Close
+              aria-label={L.close}
+              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25 sm:size-8 sm:bg-transparent sm:text-muted-foreground sm:hover:bg-muted"
+            >
+              <X className="size-5 sm:size-4" />
+            </DialogPrimitive.Close>
+          </div>
+
+          {/* Điện thoại: camera lấp phần còn lại của màn hình; màn rộng: khung vuông. */}
+          <div className="relative mt-3 min-h-0 flex-1 overflow-hidden bg-black sm:aspect-square sm:flex-none sm:rounded-2xl">
+            <video ref={setVideo} className="size-full object-cover" muted playsInline />
+            {status === 'starting' && (
+              <span className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-white/80">
+                <Loader2 className="size-4 animate-spin" aria-hidden /> {L.starting}
+              </span>
+            )}
+            {/* Khung ngắm vuông giữa khung hình */}
+            {status === 'scanning' && (
+              <span
+                aria-hidden
+                className="pointer-events-none absolute top-1/2 left-1/2 aspect-square w-[64%] max-w-72 -translate-x-1/2 -translate-y-1/2 rounded-3xl border-2 border-white/85 shadow-[0_0_0_9999px_rgba(0,0,0,0.4)]"
+              />
+            )}
+          </div>
+          {(error || notice) && (
+            <p
+              role="alert"
+              className={`mx-4 mt-3 rounded-xl px-3 py-2 text-sm sm:mx-0 ${
+                error ? 'bg-destructive/15 text-red-300 sm:text-destructive' : 'bg-white/10 text-amber-300 sm:bg-transparent sm:px-0 sm:text-warn'
+              }`}
+            >
+              {error ?? notice}
+            </p>
+          )}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   )
 }
