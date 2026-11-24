@@ -1,5 +1,4 @@
 import { useState, type ReactNode } from 'react'
-import { Credits } from './Credits'
 import { SwitchRow } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Segmented } from '@/components/ui/segmented'
@@ -209,8 +208,6 @@ export function SettingsSheet({ open, settings, onChange, onClose, placesSummary
         <Button variant="ghost" size="sm" className="self-start text-muted-foreground" onClick={() => onChange(resetKeepingCar(settings))}>
           {L.reset}
         </Button>
-
-        <Credits />
       </div>
       <VehicleSheet nested open={vehicleOpen} settings={settings} onChange={onChange} onClose={() => setVehicleOpen(false)} />
       {children}

@@ -5,10 +5,10 @@ import { pick } from '../i18n'
 
 /**
  * Chia Tiền kèm UTM để bên đó thống kê được lượt truy cập đến từ app này (nguồn = domain app, kênh =
- * referral, chiến dịch = mục ghi công trong Cài đặt).
+ * referral, chiến dịch = mục ghi công, cuối bảng Lịch sử cập nhật).
  */
 const CHIATIEN_URL =
-  'https://chiatien.cangao.asia/?utm_source=charging.cangao.asia&utm_medium=referral&utm_campaign=tramsac_credits&utm_content=settings'
+  'https://chiatien.cangao.asia/?utm_source=charging.cangao.asia&utm_medium=referral&utm_campaign=tramsac_credits&utm_content=changelog'
 
 /** Người làm app (tên tác giả commit trong repo). */
 const DEVELOPER = 'NghiaDT'

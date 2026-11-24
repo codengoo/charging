@@ -83,6 +83,9 @@ interface Props {
   range?: RangeLayer | null
 }
 
+/** Ghi công bản đồ mở ra bao lâu thì tự thu gọn lại. */
+const ATTRIB_SHOW_MS = 4000
+
 /** Giữ ngón tay chừng này (ms) không di chuyển quá LONG_PRESS_SLOP px thì coi là chạm giữ. */
 const LONG_PRESS_MS = 550
 const LONG_PRESS_SLOP = 10
@@ -107,8 +110,23 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
       style: STYLES[theme],
       center: DEFAULT_CENTER,
       zoom: 5,
-      attributionControl: { compact: true },
+      // Tự thêm bên dưới để đặt góc dưới TRÁI (góc phải dành cho nút định vị + số phiên bản).
+      attributionControl: false,
     })
+    const attrib = new maplibregl.AttributionControl({ compact: true })
+    map.addControl(attrib, 'bottom-left')
+    // Ghi công dạng gọn: maplibre mở sẵn lúc tải và chỉ thu lại khi kéo bản đồ. Tự thu sau vài giây
+    // mỗi lần nó mở ra (lúc tải, hoặc người dùng bấm ⓘ xem) — vẫn đủ thời gian đọc.
+    const attribEl = map.getContainer().querySelector<HTMLElement>('.maplibregl-ctrl-attrib')
+    let attribTimer: ReturnType<typeof setTimeout> | null = null
+    const attribObserver = new MutationObserver(() => {
+      if (!attribEl?.classList.contains('maplibregl-compact-show')) return
+      if (attribTimer) clearTimeout(attribTimer)
+      attribTimer = setTimeout(() => {
+        ;(attrib as unknown as { _updateCompactMinimize: () => void })._updateCompactMinimize()
+      }, ATTRIB_SHOW_MS)
+    })
+    if (attribEl) attribObserver.observe(attribEl, { attributes: true, attributeFilter: ['class'] })
     mapRef.current = map
     if (import.meta.env.DEV) (window as unknown as { __map: maplibregl.Map }).__map = map
 
@@ -227,6 +245,8 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
     })
 
     return () => {
+      attribObserver.disconnect()
+      if (attribTimer) clearTimeout(attribTimer)
       map.remove()
       mapRef.current = null
       loadedRef.current = false
@@ -373,7 +393,7 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
   return (
     <div className="absolute inset-0">
       <div ref={containerRef} className="h-full w-full" />
-      {/* Góc dưới phải, trên dòng ghi công bản đồ: chú giải (nếu có) rồi nút định vị — nút đứng yên
+      {/* Góc dưới phải, trên số phiên bản (App): chú giải (nếu có) rồi nút định vị — nút đứng yên
           khi chú giải thu / mở. */}
       <div className="absolute right-3 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-[5] flex flex-col items-end gap-2">
         {overlay}

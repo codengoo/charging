@@ -11,6 +11,22 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.16.1',
+    date: '2026-11-24',
+    title: 'Gọn hơn',
+    changes: [
+      "Số phiên bản chuyển sang góc dưới phải, ghi công bản đồ sang góc trái và tự thu gọn.",
+      "Thông tin & ghi công chuyển vào Lịch sử cập nhật.",
+      "Lịch sử cập nhật hiện 3 bản mới nhất, bấm để xem các bản cũ hơn.",
+    ],
+    titleEn: 'Tidier',
+    changesEn: [
+      "Version number moved to the bottom right; map credits moved to the left and collapse on their own.",
+      "About & credits moved into the Changelog.",
+      "The Changelog shows the 3 latest versions — tap to see older ones.",
+    ],
+  },
+  {
     version: '0.16.0',
     date: '2026-11-24',
     title: 'Tiền sạc, tầm pin & lọc thêm',

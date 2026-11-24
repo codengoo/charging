@@ -379,10 +379,12 @@ export function App() {
       <Button
         variant="secondary"
         size="sm"
-        className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-3 z-[5] rounded-full bg-card/90 shadow-lg shadow-black/10 backdrop-blur"
+        className="absolute right-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-[5] rounded-full bg-card/90 shadow-lg shadow-black/10 backdrop-blur"
         onClick={() => sheets.open('changelog')}
+        aria-label={`v${APP_VERSION} · ${T.whatsNew}`}
+        title={T.whatsNew}
       >
-        v{APP_VERSION} · {T.whatsNew}
+        v{APP_VERSION}
       </Button>
 
       {/* Các bảng luôn GẮN sẵn, chỉ đổi `open`: gỡ hẳn khi đóng thì vaul/Radix không kịp chạy
