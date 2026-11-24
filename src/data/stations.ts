@@ -270,9 +270,29 @@ export interface Filters {
   activeOnly: boolean
   /** Mức công suất được hiện; xem kwActive. Đang lọc thì trạm chưa có dữ liệu power bị ẩn. */
   kw: KwBand[]
+  /** Chỉ trạm công cộng (bỏ trạm nội bộ). */
+  publicOnly: boolean
+  /** Chỉ trạm không thu phí gửi xe. */
+  freeParking: boolean
+  /** Số cổng tối thiểu; 0 = không lọc. Đang lọc thì trạm chưa có dữ liệu power bị ẩn. */
+  minPorts: number
 }
 
-export const DEFAULT_FILTERS: Filters = { favoritesOnly: false, activeOnly: false, kw: [] }
+export const DEFAULT_FILTERS: Filters = {
+  favoritesOnly: false,
+  activeOnly: false,
+  kw: [],
+  publicOnly: false,
+  freeParking: false,
+  minPorts: 0,
+}
+
+/** Mức "số cổng tối thiểu" trong Cài đặt (0 = mọi trạm). */
+export const MIN_PORT_OPTIONS = [0, 2, 4, 8] as const
+
+/** Số bộ lọc thêm (ngoài các chip có sẵn) đang bật — chip "Bộ lọc" trên bản đồ. */
+export const extraFilterCount = (f: Pick<Filters, 'publicOnly' | 'freeParking' | 'minPorts'>): number =>
+  Number(f.publicOnly) + Number(f.freeParking) + Number(f.minPorts > 0)
 
 /** Lọc chung cho bản đồ và bảng "Gần tôi". `saved` chỉ cần khi favoritesOnly. */
 export function passesFilters(
@@ -283,6 +303,9 @@ export function passesFilters(
 ): boolean {
   if (f.favoritesOnly && !saved?.has(st.entityId)) return false
   if (f.activeOnly && st.status !== 0) return false
+  if (f.publicOnly && !st.isPublic) return false
+  if (f.freeParking && st.parkingFee) return false
+  if (f.minPorts > 0 && (power?.get(st.entityId)?.portCount ?? 0) < f.minPorts) return false
   if (kwActive(f.kw)) {
     const b = bandOf(power?.get(st.entityId))
     if (!b || !f.kw.includes(b)) return false

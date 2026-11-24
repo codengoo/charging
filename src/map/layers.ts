@@ -7,6 +7,7 @@ import type { Station, StationPower } from '../data/types'
 import { passesFilters, tierOf, type Filters, type StationIndex } from '../data/stations'
 import { allSaved, pinGroupOf, type GroupBook, type StationGroup } from '../data/groups'
 import type { GeoPoint } from '../lib/geo'
+import { circleRing, destination } from '../data/range'
 import { TIER_COLORS, pinTipOffset, rasterizePin, type PinSpec } from './pins'
 
 export const SRC = 'stations'
@@ -16,6 +17,8 @@ const SRC_TRIP = 'stations-trip'
 const SRC_ROUTE = 'trip-route'
 /** Tuyến phụ (HERE gợi ý thêm): xám, nằm dưới tuyến chính, chạm để chọn. */
 const SRC_ALT = 'trip-alt'
+/** Vòng tầm pin (đi tới được / đi về được) quanh vị trí người dùng. */
+const SRC_RANGE = 'battery-range'
 /** Các lớp của bản đồ thường, ẩn đi khi đang có tuyến. */
 const NORMAL_LAYERS = ['clusters', 'cluster-count', 'point']
 const ROUTE_COLOR = '#009966'
@@ -169,6 +172,7 @@ export function selectedGeoJSON(st: Station | null): GeoJSON.FeatureCollection {
 /** Nạp ảnh ghim còn thiếu vào style. Ảnh đã có thì bỏ qua — gọi lại thoải mái. */
 export async function ensurePinImages(map: maplibregl.Map, groups: StationGroup[]) {
   const ratio = Math.max(1, Math.min(3, window.devicePixelRatio || 1))
+  addRangeChip(map, ratio)
   const wanted: Array<[string, PinSpec, number]> = [
     [IMG_DEFAULT, { colorHex: TIER_COLORS[0], glyph: 'charger' }, PIN_W],
     [IMG_DC, { colorHex: TIER_COLORS[1], glyph: 'charger' }, PIN_W],
@@ -190,8 +194,81 @@ export async function ensurePinImages(map: maplibregl.Map, groups: StationGroup[
   )
 }
 
+/** Nền chip cho nhãn km của vòng tầm pin. */
+const IMG_RANGE_CHIP = 'range-chip'
+
+/**
+ * Viên thuốc bo tròn màu brand, co giãn theo chữ (`icon-text-fit`): chỉ kéo dãn phần giữa, giữ
+ * nguyên hai đầu bo. Vẽ bằng canvas — đồng bộ, không phải chờ như ảnh ghim SVG.
+ */
+function addRangeChip(map: maplibregl.Map, ratio: number) {
+  if (map.hasImage(IMG_RANGE_CHIP)) return
+  const r = 10 // bán kính bo, px CSS
+  const w = 2 * r + 4
+  const h = 2 * r + 2
+  const canvas = document.createElement('canvas')
+  canvas.width = w * ratio
+  canvas.height = h * ratio
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.scale(ratio, ratio)
+  ctx.fillStyle = ROUTE_COLOR
+  ctx.beginPath()
+  ctx.roundRect(0, 0, w, h, r)
+  ctx.fill()
+  const px = (v: number) => v * ratio
+  map.addImage(IMG_RANGE_CHIP, ctx.getImageData(0, 0, canvas.width, canvas.height), {
+    pixelRatio: ratio,
+    stretchX: [[px(r), px(w - r)]],
+    stretchY: [[px(r), px(h - r)]],
+    content: [px(r), px(2), px(w - r), px(h - 2)],
+  })
+}
+
 /** Nguồn của app (không thuộc style nền) — mang sang khi đổi nền sáng/tối. */
-export const OWN_SOURCES = new Set([SRC, SRC_SELECTED, SRC_TRIP, SRC_ROUTE, SRC_ALT])
+export const OWN_SOURCES = new Set([SRC, SRC_SELECTED, SRC_TRIP, SRC_ROUTE, SRC_ALT, SRC_RANGE])
+
+/** Vòng tầm pin: tâm + bán kính chim bay (km) + nhãn đặt ở đáy phía nam mỗi vòng. */
+export interface RangeLayer {
+  center: { lat: number; lng: number }
+  rings: Array<{ km: number; label: string; kind: 'one-way' | 'round-trip' }>
+}
+
+export function rangeGeoJSON(r: RangeLayer | null): GeoJSON.FeatureCollection {
+  if (!r) return { type: 'FeatureCollection', features: [] }
+  const features: GeoJSON.Feature[] = []
+  for (const ring of r.rings) {
+    if (!(ring.km > 0)) continue
+    features.push({
+      type: 'Feature',
+      properties: { kind: ring.kind },
+      geometry: { type: 'Polygon', coordinates: [circleRing(r.center, ring.km)] },
+    })
+    features.push({
+      type: 'Feature',
+      properties: { kind: ring.kind, label: ring.label },
+      // Nhãn ở đáy phía nam: phía bắc hay bị ô tìm kiếm / thẻ tầm pin che.
+      geometry: { type: 'Point', coordinates: destination(r.center, ring.km, 180) },
+    })
+  }
+  return { type: 'FeatureCollection', features }
+}
+
+/** Khung bao vòng ngoài cùng — bay camera cho vừa khi bật tầm pin. */
+export function rangeBounds(r: RangeLayer): [[number, number], [number, number]] | null {
+  const km = Math.max(0, ...r.rings.map((x) => x.km))
+  if (!(km > 0)) return null
+  const [, n] = destination(r.center, km, 0)
+  const [e] = destination(r.center, km, 90)
+  const [, s] = destination(r.center, km, 180)
+  const [w] = destination(r.center, km, 270)
+  return [[w, s], [e, n]]
+}
+
+/** Đặt dữ liệu vòng tầm pin (null = ẩn). */
+export function setRange(map: maplibregl.Map, r: RangeLayer | null) {
+  ;(map.getSource(SRC_RANGE) as maplibregl.GeoJSONSource | undefined)?.setData(rangeGeoJSON(r))
+}
 
 /** Thêm mọi nguồn + lớp của app vào style vừa nạp. Thứ tự thêm = thứ tự vẽ (sau đè trước). */
 export function addAppLayers(map: maplibregl.Map, stations: GeoJSON.FeatureCollection, sel: Station | null) {
@@ -206,6 +283,54 @@ export function addAppLayers(map: maplibregl.Map, stations: GeoJSON.FeatureColle
   map.addSource(SRC_TRIP, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
   map.addSource(SRC_ROUTE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
   map.addSource(SRC_ALT, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+  map.addSource(SRC_RANGE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
+
+  // Tầm pin: dưới cùng trong các lớp của app. Vòng "đi tới được" tô nhạt + viền liền; vòng "đi về
+  // được" chỉ viền đứt. Nhãn km ở đáy phía nam mỗi vòng.
+  addRangeChip(map, Math.max(1, Math.min(3, window.devicePixelRatio || 1)))
+  const polys: maplibregl.FilterSpecification = ['==', ['geometry-type'], 'Polygon']
+  map.addLayer({
+    id: 'range-fill',
+    type: 'fill',
+    source: SRC_RANGE,
+    filter: ['all', polys, ['==', ['get', 'kind'], 'one-way']],
+    paint: { 'fill-color': ROUTE_COLOR, 'fill-opacity': 0.07 },
+  })
+  // line-dasharray không theo dữ liệu được — hai lớp riêng cho viền liền / viền đứt.
+  map.addLayer({
+    id: 'range-line',
+    type: 'line',
+    source: SRC_RANGE,
+    filter: ['all', polys, ['==', ['get', 'kind'], 'one-way']],
+    paint: { 'line-color': ROUTE_COLOR, 'line-width': 2, 'line-opacity': 0.8 },
+  })
+  map.addLayer({
+    id: 'range-line-round',
+    type: 'line',
+    source: SRC_RANGE,
+    filter: ['all', polys, ['==', ['get', 'kind'], 'round-trip']],
+    paint: { 'line-color': ROUTE_COLOR, 'line-width': 2, 'line-opacity': 0.8, 'line-dasharray': [2, 2] },
+  })
+  map.addLayer({
+    id: 'range-label',
+    type: 'symbol',
+    source: SRC_RANGE,
+    filter: ['==', ['geometry-type'], 'Point'],
+    layout: {
+      'text-field': ['get', 'label'],
+      'text-font': ['Noto Sans Regular'],
+      'text-size': 12,
+      'text-anchor': 'top',
+      'text-offset': [0, 0.5],
+      'text-allow-overlap': true,
+      // Chữ nằm trong chip xanh (ảnh co giãn theo chữ): đọc được trên cả nền sáng lẫn tối.
+      'icon-image': IMG_RANGE_CHIP,
+      'icon-text-fit': 'both',
+      'icon-text-fit-padding': [3, 8, 3, 8],
+      'icon-allow-overlap': true,
+    },
+    paint: { 'text-color': '#ffffff' },
+  })
 
   // Tuyến phụ: xám, dưới tuyến chính. Lớp `trip-alt-hit` trong suốt và rộng để chạm trúng trên điện thoại.
   map.addLayer({
@@ -299,6 +424,8 @@ export function addAppLayers(map: maplibregl.Map, stations: GeoJSON.FeatureColle
       'icon-ignore-placement': true,
     },
   })
+  // Nhãn km của vòng tầm pin nằm trên cùng — không để cụm / ghim che mất.
+  map.moveLayer('range-label')
 }
 
 /** Bấm cụm (phóng to), bấm ghim (mở trạm), chạm tuyến phụ (chọn tuyến), con trỏ tay khi rê. */

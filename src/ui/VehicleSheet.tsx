@@ -7,6 +7,7 @@ import type { Settings } from '../data/settings'
 import { CUSTOM_ID, VEHICLES, vehicleOf } from '../data/vehicles'
 import { ChargeCurveChart } from './ChargeCurveChart'
 import { RESERVE_MAX, RESERVE_MIN, RESERVE_OPTIONS } from '../data/battery'
+import { DEFAULT_PRICE, PRICE_MAX } from '../data/cost'
 import { LOCALE, pick } from '@/i18n'
 import { AppSheet } from './AppSheet'
 
@@ -27,6 +28,8 @@ const L = pick({
     other: 'Khác',
     reserveInput: `Mức dự phòng (%, ${RESERVE_MIN}–${RESERVE_MAX})`,
     reserveHint: 'Kế hoạch sạc và vạch "Trạm cuối còn kịp" luôn chừa lại ít nhất mức này (theo ước tính bi quan).',
+    price: 'Giá sạc (đ/kWh)',
+    priceHint: (d: string) => `Để ước tính tiền sạc. Mặc định ${d} đ/kWh (giá trạm VinFast tham khảo). Nhập 0 nếu bạn được sạc miễn phí.`,
   },
   en: {
     title: 'Your car',
@@ -44,6 +47,8 @@ const L = pick({
     other: 'Other',
     reserveInput: `Reserve (%, ${RESERVE_MIN}–${RESERVE_MAX})`,
     reserveHint: 'The charging plan and the "last station you can reach" line always keep at least this much (pessimistic estimate).',
+    price: 'Charging price (VND/kWh)',
+    priceHint: (d: string) => `Used to estimate charging cost. Default ${d} VND/kWh (VinFast station list price, for reference). Enter 0 if you charge for free.`,
   },
 })
 
@@ -161,6 +166,28 @@ export function VehicleSheet({ open, settings, onChange, onClose, nested = false
             <ReservePicker value={settings.reservePct} onChange={(reservePct) => onChange({ reservePct })} />
             <p className="text-xs text-muted-foreground">{L.reserveHint}</p>
           </section>
+        )}
+
+        {settings.vehicleId && (
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-semibold">{L.price}</span>
+            <Input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={PRICE_MAX}
+              step="1"
+              placeholder={String(DEFAULT_PRICE)}
+              defaultValue={settings.pricePerKwh}
+              onChange={(e) => {
+                // Để trống = về giá mặc định; ngoài khoảng thì chưa lưu (đang gõ dở).
+                const v = Number(e.target.value)
+                if (!e.target.value) onChange({ pricePerKwh: DEFAULT_PRICE })
+                else if (Number.isFinite(v) && v >= 0 && v <= PRICE_MAX) onChange({ pricePerKwh: v })
+              }}
+            />
+            <span className="text-xs text-muted-foreground">{L.priceHint(DEFAULT_PRICE.toLocaleString(LOCALE))}</span>
+          </label>
         )}
       </div>
     </AppSheet>

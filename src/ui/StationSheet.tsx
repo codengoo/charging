@@ -85,6 +85,8 @@ interface Props {
   /** Xe đã chọn trong Cài đặt (null = chưa chọn) + % pin hiện tại, để ước tính pin khi tới. */
   vehicle: Vehicle | null
   climate: boolean
+  /** Giá sạc đ/kWh — ước tính tiền sạc lên 80%. */
+  pricePerKwh: number
   battery: BatteryReading | null
   batteryStale: boolean
   onBattery: (pct: number) => void
@@ -110,7 +112,7 @@ const STATUS_BG = {
   planned: 'bg-[#64748B]',
 } as const
 
-export function StationSheet({ open, station, book, power, powerLoading, detail, detailLoading, drive, live, vehicle, climate, battery, batteryStale, onBattery, onPickCar, note, onNote, reviews, theme, onOpenGroups, onShare, onClose, children }: Props) {
+export function StationSheet({ open, station, book, power, powerLoading, detail, detailLoading, drive, live, vehicle, climate, pricePerKwh, battery, batteryStale, onBattery, onPickCar, note, onNote, reviews, theme, onOpenGroups, onShare, onClose, children }: Props) {
   const gmapsDir = `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}`
   const groups = groupsOf(book, station.entityId)
     .map((id) => group(book, id))
@@ -199,6 +201,7 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
           power={ports}
           live={live?.live?.ports ?? null}
           onPickCar={onPickCar}
+          pricePerKwh={pricePerKwh}
         />
 
         {/* key theo trạm: lựa chọn khoảng giờ / mức kW không mang sang trạm khác. */}

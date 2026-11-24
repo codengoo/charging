@@ -22,8 +22,16 @@ describe('parseSettings', () => {
       usageOverride: 21.5,
       climate: false,
       reservePct: 15,
+      publicOnly: true,
+      freeParking: true,
+      minPorts: 4,
+      pricePerKwh: 0,
     })
     expect(s).toEqual({
+      publicOnly: true,
+      freeParking: true,
+      minPorts: 4,
+      pricePerKwh: 0,
       kwBands: ['hi'],
       activeOnly: true,
       tripRadiusKm: 5,
@@ -59,6 +67,9 @@ describe('parseSettings', () => {
       customKwhPer100: 4,
       usageOverride: 'x',
       reservePct: 12.5,
+      publicOnly: 1,
+      minPorts: 3,
+      pricePerKwh: -5,
     })
     expect(s).toEqual(DEFAULT_SETTINGS)
   })
@@ -74,8 +85,15 @@ describe('parseSettings', () => {
 })
 
 describe('filtersFrom', () => {
-  it('lấy kW + activeOnly, favoritesOnly luôn tắt', () => {
-    const s = parse({ kwBands: ['mid'], activeOnly: true })
-    expect(filtersFrom(s)).toEqual({ favoritesOnly: false, activeOnly: true, kw: ['mid'] })
+  it('lấy kW + activeOnly + lọc thêm, favoritesOnly luôn tắt', () => {
+    const s = parse({ kwBands: ['mid'], activeOnly: true, freeParking: true, minPorts: 2 })
+    expect(filtersFrom(s)).toEqual({
+      favoritesOnly: false,
+      activeOnly: true,
+      kw: ['mid'],
+      publicOnly: false,
+      freeParking: true,
+      minPorts: 2,
+    })
   })
 })

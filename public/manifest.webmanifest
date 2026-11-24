@@ -15,6 +15,29 @@
     "enctype": "application/x-www-form-urlencoded",
     "params": { "title": "title", "text": "text", "url": "url" }
   },
+  "shortcuts": [
+    {
+      "name": "Trạm gần tôi",
+      "short_name": "Gần tôi",
+      "description": "Trạm sạc đang hoạt động gần vị trí hiện tại",
+      "url": "/?open=nearby",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Trạm dọc đường",
+      "short_name": "Dọc đường",
+      "description": "Tìm trạm sạc dọc tuyến đường Google Maps",
+      "url": "/trip",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Quét QR trạm",
+      "short_name": "Quét QR",
+      "description": "Quét mã QR trên thẻ trạm để mở trạm",
+      "url": "/?open=scan",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },

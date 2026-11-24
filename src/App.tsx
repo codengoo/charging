@@ -36,7 +36,10 @@ import { useIsMobile } from '@/hooks/use-media-query'
 import { Button } from '@/components/ui/button'
 import { useStationData } from './data/useStationData'
 import { useStationDetail } from './data/useStationDetail'
-import { DEFAULT_FILTERS, kwActive, kwLabel, passesFilters, type Filters } from './data/stations'
+import { DEFAULT_FILTERS, extraFilterCount, kwActive, kwLabel, passesFilters, type Filters } from './data/stations'
+import { batteryRange } from './data/range'
+import { RangeCard, rangeLayerOf } from './ui/RangeCard'
+import { pctOf } from './ui/BatteryControl'
 import { allSaved } from './data/groups'
 import { useGroupBook } from './data/useGroupBook'
 import { APP_VERSION } from './data/changelog'
@@ -109,6 +112,19 @@ export function App() {
     (st: Station) => passesFilters(st, { ...DEFAULT_FILTERS, kw: filters.kw }, power),
     [filters.kw, power],
   )
+  // Tầm pin: vòng quanh vị trí GPS; chưa có GPS thì quanh tâm bản đồ lúc bật (đứng yên, không chạy theo khi kéo).
+  const [rangeOn, setRangeOn] = useState(false)
+  const [rangeAnchor, setRangeAnchor] = useState<{ lat: number; lng: number } | null>(null)
+  const rangeCenter = userPos ?? rangeAnchor
+  const rangeInfo = useMemo(
+    () => (rangeOn && vehicle ? batteryRange(pctOf(battery.reading), settings.reservePct, vehicle, settings.climate) : null),
+    [rangeOn, vehicle, battery.reading, settings.reservePct, settings.climate],
+  )
+  const rangeLayer = useMemo(
+    () => (rangeInfo && rangeCenter ? rangeLayerOf(rangeCenter, rangeInfo) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- theo toạ độ, không theo object
+    [rangeInfo, rangeCenter?.lat, rangeCenter?.lng],
+  )
   const tripCtl = useTrip(index, userPos, settings.tripRadiusKm, tripKeep)
   const { trip, hits } = tripCtl
   // Giữ lần nhập cuối để hộp xác nhận còn nội dung lúc trôi xuống.
@@ -171,10 +187,39 @@ export function App() {
     updateSettings(patch)
     if (patch.kwBands !== undefined) setFilters((f) => ({ ...f, kw: patch.kwBands! }))
     if (patch.activeOnly !== undefined) setFilters((f) => ({ ...f, activeOnly: patch.activeOnly! }))
+    if (patch.publicOnly !== undefined) setFilters((f) => ({ ...f, publicOnly: patch.publicOnly! }))
+    if (patch.freeParking !== undefined) setFilters((f) => ({ ...f, freeParking: patch.freeParking! }))
+    if (patch.minPorts !== undefined) setFilters((f) => ({ ...f, minPorts: patch.minPorts! }))
     if (patch.tripRadiusKm !== undefined) tripCtl.setRadius(patch.tripRadiusKm)
   }
 
-  useUrlSync({ index, selected, tripCtl, pick, askImport })
+  function toggleRange() {
+    if (rangeOn) return setRangeOn(false)
+    // Chưa chọn xe thì không tính được — mở Cài đặt (mục Xe của bạn ở đầu).
+    if (!vehicle) return sheets.open('settings')
+    setRangeAnchor(userPos ?? mapCenter.current)
+    setRangeOn(true)
+  }
+
+  /** "Gần tôi": GPS có rồi thì theo GPS, chưa thì tâm bản đồ (bảng có nút xin vị trí). */
+  function openNearby() {
+    setNearby(userPos ? { origin: userPos, fromGps: true } : { origin: mapCenter.current, fromGps: false })
+    sheets.open('nearby')
+  }
+
+  useUrlSync({
+    index,
+    selected,
+    tripCtl,
+    pick,
+    askImport,
+    // Lối tắt PWA (nhấn giữ icon app): /?open=nearby → Gần tôi + xin vị trí; /?open=scan → quét QR.
+    onShortcut: (action) => {
+      if (action === 'scan') return sheets.open('scan')
+      openNearby()
+      if (!userPos) void requestGps()
+    },
+  })
   const tripOpen = trip.status !== 'closed'
   // Giữ bảng Dọc đường trong cây sau lần mở đầu: gỡ ngay khi đóng thì drawer mất luôn, không trượt xuống.
   const [tripMounted, setTripMounted] = useState(false)
@@ -256,6 +301,8 @@ export function App() {
         onLongPress={(pt) => (editTarget ? pickOnMap(pt) : openPoint(pt, null))}
         pinAt={editTarget ? editPin : sheets.is('point') && point && !point.placeId ? point.at : null}
         onMapClick={editTarget ? pickOnMap : undefined}
+        range={rangeLayer}
+        overlay={settings.showLegend ? <PowerLegend /> : null}
       />
 
       {/* Status bar trong suốt (PWA iOS): chữ giờ/pin luôn trắng — dải mờ tối cho đọc được trên nền bản đồ sáng.
@@ -267,12 +314,13 @@ export function App() {
           <SearchBar index={index} onPick={pick} onSettings={() => sheets.open('settings')} onScan={() => sheets.open('scan')} />
         </div>
         <MapChips
-          onNearby={() => {
-            setNearby(userPos ? { origin: userPos, fromGps: true } : { origin: mapCenter.current, fromGps: false })
-            sheets.open('nearby')
-          }}
+          onNearby={openNearby}
           tripOpen={tripOpen}
           onToggleTrip={() => (tripOpen ? tripCtl.close() : tripCtl.show())}
+          rangeOn={rangeOn}
+          onToggleRange={toggleRange}
+          extraFilters={extraFilterCount(filters)}
+          onFilters={() => sheets.open('settings')}
           savedCount={savedCount}
           savedOnly={filters.favoritesOnly}
           onToggleSaved={() => setFilters((f) => ({ ...f, favoritesOnly: !f.favoritesOnly }))}
@@ -281,10 +329,20 @@ export function App() {
           onToggleKw={toggleKw}
           onList={() => sheets.open('saved')}
         />
+        {rangeInfo && vehicle && !editTarget && (
+          <RangeCard
+            range={rangeInfo}
+            vehicle={vehicle}
+            reservePct={settings.reservePct}
+            fromGps={userPos !== null}
+            reading={battery.reading}
+            stale={battery.stale}
+            onBattery={battery.set}
+            onClose={() => setRangeOn(false)}
+          />
+        )}
         <OfflineBadge />
       </div>
-
-      {settings.showLegend && <PowerLegend />}
 
       {tripMounted && (
         <TripPanel
@@ -308,6 +366,7 @@ export function App() {
           vehicle={vehicle}
           climate={settings.climate}
           reservePct={settings.reservePct}
+          pricePerKwh={settings.pricePerKwh}
           battery={battery.reading}
           batteryStale={battery.stale}
           onBattery={battery.set}
@@ -341,6 +400,7 @@ export function App() {
           live={live}
           vehicle={vehicle}
           climate={settings.climate}
+          pricePerKwh={settings.pricePerKwh}
           battery={battery.reading}
           batteryStale={battery.stale}
           onBattery={battery.set}

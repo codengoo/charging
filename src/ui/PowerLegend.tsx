@@ -31,7 +31,7 @@ const ROWS = [
 const readOpen = (): boolean => readStr(KEY) !== 'closed'
 
 /**
- * Chú giải màu ghim, góc dưới phải. Bấm để thu thành chấm nhỏ; nhớ lựa chọn trong localStorage
+ * Chú giải màu ghim, góc dưới phải (MapView đặt vị trí, xếp trên nút định vị). Bấm để thu thành chấm nhỏ; nhớ lựa chọn trong localStorage
  * (chế độ riêng tư không đọc được thì cứ mở — chỉ là tiện ích hiển thị).
  */
 export function PowerLegend() {
@@ -49,7 +49,7 @@ export function PowerLegend() {
       onClick={toggle}
       aria-expanded={open}
       aria-label={open ? L.collapse : L.expand}
-      className="absolute right-3 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-[5] rounded-xl bg-card/90 text-left shadow-lg shadow-black/10 backdrop-blur outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
+      className="rounded-xl bg-card/90 text-left shadow-lg shadow-black/10 backdrop-blur outline-none focus-visible:ring-3 focus-visible:ring-ring/40"
     >
       {open ? (
         <span className="flex flex-col gap-2 px-3 py-2.5 text-[13px] leading-none">

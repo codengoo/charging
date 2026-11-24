@@ -4,7 +4,7 @@ import { SwitchRow } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Segmented } from '@/components/ui/segmented'
 import { DEFAULT_SETTINGS, type Settings } from '../data/settings'
-import { KW_BANDS, KW_BAND_LABEL } from '../data/stations'
+import { KW_BANDS, KW_BAND_LABEL, MIN_PORT_OPTIONS } from '../data/stations'
 import { TRIP_RADII, type TripRadius } from '../data/tripTypes'
 import { CarFront, CheckIcon, ChevronRight, MapPin } from 'lucide-react'
 import { cn } from 'cn'
@@ -25,6 +25,14 @@ const L = pick({
     powerHint: 'Theo cổng mạnh nhất của trạm. Bỏ chọn bớt mức thì trạm chưa có dữ liệu công suất bị ẩn.',
     activeOnly: 'Chỉ trạm đang hoạt động',
     activeHint: 'Ẩn trạm bảo trì, ngừng hoạt động, sắp khai trương.',
+    more: 'Lọc thêm',
+    publicOnly: 'Chỉ trạm công cộng',
+    publicHint: 'Ẩn trạm nội bộ (khu đô thị, cơ quan…).',
+    freeParking: 'Miễn phí gửi xe',
+    freeParkingHint: 'Ẩn trạm có thu phí gửi xe.',
+    minPorts: 'Số cổng sạc tối thiểu',
+    minPortsAll: 'Tất cả',
+    minPortsHint: 'Trạm đông cổng ít phải chờ hơn. Trạm chưa có dữ liệu số cổng bị ẩn khi lọc.',
     corridor: 'Bề rộng hành lang dọc đường',
     legend: 'Chú giải màu ghim',
     reset: 'Khôi phục mặc định',
@@ -44,6 +52,14 @@ const L = pick({
     powerHint: "By the station's fastest port. Unticking a level hides stations without power data.",
     activeOnly: 'Operating stations only',
     activeHint: 'Hide stations under maintenance, closed or opening soon.',
+    more: 'More filters',
+    publicOnly: 'Public stations only',
+    publicHint: 'Hide private stations (residential areas, offices…).',
+    freeParking: 'Free parking',
+    freeParkingHint: 'Hide stations that charge a parking fee.',
+    minPorts: 'Minimum charging ports',
+    minPortsAll: 'All',
+    minPortsHint: 'Stations with more ports mean less waiting. Stations without port data are hidden when filtering.',
     corridor: 'Distance from route',
     legend: 'Pin colour legend',
     reset: 'Reset to defaults',
@@ -167,6 +183,18 @@ export function SettingsSheet({ open, settings, onChange, onClose, placesSummary
 
         <SwitchRow title={L.activeOnly} hint={L.activeHint} checked={settings.activeOnly} onCheckedChange={(activeOnly) => onChange({ activeOnly })} />
 
+        <h3 className="-mb-2 text-sm font-semibold">{L.more}</h3>
+        <SwitchRow title={L.publicOnly} hint={L.publicHint} checked={settings.publicOnly} onCheckedChange={(publicOnly) => onChange({ publicOnly })} />
+        <SwitchRow title={L.freeParking} hint={L.freeParkingHint} checked={settings.freeParking} onCheckedChange={(freeParking) => onChange({ freeParking })} />
+        <Field title={L.minPorts} hint={L.minPortsHint}>
+          <Segmented
+            label={L.minPorts}
+            value={String(settings.minPorts)}
+            onChange={(v) => onChange({ minPorts: Number(v) })}
+            options={MIN_PORT_OPTIONS.map((n) => ({ value: String(n), label: n ? `≥ ${n}` : L.minPortsAll }))}
+          />
+        </Field>
+
         <Field title={L.corridor}>
           <Segmented
             label={L.corridor}
@@ -192,8 +220,8 @@ export function SettingsSheet({ open, settings, onChange, onClose, placesSummary
 
 /** "Khôi phục mặc định" là cấu hình HIỂN THỊ — xe của người dùng không phải sở thích hiển thị, giữ lại. */
 function resetKeepingCar(s: Settings): Settings {
-  const { vehicleId, customKwh, customKwhPer100, usageOverride, climate } = s
-  return { ...DEFAULT_SETTINGS, vehicleId, customKwh, customKwhPer100, usageOverride, climate }
+  const { vehicleId, customKwh, customKwhPer100, usageOverride, climate, pricePerKwh } = s
+  return { ...DEFAULT_SETTINGS, vehicleId, customKwh, customKwhPer100, usageOverride, climate, pricePerKwh }
 }
 
 function Field({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {

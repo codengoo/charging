@@ -32,8 +32,12 @@ export const RESERVE_MAX = 50
 export const TARGET_PCT = 80
 /** % pin hiện khi chưa nhập lần nào. */
 export const DEFAULT_PCT = 80
-const CLIMATE = 1.08
-const SPREAD = 0.08
+/** Điều hoà bật: tiêu thụ ×1,08. */
+export const CLIMATE = 1.08
+/** Nửa bề rộng khoảng ước tính (±8%). */
+export const SPREAD = 0.08
+/** Đường chim bay → đường lái ~1,3 lần (đường VN vòng vèo). */
+export const ROAD_DETOUR = 1.3
 
 /** Đi phố chậm tốn ít hơn (tái sinh khi phanh), cao tốc tốn hơn hẳn (cản gió). */
 export function speedFactor(avgKmh: number): number {

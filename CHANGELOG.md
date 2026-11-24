@@ -2,6 +2,14 @@
 
 Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app).
 
+## [0.16.0] — 2026-11-24 — Tiền sạc, tầm pin & lọc thêm
+
+- Nút định vị ở góc dưới phải bản đồ: bấm để về chỗ bạn đứng.
+- Ước tính tiền sạc ở từng trạm và cho cả kế hoạch sạc dọc đường — đặt giá sạc trong Xe của bạn.
+- Tầm pin: xem trên bản đồ với % pin hiện tại đi được bao xa, đi rồi về được bao xa.
+- Lọc thêm trong Cài đặt: chỉ trạm công cộng, miễn phí gửi xe, số cổng tối thiểu.
+- Nhấn giữ biểu tượng app để mở nhanh Gần tôi, Dọc đường, Quét QR.
+
 ## [0.15.1] — 2026-11-17 — Đường cong sạc
 
 - Xem đường cong sạc nhanh của xe trong Xe của bạn, so ở trụ 60 / 120 / 250 kW.

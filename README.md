@@ -13,11 +13,16 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
 ## Tính năng
 
 - Bản đồ toàn VN, tự gom cụm marker, bấm cụm để phóng to.
-- Mở trang tự xin vị trí hiện tại và bay về đó (không có nút zoom / định vị — GeolocateControl
-  vẫn chạy ngầm để vẽ chấm vị trí).
+- Mở trang tự xin vị trí hiện tại và bay về đó. Không có nút zoom; nút gốc của GeolocateControl
+  ẩn (control vẫn chạy để vẽ chấm vị trí), thay bằng **nút định vị riêng** góc dưới phải
+  (`MapView.tsx` `locate()`): bấm khi đang bám theo thì bay lại về vị trí chứ không tắt theo dõi như
+  nút gốc; trạng thái chờ / bám theo / lỗi quyền suy từ `_watchState` (trường nội bộ maplibre 4.x).
 - Tìm trạm theo tên/địa chỉ (không phân biệt dấu).
 - Lọc (kết hợp phép VÀ, `passesFilters` trong `src/data/stations.ts`): đã lưu, **sạc nhanh DC** /
   **≥ 120 kW** (theo cổng DC mạnh nhất; trạm chưa có dữ liệu power bị ẩn khi lọc), **đang hoạt động**.
+  **Lọc thêm** trong Cài đặt (`Settings.publicOnly / freeParking / minPorts`): chỉ trạm công cộng, miễn phí
+  gửi xe, số cổng ≥ 2/4/8 (chưa có power thì ẩn); đang bật thì hiện chip "Bộ lọc (n)" mở Cài đặt. Áp cho bản
+  đồ và Gần tôi; Dọc đường vẫn chỉ theo lọc công suất.
 - **Màu ghim theo công suất** (`TIER_COLORS` trong `src/map/pins.ts`): AC/chưa rõ xanh lá, DC < 120 kW
   xanh dương, DC ≥ 120 kW tím; trạm đã lưu vẫn đeo ghim nhóm. Chú giải `src/ui/PowerLegend.tsx`.
 - **Trạng thái trạm**: bảo trì / ngừng / sắp khai trương vẽ mờ (`icon-opacity`), có nhãn trong chi
@@ -54,6 +59,13 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   gọi thêm HERE/EVCS. Mô hình: tiêu thụ thực tế ước tính của xe × hệ số tốc độ trung bình (< 40 km/h 0,95 … ≥ 90
   km/h 1,25), hiện khoảng ±8%, chưa tính độ dốc. Thông số xe tra 2026-11-17, `kwhPer100` là ước tính (≈ dung
   lượng ÷ NEDC × 0,8), không phải số hãng công bố.
+- **Tiền sạc** (`src/data/cost.ts`): giá đ/kWh trong Xe của bạn (`Settings.pricePerKwh`, mặc định 3.858 đ —
+  giá trạm VinFast tham khảo; 0 = miễn phí, ẩn tiền). kWh tính tiền = kWh vào pin ÷ 0,92 (hao hụt sạc). Hiện ở
+  bảng trạm (sạc lên 80%) và kế hoạch sạc (từng điểm dừng + tổng).
+- **Tầm pin** (`src/data/range.ts`, `src/ui/RangeCard.tsx`, lớp `battery-range` trong `src/map/layers.ts`): chip
+  "Tầm pin" vẽ vòng liền "đi tới được" và vòng đứt "đi rồi về" quanh vị trí GPS (chưa có thì tâm bản đồ lúc bật),
+  kèm thẻ có thanh kéo % pin. Ước tính bi quan (tiêu thụ +8%, chừa `reservePct`), tốc độ hỗn hợp; bán kính chim
+  bay = quãng lái ÷ 1,3, nhãn ghi quãng lái.
 - **Ghi đè tiêu thụ:** VehicleSheet có ô "Tiêu thụ thực tế" (`Settings.usageOverride`) — giữ pin / công suất sạc
   của mẫu, chỉ thay kWh/100 km. Đổi mẫu thì xoá.
 - **Kế hoạch dừng sạc** (`src/data/chargePlan.ts`): chip "Lên kế hoạch sạc" trong Dọc đường. Thứ tự ưu tiên:
@@ -76,6 +88,8 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   geocode|revgeocode|drive` NetworkFirst (7 ngày) → mở lại hành trình vừa xem khi mất sóng; live / đánh giá không
   cache. Nhãn "Đang offline" (`src/ui/OfflineBadge.tsx`). `sw.js` no-cache trong `public/_headers`. Tính trên danh sách trạm dọc đường đang hiện (theo bộ lọc công suất), không gọi thêm API. Bật thì bản
   đồ chỉ vẽ ghim các điểm dừng.
+- **Lối tắt PWA** (`shortcuts` trong `public/manifest.webmanifest`): nhấn giữ icon app → Gần tôi (`/?open=nearby`,
+  tự xin vị trí), Dọc đường (`/trip`), Quét QR (`/?open=scan`). `?open=` đọc và xoá ở `src/app/useUrlSync.ts`.
 - **Ghi chú cá nhân** (`src/data/notes.ts`, `src/ui/NoteBox.tsx`): localStorage `tramsac.notes`, ≤ 1.000 ký tự;
   sao lưu mang trường `notes` (gộp giữ bản sửa sau).
 - **Đánh giá & bình luận công khai** (`worker/reviews.ts`, `src/ui/ReviewsSection.tsx`): xem mục bên dưới.

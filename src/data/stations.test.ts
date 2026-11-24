@@ -3,6 +3,7 @@ import {
   DEFAULT_FILTERS,
   bandOf,
   cellOf,
+  extraFilterCount,
   kwActive,
   kwLabel,
   nearestStations,
@@ -187,5 +188,23 @@ describe('passesFilters', () => {
     expect(passesFilters(s, { ...DEFAULT_FILTERS, kw: ['mid'] }, null)).toBe(false)
     // Đủ 3 mức = không lọc → trạm chưa có power vẫn qua.
     expect(passesFilters(s, { ...DEFAULT_FILTERS, kw: ['hi', 'mid', 'low'] }, null)).toBe(true)
+  })
+  it('publicOnly loại trạm nội bộ; freeParking loại trạm thu phí gửi xe', () => {
+    const priv = st('8', 21, 105, { isPublic: false })
+    const paid = st('9', 21, 105, { parkingFee: true })
+    expect(passesFilters(priv, { ...DEFAULT_FILTERS, publicOnly: true }, null)).toBe(false)
+    expect(passesFilters(paid, { ...DEFAULT_FILTERS, publicOnly: true }, null)).toBe(true)
+    expect(passesFilters(paid, { ...DEFAULT_FILTERS, freeParking: true }, null)).toBe(false)
+    expect(passesFilters(priv, { ...DEFAULT_FILTERS, freeParking: true }, null)).toBe(true)
+  })
+  it('minPorts: đủ cổng thì qua, thiếu hoặc chưa có power thì ẩn', () => {
+    expect(passesFilters(s, { ...DEFAULT_FILTERS, minPorts: 2 }, pw)).toBe(true)
+    expect(passesFilters(s, { ...DEFAULT_FILTERS, minPorts: 4 }, pw)).toBe(false)
+    expect(passesFilters(s, { ...DEFAULT_FILTERS, minPorts: 2 }, null)).toBe(false)
+    expect(passesFilters(s, { ...DEFAULT_FILTERS, minPorts: 0 }, null)).toBe(true)
+  })
+  it('extraFilterCount đếm bộ lọc thêm đang bật', () => {
+    expect(extraFilterCount(DEFAULT_FILTERS)).toBe(0)
+    expect(extraFilterCount({ publicOnly: true, freeParking: true, minPorts: 4 })).toBe(3)
   })
 })

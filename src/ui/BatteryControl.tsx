@@ -2,6 +2,8 @@ import { BatteryMedium, ChevronRight, Zap } from 'lucide-react'
 import {
   DEFAULT_PCT,
   FALLBACK_KMH,
+  ROAD_DETOUR,
+  TARGET_PCT,
   arrivalPct,
   avgKmh,
   chargeMinutes,
@@ -9,6 +11,7 @@ import {
   type ArrivalEstimate,
   type BatteryReading,
 } from '../data/battery'
+import { chargeCost, fmtVnd } from '../data/cost'
 import type { DriveState } from '../data/drive'
 import type { LivePorts } from '../data/live'
 import type { StationPower } from '../data/types'
@@ -112,9 +115,6 @@ export function BatteryControl({
   )
 }
 
-/** Đường chim bay → đường lái ~1,3 lần (đường VN vòng vèo), tốc độ hỗn hợp. */
-const DETOUR = 1.3
-
 /**
  * Hộp "pin khi tới" trong bảng trạm: thanh trượt, % ước tính khi đến, thời gian sạc lên 80%.
  * Chưa chọn xe → chỉ một link mở drawer chọn xe.
@@ -129,9 +129,12 @@ export function BatteryBox({
   power,
   live,
   onPickCar,
+  pricePerKwh,
 }: {
   vehicle: Vehicle | null
   climate: boolean
+  /** Giá sạc đ/kWh (Settings); 0 = miễn phí → không hiện tiền. */
+  pricePerKwh: number
   reading: BatteryReading | null
   stale: boolean
   onBattery: (pct: number) => void
@@ -157,10 +160,12 @@ export function BatteryBox({
   const pct = pctOf(reading)
   let est: ArrivalEstimate | null = null
   if (drive?.kind === 'ok') est = arrivalPct(pct, drive.info.meters / 1000, avgKmh(drive.info.meters, drive.info.seconds), vehicle, climate)
-  else if (drive?.kind === 'fallback') est = arrivalPct(pct, drive.straightKm * DETOUR, FALLBACK_KMH, vehicle, climate)
+  else if (drive?.kind === 'fallback') est = arrivalPct(pct, drive.straightKm * ROAD_DETOUR, FALLBACK_KMH, vehicle, climate)
 
   const port = chargePort(power, live)
-  const minutes = est && port && est.high >= 0 ? chargeMinutes((est.low + est.high) / 2, port, vehicle) : null
+  const mid = est ? (est.low + est.high) / 2 : 0
+  const minutes = est && port && est.high >= 0 ? chargeMinutes(mid, port, vehicle) : null
+  const cost = minutes !== null ? chargeCost(mid, TARGET_PCT, vehicle, pricePerKwh) : null
 
   return (
     <section className="mt-2 flex flex-col gap-1.5 rounded-xl bg-muted px-3 py-2.5" aria-label={L.battery}>
@@ -185,6 +190,7 @@ export function BatteryBox({
         <p className="flex items-center gap-1 pl-6 text-sm text-muted-foreground">
           <Zap className="-ml-0.5 size-3.5 shrink-0" aria-hidden />
           {L.charge(fmtKw(port.kw), fmtMinutes(minutes * 60))}
+          {cost !== null && ` · ${fmtVnd(cost)}`}
         </p>
       )}
       {est && <p className="pl-6 text-[11px] text-muted-foreground">{L.note(vehicle.name)}</p>}

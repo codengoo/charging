@@ -26,6 +26,17 @@ interface Args {
   pick: (st: Station) => void
   /** Link sao lưu đã giải mã (null = hỏng) → hỏi xác nhận gộp. */
   askImport: (incoming: Backup | null) => void
+  /** Lối tắt PWA `?open=nearby|scan` (manifest `shortcuts`) — gọi một lần khi có dữ liệu. */
+  onShortcut: (action: Shortcut) => void
+}
+
+export type Shortcut = 'nearby' | 'scan'
+const SHORTCUTS: Shortcut[] = ['nearby', 'scan']
+
+/** `?open=` của lối tắt; lạ hoặc không có → null. */
+export function readShortcut(search: string): Shortcut | null {
+  const v = new URLSearchParams(search).get('open')
+  return SHORTCUTS.includes(v as Shortcut) ? (v as Shortcut) : null
 }
 
 /**
@@ -33,11 +44,29 @@ interface Args {
  * (cả Web Share Target), link sao lưu `#import=…`; rồi giữ thanh địa chỉ + tiêu đề tab theo trạm /
  * hành trình đang mở. Mọi link đọc NGAY lúc khởi tạo — effect đồng bộ URL sẽ ghi đè pathname.
  */
-export function useUrlSync({ index, selected, tripCtl, pick, askImport }: Args) {
+export function useUrlSync({ index, selected, tripCtl, pick, askImport, onShortcut }: Args) {
   const [linkedId] = useState(() => parseStationId(location.pathname))
   const [tripLink] = useState(() => readTripLink(location))
   const [importHash] = useState(readImportHash)
+  const [shortcut] = useState(() => readShortcut(location.search))
   const { trip } = tripCtl
+
+  // Lối tắt: bỏ `?open=` khỏi URL ngay (tải lại trang không mở lại bảng), chạy khi có dữ liệu.
+  const shortcutRef = useRef(onShortcut)
+  shortcutRef.current = onShortcut
+  const shortcutHandled = useRef(false)
+  useEffect(() => {
+    if (!shortcut || shortcutHandled.current) return
+    if (location.search.includes('open=')) {
+      const q = new URLSearchParams(location.search)
+      q.delete('open')
+      const rest = q.toString()
+      history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash)
+    }
+    if (!index) return
+    shortcutHandled.current = true
+    shortcutRef.current(shortcut)
+  }, [index, shortcut])
 
   // Mở từ link chia sẻ /station/<id>-<slug>: chọn trạm và bay tới ngay khi có dữ liệu (một lần).
   const linkHandled = useRef(false)

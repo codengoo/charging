@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { DEFAULT_FILTERS, KW_BANDS, type Filters, type KwBand } from './stations'
+import { DEFAULT_FILTERS, KW_BANDS, MIN_PORT_OPTIONS, type Filters, type KwBand } from './stations'
+import { DEFAULT_PRICE, PRICE_MAX } from './cost'
 import { TRIP_RADII, type TripRadius } from './tripTypes'
 import { THEME_PREFS, type ThemePref } from '../lib/theme'
 import { VEHICLE_IDS } from './vehicles'
@@ -15,6 +16,10 @@ export interface Settings {
   kwBands: KwBand[]
   /** Chỉ hiện trạm đang hoạt động. */
   activeOnly: boolean
+  /** Lọc thêm: chỉ trạm công cộng / không thu phí gửi xe / có ít nhất N cổng (0 = không lọc). */
+  publicOnly: boolean
+  freeParking: boolean
+  minPorts: number
   /** Bề rộng hành lang mặc định của "Dọc đường". */
   tripRadiusKm: TripRadius
   /** Chú giải màu ghim góc dưới phải. */
@@ -32,13 +37,18 @@ export interface Settings {
   climate: boolean
   /** Pin dự phòng tối thiểu (%): kế hoạch sạc và "Trạm cuối còn kịp" luôn chừa lại mức này (ước tính bi quan). */
   reservePct: number
+  /** Giá sạc (đ/kWh) để ước tính tiền sạc; 0 = được sạc miễn phí, ẩn chi phí. */
+  pricePerKwh: number
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   kwBands: KW_BANDS,
   activeOnly: DEFAULT_FILTERS.activeOnly,
+  publicOnly: DEFAULT_FILTERS.publicOnly,
+  freeParking: DEFAULT_FILTERS.freeParking,
+  minPorts: DEFAULT_FILTERS.minPorts,
   tripRadiusKm: 2,
-  showLegend: true,
+  showLegend: false,
   theme: 'system',
   vehicleId: null,
   customKwh: 60,
@@ -46,6 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
   usageOverride: null,
   climate: true,
   reservePct: RESERVE_PCT,
+  pricePerKwh: DEFAULT_PRICE,
 }
 
 const KEY = 'tramsac.settings'
@@ -77,6 +88,9 @@ export function parseSettings(raw: string | null): Settings {
   return {
     kwBands: readBands(o),
     activeOnly: typeof o.activeOnly === 'boolean' ? o.activeOnly : d.activeOnly,
+    publicOnly: typeof o.publicOnly === 'boolean' ? o.publicOnly : d.publicOnly,
+    freeParking: typeof o.freeParking === 'boolean' ? o.freeParking : d.freeParking,
+    minPorts: (MIN_PORT_OPTIONS as readonly unknown[]).includes(o.minPorts) ? (o.minPorts as number) : d.minPorts,
     tripRadiusKm: TRIP_RADII.includes(o.tripRadiusKm as TripRadius) ? (o.tripRadiusKm as TripRadius) : d.tripRadiusKm,
     showLegend: typeof o.showLegend === 'boolean' ? o.showLegend : d.showLegend,
     theme: THEME_PREFS.includes(o.theme as ThemePref) ? (o.theme as ThemePref) : d.theme,
@@ -87,6 +101,7 @@ export function parseSettings(raw: string | null): Settings {
     climate: typeof o.climate === 'boolean' ? o.climate : d.climate,
     reservePct:
       inRange(o.reservePct, RESERVE_MIN, RESERVE_MAX) && Number.isInteger(o.reservePct) ? o.reservePct : d.reservePct,
+    pricePerKwh: inRange(o.pricePerKwh, 0, PRICE_MAX) ? o.pricePerKwh : d.pricePerKwh,
   }
 }
 
@@ -95,7 +110,8 @@ const load = (): Settings => parseSettings(readStr(KEY))
 
 /** Bộ lọc lúc mở app theo cấu hình. "Đã lưu" luôn tắt — đó là thao tác tạm, không phải sở thích. */
 export function filtersFrom(s: Settings): Filters {
-  return { ...DEFAULT_FILTERS, kw: s.kwBands, activeOnly: s.activeOnly }
+  const { publicOnly, freeParking, minPorts } = s
+  return { ...DEFAULT_FILTERS, kw: s.kwBands, activeOnly: s.activeOnly, publicOnly, freeParking, minPorts }
 }
 
 export function useSettings() {

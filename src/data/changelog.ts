@@ -11,6 +11,26 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.16.0',
+    date: '2026-11-24',
+    title: 'Tiền sạc, tầm pin & lọc thêm',
+    changes: [
+      "Nút định vị ở góc dưới phải bản đồ: bấm để về chỗ bạn đứng.",
+      "Ước tính tiền sạc ở từng trạm và cho cả kế hoạch sạc dọc đường — đặt giá sạc trong Xe của bạn.",
+      "Tầm pin: xem trên bản đồ với % pin hiện tại đi được bao xa, đi rồi về được bao xa.",
+      "Lọc thêm trong Cài đặt: chỉ trạm công cộng, miễn phí gửi xe, số cổng tối thiểu.",
+      "Nhấn giữ biểu tượng app để mở nhanh Gần tôi, Dọc đường, Quét QR.",
+    ],
+    titleEn: 'Charging cost, range & more filters',
+    changesEn: [
+      "Locate button in the bottom-right corner of the map: tap to jump to where you are.",
+      "Estimated charging cost at each station and for the whole charging plan — set your price in Your car.",
+      "Range: see on the map how far you can go, and go and come back, with your current battery.",
+      "More filters in Settings: public stations only, free parking, minimum number of ports.",
+      "Long-press the app icon for quick access to Near me, Along route and QR scan.",
+    ],
+  },
+  {
     version: '0.15.1',
     date: '2026-11-17',
     title: 'Đường cong sạc',

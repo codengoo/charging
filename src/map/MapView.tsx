@@ -1,6 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { Locate, LocateFixed, LocateOff } from 'lucide-react'
+import { pick } from '../i18n'
 import type { Station, StationPower } from '../data/types'
 import type { Filters, StationIndex } from '../data/stations'
 import type { GroupBook } from '../data/groups'
@@ -16,12 +18,15 @@ import {
   ensurePinImages,
   notSelected,
   pointFilter,
+  rangeBounds,
   selectedGeoJSON,
+  setRange,
   toGeoJSON,
+  type RangeLayer,
   type TripLayer,
 } from './layers'
 
-export type { TripLayer } from './layers'
+export type { RangeLayer, TripLayer } from './layers'
 
 // Trung tâm VN (Đà Nẵng) làm mặc định khi chưa có vị trí người dùng.
 const DEFAULT_CENTER: [number, number] = [108.2, 16.05]
@@ -34,6 +39,16 @@ const STYLES = {
   light: 'https://tiles.openfreemap.org/styles/positron',
   dark: 'https://tiles.openfreemap.org/styles/dark',
 } as const
+
+const L = pick({
+  vi: { locate: 'Về vị trí của tôi', locating: 'Đang tìm vị trí…', denied: 'Không lấy được vị trí — kiểm tra quyền vị trí của trình duyệt' },
+  en: { locate: 'Go to my location', locating: 'Finding your location…', denied: 'Location unavailable — check browser location permission' },
+})
+
+/** Trạng thái nút định vị, suy từ `_watchState` (trường nội bộ maplibre 4.x) của GeolocateControl. */
+type LocState = 'off' | 'waiting' | 'active' | 'background' | 'error'
+type WatchState = 'OFF' | 'WAITING_ACTIVE' | 'ACTIVE_LOCK' | 'ACTIVE_ERROR' | 'BACKGROUND' | 'BACKGROUND_ERROR'
+type GeoInternal = { _watchState: WatchState; _lastKnownPosition?: GeolocationPosition }
 
 interface Props {
   index: StationIndex
@@ -62,13 +77,17 @@ interface Props {
   pinAt?: { lat: number; lng: number } | null
   /** Chạm (click) bản đồ — chỉ truyền khi đang chọn chỗ (đặt địa điểm). */
   onMapClick?: (p: { lat: number; lng: number }) => void
+  /** Phần nổi xếp trên nút định vị ở góc dưới phải (chú giải màu ghim). */
+  overlay?: ReactNode
+  /** Vòng tầm pin; null = tắt. Bật lên thì camera bay cho vừa vòng ngoài. */
+  range?: RangeLayer | null
 }
 
 /** Giữ ngón tay chừng này (ms) không di chuyển quá LONG_PRESS_SLOP px thì coi là chạm giữ. */
 const LONG_PRESS_MS = 550
 const LONG_PRESS_SLOP = 10
 
-export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate, onMoveEnd, trip = null, onPickRoute, theme = 'light', places = [], onPlaceClick, onLongPress, pinAt = null, onMapClick }: Props) {
+export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate, onMoveEnd, trip = null, onPickRoute, theme = 'light', places = [], onPlaceClick, onLongPress, pinAt = null, onMapClick, overlay, range = null }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const loadedRef = useRef(false)
@@ -77,6 +96,8 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
   latest.current = { index, filters, book, power, selected, onSelect, onLocate, onMoveEnd, trip, onPickRoute, onPlaceClick, onLongPress, onMapClick }
   const placeMarkers = useRef<ReturnType<typeof createPlaceMarkers> | null>(null)
   const pinMarker = useRef<maplibregl.Marker | null>(null)
+  const geoRef = useRef<maplibregl.GeolocateControl | null>(null)
+  const [loc, setLoc] = useState<LocState>('off')
 
   // Khởi tạo map một lần.
   useEffect(() => {
@@ -97,10 +118,30 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
       showUserLocation: true,
     })
     map.addControl(geo, 'top-right')
-    // Không hiện nút (zoom bằng ngón tay / con lăn là đủ): control vẫn cần để vẽ chấm vị trí,
-    // tự bay về chỗ người dùng lúc mở và báo onLocate. Góc trên phải chỉ có control này.
+    geoRef.current = geo
+    // Ẩn nút gốc của control (nút định vị riêng ở góc dưới phải, xem cuối file): control vẫn cần để
+    // vẽ chấm vị trí, tự bay về chỗ người dùng lúc mở và báo onLocate. Góc trên phải chỉ có control này.
     const corner = map.getContainer().querySelector<HTMLElement>('.maplibregl-ctrl-top-right')
     if (corner) corner.style.display = 'none'
+    // Nút định vị riêng phản chiếu trạng thái control.
+    const syncLoc = () => {
+      const { _watchState: s, _lastKnownPosition: fix } = geo as unknown as GeoInternal
+      // Bám theo / nền mà chưa có toạ độ nào (GPS chưa trả, hoặc trình duyệt treo không hỏi quyền)
+      // vẫn là đang tìm — đừng hiện xanh như đã định vị được.
+      const searching = !fix && (s === 'ACTIVE_LOCK' || s === 'BACKGROUND')
+      setLoc(
+        s === 'WAITING_ACTIVE' || searching ? 'waiting'
+        : s === 'ACTIVE_LOCK' ? 'active'
+        : s === 'BACKGROUND' ? 'background'
+        : s === 'OFF' ? 'off'
+        : 'error',
+      )
+    }
+    for (const ev of ['trackuserlocationstart', 'trackuserlocationend', 'userlocationlostfocus', 'userlocationfocus', 'geolocate'] as const) {
+      geo.on(ev, syncLoc)
+    }
+    // Bị từ chối quyền: control về OFF — vẫn hiện dạng lỗi để người dùng biết vì sao.
+    geo.on('error', (e: GeolocationPositionError) => (e.code === 1 ? setLoc('error') : syncLoc()))
     // Theo dõi vị trí bắn ~1 lần/giây trên điện thoại; mỗi lần báo lên là App render lại cả cây.
     // Chỉ báo khi dịch đủ xa — đứng yên GPS vẫn nhảy vài chục mét.
     let reported: { lat: number; lng: number } | null = null
@@ -116,7 +157,10 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
     map.on('movestart', (e: { geolocateSource?: boolean; originalEvent?: Event }) => {
       const g = geo as unknown as { _watchState: string }
       if (e.geolocateSource || e.originalEvent?.type === 'resize') return
-      if (g._watchState === 'WAITING_ACTIVE') g._watchState = 'BACKGROUND'
+      if (g._watchState === 'WAITING_ACTIVE') {
+        g._watchState = 'BACKGROUND'
+        syncLoc()
+      }
     })
 
     // Chạm giữ: maplibre không phát sự kiện riêng, iOS Safari cũng không bắn contextmenu khi chạm giữ
@@ -176,6 +220,7 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
       placeMarkers.current = createPlaceMarkers(map, (id) => latest.current.onPlaceClick?.(id))
       placeMarkers.current.sync(latestPlaces.current)
       applyTrip(map, latest.current.trip, idx, b, p)
+      setRange(map, latestRange.current)
       void ensurePinImages(map, latest.current.book.groups)
       // Thử lấy vị trí người dùng ngay lần mở (mirror: mở app là về vị trí hiện tại).
       geo.trigger()
@@ -253,6 +298,23 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
     map.fitBounds(t.bounds, { padding: t.padding, duration: 800 })
   }, [boundsKey])
 
+  // Vòng tầm pin. Vừa bật (tắt → bật) thì bay cho vừa vòng ngoài; kéo % pin / GPS dịch chỉ vẽ lại.
+  const latestRange = useRef(range)
+  latestRange.current = range
+  const rangeWasOn = useRef(false)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !loadedRef.current) return
+    setRange(map, range)
+    const on = range !== null
+    if (on && !rangeWasOn.current) {
+      const b = rangeBounds(range)
+      // Chừa phía trên cho ô tìm kiếm + chip + thẻ tầm pin.
+      if (b) map.fitBounds(b, { padding: { top: 290, bottom: 70, left: 30, right: 30 }, maxZoom: 13, duration: 800 })
+    }
+    rangeWasOn.current = on
+  }, [range])
+
   // Địa điểm hay dùng → ghim (đồng bộ theo danh sách; lần đầu đồng bộ trong 'load').
   const latestPlaces = useRef(places)
   latestPlaces.current = places
@@ -277,11 +339,56 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
     map.flyTo({ center: [flyTo.lng, flyTo.lat], zoom: flyTo.zoom ?? 15 })
   }, [flyTo])
 
+  // Nút định vị. Không gọi thẳng geo.trigger() như nút gốc: ở ACTIVE_LOCK / WAITING_ACTIVE nút gốc
+  // TẮT theo dõi (mất chấm vị trí) — ở đây bấm luôn nghĩa là "đưa tôi về chỗ tôi đứng".
+  function locate() {
+    const geo = geoRef.current
+    const map = mapRef.current
+    if (!geo || !map) return
+    const g = geo as unknown as GeoInternal
+    switch (g._watchState) {
+      case 'WAITING_ACTIVE':
+        return
+      case 'ACTIVE_LOCK': {
+        const p = g._lastKnownPosition
+        // geolocateSource: như camera của control — không thì control coi là người dùng kéo, thả về BACKGROUND.
+        if (p) map.flyTo({ center: [p.coords.longitude, p.coords.latitude], zoom: Math.max(map.getZoom(), 15) }, { geolocateSource: true })
+        return
+      }
+      case 'ACTIVE_ERROR':
+      case 'BACKGROUND_ERROR':
+        geo.trigger() // → OFF, rồi bật lại bên dưới để thử lấy vị trí lần nữa
+        geo.trigger()
+        return
+      default: // OFF (kể cả sau khi bị từ chối quyền — thử hỏi lại), BACKGROUND (bay về + bám theo)
+        geo.trigger()
+    }
+  }
+
+  const LocIcon = loc === 'error' ? LocateOff : loc === 'active' || loc === 'waiting' ? LocateFixed : Locate
+  const locLabel = loc === 'waiting' ? L.locating : loc === 'error' ? L.denied : L.locate
+
   // h-full/w-full (không dùng absolute): maplibre-gl.css ép .maplibregl-map thành
   // position:relative, nên inset-0 sẽ cho height 0. Cho map chiếm 100% khung cha.
   return (
     <div className="absolute inset-0">
       <div ref={containerRef} className="h-full w-full" />
+      {/* Góc dưới phải, trên dòng ghi công bản đồ: chú giải (nếu có) rồi nút định vị — nút đứng yên
+          khi chú giải thu / mở. */}
+      <div className="absolute right-3 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-[5] flex flex-col items-end gap-2">
+        {overlay}
+        <button
+          type="button"
+          onClick={locate}
+          aria-label={locLabel}
+          title={locLabel}
+          className={`flex size-11 items-center justify-center rounded-full bg-card/90 shadow-lg shadow-black/10 backdrop-blur outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/40 active:scale-95 ${
+            loc === 'active' ? 'text-brand' : loc === 'error' ? 'text-destructive' : 'text-foreground'
+          }`}
+        >
+          <LocIcon className={`size-5 ${loc === 'waiting' ? 'animate-pulse text-brand' : ''}`} />
+        </button>
+      </div>
     </div>
   )
 }

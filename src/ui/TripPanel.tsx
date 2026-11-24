@@ -16,6 +16,7 @@ import { arrivalPct, avgKmh, type ArrivalEstimate, type BatteryReading } from '.
 import type { Vehicle } from '../data/vehicles'
 import { BatteryControl, DANGER_PCT, fmtRange, pctOf, pctTone } from './BatteryControl'
 import { PLAN_MIN_DC_KW, passByKm, type ChargePlan } from '../data/chargePlan'
+import { chargeCost, fmtVnd } from '../data/cost'
 import type { Avoid } from '../lib/mapsLink'
 import { useIsMobile } from '@/hooks/use-media-query'
 import type { Place } from '../data/places'
@@ -73,6 +74,7 @@ const L = pick({
     noAvoid: 'không tránh',
     avoidSum: (s: string) => `tránh ${s.toLowerCase()}`,
     planOn: 'kế hoạch sạc',
+    planCost: (c: string) => `Tiền sạc dọc đường ${c}`,
   },
   en: {
     title: 'Along route',
@@ -124,6 +126,7 @@ const L = pick({
     noAvoid: 'no avoids',
     avoidSum: (s: string) => `avoid ${s.toLowerCase()}`,
     planOn: 'charging plan',
+    planCost: (c: string) => `Charging cost on the way ${c}`,
   },
 })
 
@@ -155,6 +158,8 @@ interface Props {
   climate: boolean
   /** Pin dự phòng tối thiểu (%). */
   reservePct: number
+  /** Giá sạc đ/kWh — tiền sạc từng điểm dừng + tổng; 0 = miễn phí, ẩn. */
+  pricePerKwh: number
   battery: BatteryReading | null
   batteryStale: boolean
   onBattery: (pct: number) => void
@@ -169,7 +174,7 @@ interface Props {
  * tuyến, và bảng chi tiết trạm mở đè lên được. Điện thoại: dải dưới đáy, bấm tay cầm để thu/mở.
  * Màn rộng: thẻ nổi góc trái.
  */
-export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, stationOpen, onOpen, onRadius, routeTotals, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, places, onRouteTo, onManagePlaces, onClose, vehicle, climate, reservePct, battery, batteryStale, onBattery, planOn, plan, onTogglePlan }: Props) {
+export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, stationOpen, onOpen, onRadius, routeTotals, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, places, onRouteTo, onManagePlaces, onClose, vehicle, climate, reservePct, pricePerKwh, battery, batteryStale, onBattery, planOn, plan, onTogglePlan }: Props) {
   // Đóng xong App xoá hành trình ngay; giữ bản lúc còn mở để bảng không chớp sang trạng thái trống
   // trong lúc trượt xuống.
   const last = useRef({ trip: tripNow, hits: hitsNow })
@@ -393,7 +398,7 @@ export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, statio
             )}
           </div>
 
-          {planOn && plan && <PlanView plan={plan} reservePct={reservePct} onPick={onPick} />}
+          {planOn && plan && <PlanView plan={plan} reservePct={reservePct} vehicle={vehicle} pricePerKwh={pricePerKwh} onPick={onPick} />}
 
           {!(planOn && plan) && hits.items.length > 0 && (
             <ul className="-mx-4 px-4" aria-label={L.listAria}>
@@ -557,7 +562,24 @@ function RoutePicker({ trip, totals, onSelect }: { trip: TripState; totals: numb
 }
 
 /** Tóm tắt kế hoạch + danh sách điểm dừng (thay danh sách trạm khi bật). */
-function PlanView({ plan, reservePct, onPick }: { plan: ChargePlan; reservePct: number; onPick: (st: Station) => void }) {
+function PlanView({
+  plan,
+  reservePct,
+  vehicle,
+  pricePerKwh,
+  onPick,
+}: {
+  plan: ChargePlan
+  reservePct: number
+  vehicle: Vehicle | null
+  pricePerKwh: number
+  onPick: (st: Station) => void
+}) {
+  // Tiền sạc mỗi điểm dừng: từ % khi tới (giữa khoảng ước tính) lên mức sạc tới.
+  const costs = plan.stops.map((s) =>
+    vehicle && s.chargeMin !== null ? chargeCost((s.arrive.low + s.arrive.high) / 2, s.toPct, vehicle, pricePerKwh) : null,
+  )
+  const total = costs.reduce<number | null>((sum, c) => (c === null ? sum : (sum ?? 0) + c), null)
   const head = !plan.ok
     ? L.planFail(Math.round(plan.stuckAtKm))
     : plan.stops.length === 0
@@ -567,6 +589,7 @@ function PlanView({ plan, reservePct, onPick }: { plan: ChargePlan; reservePct: 
     <>
       <p className={`rounded-xl px-3 py-2 text-sm ${plan.ok ? 'bg-brand/10 text-foreground' : 'bg-destructive/10 text-destructive'}`}>
         {head}
+        {plan.ok && total !== null && <span className="block font-semibold">{L.planCost(fmtVnd(total))}</span>}
         <span className="mt-0.5 block text-[11px] text-muted-foreground">{L.planNote(reservePct)}</span>
       </p>
       {plan.stops.length > 0 && (
@@ -582,6 +605,7 @@ function PlanView({ plan, reservePct, onPick }: { plan: ChargePlan; reservePct: 
                   <span className="line-clamp-2 text-[15px] leading-snug">{s.item.station.name}</span>
                   <span className={`text-xs ${pctTone(s.arrive.low)}`}>
                     {L.stopLine(fmtRange(s.arrive), s.toPct, s.chargeMin === null ? null : fmtMinutes(s.chargeMin * 60), fmtKw(s.kw))}
+                    {costs[i] !== null && <span className="text-muted-foreground"> · {fmtVnd(costs[i]!)}</span>}
                   </span>
                   {s.item.viaExit && (
                     <span className="text-xs text-[#B45309] dark:text-[#F0A500]">{L.exitDetour(Math.round(s.detourKm))}</span>
