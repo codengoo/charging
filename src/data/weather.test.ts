@@ -1,5 +1,5 @@
 import { describe as group, expect, it } from 'vitest'
-import { describe, parseWeather, rainSoon } from '@/data/weather'
+import { describe, parseWeather, rainSoon, weatherAt } from '@/data/weather'
 
 const body = {
   current: { time: '2026-11-24T16:30', temperature_2m: 20.4, apparent_temperature: 19.4, weather_code: 3, wind_speed_10m: 14.2, is_day: 1 },
@@ -40,5 +40,14 @@ group('describe (mã WMO)', () => {
     expect(describe(65).label).toBe('Mưa to')
     expect(describe(95).icon).toBe('storm')
     expect(describe(53).icon).toBe('drizzle')
+  })
+})
+
+group('weatherAt', () => {
+  it('tra theo giờ địa phương của trạm', () => {
+    const w = parseWeather({ ...body, utc_offset_seconds: 25200 })!
+    // 18:20 giờ VN = 11:20 UTC
+    expect(weatherAt(w, Date.UTC(2026, 10, 24, 11, 20))?.hour).toBe(18)
+    expect(weatherAt(w, Date.UTC(2026, 10, 26, 0, 0))).toBeNull()
   })
 })

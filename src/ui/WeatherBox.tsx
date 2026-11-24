@@ -1,5 +1,5 @@
 import { Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudRain, CloudSun, Moon, Sun, Umbrella, type LucideIcon } from 'lucide-react'
-import { describe, rainSoon, type WeatherIcon, type WeatherState } from '../data/weather'
+import { describe, rainSoon, type WeatherHour, type WeatherIcon, type WeatherState } from '../data/weather'
 import { pick } from '../i18n'
 
 const ICONS: Record<WeatherIcon, LucideIcon> = {
@@ -85,5 +85,19 @@ export function WeatherBox({ state }: { state: WeatherState | null }) {
         </p>
       )}
     </section>
+  )
+}
+
+/** Chip thời tiết nhỏ cho một giờ (điểm dừng trong kế hoạch sạc): biểu tượng, nhiệt độ, % mưa khi ≥ 30%. */
+export function WeatherChip({ h }: { h: WeatherHour }) {
+  const d = describe(h.code, h.hour >= 6 && h.hour < 18)
+  const Icon = ICONS[d.icon]
+  const rainy = (h.rainPct ?? 0) >= 30
+  return (
+    <span className="inline-flex items-center gap-0.5 whitespace-nowrap text-muted-foreground" title={d.label}>
+      <Icon className="size-3.5" aria-label={d.label} />
+      <span className="tabular-nums">{Math.round(h.temp)}°</span>
+      {rainy && <span className={`tabular-nums ${(h.rainPct ?? 0) >= 50 ? 'text-brand' : ''}`}>· {h.rainPct}%</span>}
+    </span>
   )
 }

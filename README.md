@@ -124,6 +124,16 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   đồ chỉ vẽ ghim các điểm dừng.
 - **Lối tắt PWA** (`shortcuts` trong `public/manifest.webmanifest`): nhấn giữ icon app → Gần tôi (`/?open=nearby`,
   tự xin vị trí), Dọc đường (`/trip`), Quét QR (`/?open=scan`). `?open=` đọc và xoá ở `src/app/useUrlSync.ts`.
+- **Lớp bản đồ** (`src/map/basemaps.ts`, `Settings.mapLayer`): Mặc định (positron / dark theo giao diện), Đường phố (OpenFreeMap
+  liberty), Vệ tinh (Esri World Imagery + nhãn place / transportation_name / water_name của positron, chữ trắng viền tối; giữ
+  glyphs / sprite cho lớp chữ của app). Đổi bằng `setStyle` + `transformStyle` như sáng/tối. Có `VITE_ARCGIS_KEY` lúc build thì
+  dùng endpoint có key (ArcGIS Location Platform), chưa có dùng URL công khai — nên lấy key trước khi có nhiều người dùng.
+  Service worker cache ảnh vệ tinh 1.000 ô / 7 ngày.
+- **Về Nhà** (`homeAdvice` trong `src/ui/BatteryControl.tsx`, `RangeCard`): từ trạm / vị trí tới địa điểm Nhà, chim bay × 1,3,
+  ước tính bi quan — đủ về còn ≥ dự phòng hay cần sạc lên tối thiểu bao nhiêu. Không gọi API.
+- **So sánh tuyến** (`useTripPlan().routeSummaries`): mỗi tuyến chạy `planCharging` (độ dốc riêng) → số lần sạc + phút sạc trên thẻ.
+- **Thời tiết dọc đường**: `/api/weather` trả 24 giờ; `weatherAt` tra giờ tới từng điểm dừng (5 điểm đầu, `useWeatherMany` tuần tự).
+- **Sắp Đã lưu theo cổng trống**: chip Gần nhất / Còn cổng trống (theo `useLiveMany`).
 - **Thời tiết tại trạm** (`worker/weather.ts`, `src/data/weather.ts`, `src/ui/WeatherBox.tsx`): `/api/weather?at=lat,lng` → Open-Meteo
   (miễn phí, không key, CC BY 4.0 — ghi công trong Credits; dùng thương mại cần gói trả phí). Toạ độ làm tròn 0,05° (~5 km),
   cache edge 15 phút, client nhớ 10 phút. Bảng trạm hiện nhiệt độ, trạng thái (mã WMO), gió, 6 giờ tới kèm % mưa; nhắc mang ô

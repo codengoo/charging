@@ -20,6 +20,9 @@ import { chargeCost, fmtVnd, tripCosts } from '../data/cost'
 import { planMapsLink } from '../data/planLink'
 import { nextFiveMinutes, planTimeline } from '../data/eta'
 import type { RecentTrip } from '../data/recentTrips'
+import type { RouteSummary } from '../app/useTripPlan'
+import { useWeatherMany, weatherAt } from '../data/weather'
+import { WeatherChip } from './WeatherBox'
 import type { RoutePath } from '../data/tripTypes'
 import type { TripPoint } from '../data/trip'
 import { LOCALE } from '../i18n'
@@ -70,6 +73,8 @@ const L = pick({
     planNote: (r: number) => `Ước tính: ghé trạm xa nhất còn ≥ ${r}% pin, sạc lên 80% (điểm cuối sạc vừa đủ tới nơi). Ưu tiên trạm vào thẳng; chỉ ra cao tốc khi chặng đó không còn trạm nào khác. Đổi mức dự phòng trong Xe của bạn.`,
     routes: 'Tuyến đường',
     routeCard: (km: number, n: number) => `${km} km · ${n} trạm`,
+    routePlan: (stops: number, min: string) => (stops ? `${stops} lần sạc · ${min}` : 'không cần sạc'),
+    routeStuck: 'thiếu trạm sạc nhanh',
     googleHint: (n: number) => `Trên Google bạn chọn tuyến thứ ${n} — chạm tuyến khớp bên dưới hoặc trên bản đồ.`,
     avoid: 'Tránh',
     avoidOpt: { toll: 'Thu phí', highway: 'Cao tốc', ferry: 'Phà' },
@@ -131,6 +136,8 @@ const L = pick({
     planNote: (r: number) => `Estimate: stop at the farthest station with ≥ ${r}% left, charge to 80% (just enough at the last stop). Prefers stations you can drive straight into; exits the highway only when a leg has no other option. Change the reserve in Your car.`,
     routes: 'Routes',
     routeCard: (km: number, n: number) => `${km} km · ${n} ${n === 1 ? 'station' : 'stations'}`,
+    routePlan: (stops: number, min: string) => (stops ? `${stops} ${stops === 1 ? 'stop' : 'stops'} · ${min}` : 'no charging needed'),
+    routeStuck: 'not enough fast chargers',
     googleHint: (n: number) => `In Google Maps you picked route ${n} — tap the matching one below or on the map.`,
     avoid: 'Avoid',
     avoidOpt: { toll: 'Tolls', highway: 'Highways', ferry: 'Ferries' },
@@ -166,6 +173,8 @@ interface Props {
   onRadius: (km: TripRadius) => void
   /** Số trạm của từng tuyến (rỗng khi chỉ có một tuyến). */
   routeTotals: number[]
+  /** Kế hoạch sạc tóm tắt từng tuyến (rỗng khi chưa chọn xe / chỉ một tuyến). */
+  routeSummaries: (RouteSummary | null)[]
   onSelectRoute: (i: number) => void
   onAvoid: (avoid: Avoid) => void
   /** Mức công suất đang lọc (rỗng = tất cả). Đổi ở đây là đổi luôn Cài đặt hiển thị. */
@@ -208,7 +217,7 @@ interface Props {
  * tuyến, và bảng chi tiết trạm mở đè lên được. Điện thoại: dải dưới đáy, bấm tay cầm để thu/mở.
  * Màn rộng: thẻ nổi góc trái.
  */
-export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, stationOpen, onOpen, onRadius, routeTotals, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, places, onRouteTo, onManagePlaces, onClose, vehicle, climate, reservePct, pricePerKwh, fuelPer100, fuelPrice, climb, elevation, battery, batteryStale, onBattery, planOn, plan, onTogglePlan, recentTrips, onRemoveTrip }: Props) {
+export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, stationOpen, onOpen, onRadius, routeTotals, routeSummaries, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, places, onRouteTo, onManagePlaces, onClose, vehicle, climate, reservePct, pricePerKwh, fuelPer100, fuelPrice, climb, elevation, battery, batteryStale, onBattery, planOn, plan, onTogglePlan, recentTrips, onRemoveTrip }: Props) {
   // Đóng xong App xoá hành trình ngay; giữ bản lúc còn mở để bảng không chớp sang trạng thái trống
   // trong lúc trượt xuống.
   const last = useRef({ trip: tripNow, hits: hitsNow })
@@ -377,7 +386,7 @@ export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, statio
           )}
 
           {trip.routes.length > 1 && (
-            <RoutePicker trip={trip} totals={routeTotals} onSelect={onSelectRoute} />
+            <RoutePicker trip={trip} totals={routeTotals} summaries={routeSummaries} onSelect={onSelectRoute} />
           )}
 
           {/* Cấu hình tìm trạm: hộp riêng, cách hẳn ô link. Chip nền trắng để nổi trên nền xám.
@@ -604,7 +613,18 @@ function optsSummary(trip: TripState, bands: KwBand[], pct: number | null, planO
  * Các tuyến HERE gợi ý (khi đi thẳng 2 điểm). Thứ tự khác Google nên chỉ gợi ý bằng chữ
  * khi người dùng đã chọn tuyến khác tuyến đầu trên Google (`!5iN`).
  */
-function RoutePicker({ trip, totals, onSelect }: { trip: TripState; totals: number[]; onSelect: (i: number) => void }) {
+function RoutePicker({
+  trip,
+  totals,
+  summaries,
+  onSelect,
+}: {
+  trip: TripState
+  totals: number[]
+  /** Kế hoạch sạc tóm tắt từng tuyến (rỗng khi chưa chọn xe). */
+  summaries: (RouteSummary | null)[]
+  onSelect: (i: number) => void
+}) {
   return (
     <div className="flex flex-col gap-1.5">
       {trip.googleRoute !== null && trip.googleRoute > 0 && (
@@ -626,6 +646,12 @@ function RoutePicker({ trip, totals, onSelect }: { trip: TripState; totals: numb
             >
               <span className={`block text-sm font-semibold ${on ? 'text-brand' : 'text-foreground'}`}>{fmtMinutes(r.seconds)}</span>
               {L.routeCard(Math.round(r.meters / 1000), totals[i] ?? 0)}
+              {summaries[i] && (
+                <span className={`mt-0.5 flex items-center gap-1 ${summaries[i]!.ok ? '' : 'text-destructive'}`}>
+                  <Zap className="size-3 shrink-0" aria-hidden />
+                  {summaries[i]!.ok ? L.routePlan(summaries[i]!.stops, fmtMinutes(summaries[i]!.chargeMin * 60)) : L.routeStuck}
+                </span>
+              )}
             </button>
           )
         })}
@@ -682,6 +708,13 @@ function PlanView({
   // Giờ theo đồng hồ: chọn giờ đi (mặc định bây giờ, làm tròn lên 5 phút), không lưu lại.
   const [departMs, setDepartMs] = useState(nextFiveMinutes)
   const times = route ? planTimeline(plan, route, departMs) : null
+  // Thời tiết lúc tới từng điểm dừng (5 điểm đầu, dự báo 24 giờ).
+  const stopWeather = useWeatherMany(plan.stops.map((s) => s.item.station), true)
+  const weatherOf = (i: number) => {
+    const st = plan.stops[i].item.station
+    const w = stopWeather.get(`${st.lat},${st.lng}`)
+    return w && times ? weatherAt(w, times.stops[i].arrive) : null
+  }
   const dayOf = (ms: number) => new Date(ms).toDateString()
   const clock = (ms: number) =>
     new Date(ms).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }) +
@@ -756,6 +789,11 @@ function PlanView({
                         {clock(times.stops[i].arrive)}
                         {s.chargeMin !== null && `–${clock(times.stops[i].leave)}`} ·{' '}
                       </span>
+                    )}
+                    {weatherOf(i) && (
+                      <>
+                        <WeatherChip h={weatherOf(i)!} />{' · '}
+                      </>
                     )}
                     {L.stopLine(fmtRange(s.arrive), s.toPct, s.chargeMin === null ? null : fmtMinutes(s.chargeMin * 60), fmtKw(s.kw))}
                     {costs[i] !== null && <span className="text-muted-foreground"> · {fmtVnd(costs[i]!)}</span>}

@@ -32,7 +32,8 @@ export async function serveWeather(url: URL, ctx: ExecutionContext): Promise<Res
   target.searchParams.set('longitude', g.lng)
   target.searchParams.set('current', 'temperature_2m,apparent_temperature,weather_code,precipitation,wind_speed_10m,is_day')
   target.searchParams.set('hourly', 'temperature_2m,precipitation_probability,weather_code')
-  target.searchParams.set('forecast_hours', '7')
+  // 24 giờ: bảng trạm hiện 6 giờ tới, kế hoạch sạc dọc đường tra thời tiết lúc tới từng điểm dừng.
+  target.searchParams.set('forecast_hours', '24')
   target.searchParams.set('timezone', 'auto')
   const up = await fetch(target.toString(), { headers: { Accept: 'application/json' } })
   if (!up.ok) return fail(502, 'Không lấy được thời tiết')

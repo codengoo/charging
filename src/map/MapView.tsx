@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { Locate, LocateFixed, LocateOff } from 'lucide-react'
+import { Layers, Locate, LocateFixed, LocateOff, Map as MapIcon, Satellite, Signpost } from 'lucide-react'
+import { MAP_LAYERS, STYLE_URL, styleFor, styleKey, type MapLayerId } from './basemaps'
 import { pick } from '../i18n'
 import type { Station, StationPower } from '../data/types'
 import type { Filters, StationIndex } from '../data/stations'
@@ -35,14 +36,16 @@ const LOCATE_MIN_KM = 0.05
 // Positron = nền xám nhạt, tối giản, ít POI — tương đương HERE "lite.day" của app mobile,
 // để ghim trạm nổi bật trên nền. (Các lựa chọn khác: liberty, bright.) Giao diện tối dùng
 // "dark" cùng nhà — chung sprite và glyphs nên đổi qua lại không phải nạp lại font.
-const STYLES = {
-  light: 'https://tiles.openfreemap.org/styles/positron',
-  dark: 'https://tiles.openfreemap.org/styles/dark',
-} as const
 
 const L = pick({
-  vi: { locate: 'Về vị trí của tôi', locating: 'Đang tìm vị trí…', denied: 'Không lấy được vị trí — kiểm tra quyền vị trí của trình duyệt' },
-  en: { locate: 'Go to my location', locating: 'Finding your location…', denied: 'Location unavailable — check browser location permission' },
+  vi: {
+    layers: 'Lớp bản đồ',
+    layerNames: { default: 'Mặc định', streets: 'Đường phố', satellite: 'Vệ tinh' } as Record<MapLayerId, string>,
+    locate: 'Về vị trí của tôi', locating: 'Đang tìm vị trí…', denied: 'Không lấy được vị trí — kiểm tra quyền vị trí của trình duyệt' },
+  en: {
+    layers: 'Map layers',
+    layerNames: { default: 'Default', streets: 'Streets', satellite: 'Satellite' } as Record<MapLayerId, string>,
+    locate: 'Go to my location', locating: 'Finding your location…', denied: 'Location unavailable — check browser location permission' },
 })
 
 /** Trạng thái nút định vị, suy từ `_watchState` (trường nội bộ maplibre 4.x) của GeolocateControl. */
@@ -69,6 +72,9 @@ interface Props {
   onPickRoute?: (idx: number) => void
   /** Nền bản đồ theo giao diện sáng / tối. */
   theme?: 'light' | 'dark'
+  /** Lớp nền: mặc định / đường phố / vệ tinh. */
+  mapLayer?: MapLayerId
+  onMapLayer?: (l: MapLayerId) => void
   /** Địa điểm hay dùng (Nhà, Công ty…) vẽ thành ghim; bấm → onPlaceClick. */
   places?: MapPlace[]
   onPlaceClick?: (id: string) => void
@@ -91,7 +97,7 @@ const ATTRIB_SHOW_MS = 4000
 const LONG_PRESS_MS = 550
 const LONG_PRESS_SLOP = 10
 
-export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate, onMoveEnd, trip = null, onPickRoute, theme = 'light', places = [], onPlaceClick, onLongPress, pinAt = null, onMapClick, overlay, range = null }: Props) {
+export function MapView({ index, filters, book, power, selected, flyTo, onSelect, onLocate, onMoveEnd, trip = null, onPickRoute, theme = 'light', places = [], onPlaceClick, onLongPress, pinAt = null, onMapClick, overlay, range = null, mapLayer = 'default', onMapLayer }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<maplibregl.Map | null>(null)
   const loadedRef = useRef(false)
@@ -108,7 +114,8 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
     if (!containerRef.current || mapRef.current) return
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: STYLES[theme],
+      // Khởi tạo bằng nền mặc định; lớp khác (vệ tinh cần tải style trước) đổi ngay sau ở effect đổi nền.
+      style: STYLE_URL[theme],
       center: DEFAULT_CENTER,
       zoom: 5,
       // Tự thêm bên dưới để đặt góc dưới TRÁI (góc phải dành cho nút định vị + số phiên bản).
@@ -266,21 +273,28 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
 
   // Đổi nền sáng/tối tại chỗ: giữ nguyên nguồn + lớp của app (ghim, tuyến) bằng transformStyle,
   // camera không nhảy. Ảnh ghim (addImage) nằm ở image manager, không mất khi đổi style.
-  const styleTheme = useRef(theme)
+  // Đổi lớp nền (mặc định / đường phố / vệ tinh) cũng đi đường này. Vệ tinh dựng style bất đồng bộ —
+  // đổi tiếp trong lúc chờ thì bỏ kết quả cũ.
+  const styleKeyRef = useRef(styleKey('default', theme))
+  const [layersOpen, setLayersOpen] = useState(false)
   useEffect(() => {
     const map = mapRef.current
-    if (!map || styleTheme.current === theme) return
-    styleTheme.current = theme
-    map.setStyle(STYLES[theme], {
-      transformStyle: (prev, next) => {
-        if (!prev) return next
-        const sources = { ...next.sources }
-        for (const [id, src] of Object.entries(prev.sources)) if (OWN_SOURCES.has(id)) sources[id] = src
-        const own = prev.layers.filter((l) => 'source' in l && OWN_SOURCES.has(l.source as string))
-        return { ...next, sources, layers: [...next.layers, ...own] }
-      },
+    const key = styleKey(mapLayer, theme)
+    if (!map || styleKeyRef.current === key) return
+    styleKeyRef.current = key
+    void styleFor(mapLayer, theme).then((style) => {
+      if (styleKeyRef.current !== key || mapRef.current !== map) return
+      map.setStyle(style, {
+        transformStyle: (prev, next) => {
+          if (!prev) return next
+          const sources = { ...next.sources }
+          for (const [id, src] of Object.entries(prev.sources)) if (OWN_SOURCES.has(id)) sources[id] = src
+          const own = prev.layers.filter((l) => 'source' in l && OWN_SOURCES.has(l.source as string))
+          return { ...next, sources, layers: [...next.layers, ...own] }
+        },
+      })
     })
-  }, [theme])
+  }, [theme, mapLayer])
 
   // Nhóm mới tạo cần ảnh ghim riêng.
   useEffect(() => {
@@ -398,6 +412,46 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
           khi chú giải thu / mở. */}
       <div className="absolute right-3 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-[5] flex flex-col items-end gap-2">
         {overlay}
+        {onMapLayer && layersOpen && (
+          <div className="flex flex-col items-end gap-1.5" role="radiogroup" aria-label={L.layers}>
+            {MAP_LAYERS.map((id) => {
+              const LIcon = id === 'satellite' ? Satellite : id === 'streets' ? Signpost : MapIcon
+              const on = id === mapLayer
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  onClick={() => {
+                    onMapLayer(id)
+                    setLayersOpen(false)
+                  }}
+                  className={`flex h-9 items-center gap-1.5 rounded-full px-3 text-sm shadow-lg shadow-black/10 backdrop-blur outline-none focus-visible:ring-3 focus-visible:ring-ring/40 ${
+                    on ? 'bg-brand text-brand-foreground' : 'bg-card/90 text-foreground'
+                  }`}
+                >
+                  <LIcon className="size-4" aria-hidden />
+                  {L.layerNames[id]}
+                </button>
+              )
+            })}
+          </div>
+        )}
+        {onMapLayer && (
+          <button
+            type="button"
+            onClick={() => setLayersOpen((v) => !v)}
+            aria-label={L.layers}
+            aria-expanded={layersOpen}
+            title={L.layers}
+            className={`flex size-11 items-center justify-center rounded-full bg-card/90 shadow-lg shadow-black/10 backdrop-blur outline-none focus-visible:ring-3 focus-visible:ring-ring/40 active:scale-95 ${
+              mapLayer !== 'default' || layersOpen ? 'text-brand' : 'text-foreground'
+            }`}
+          >
+            <Layers className="size-5" />
+          </button>
+        )}
         <button
           type="button"
           onClick={locate}

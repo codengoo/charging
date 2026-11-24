@@ -45,6 +45,16 @@ const pwa = VitePWA({
         },
       },
       {
+        // Ảnh vệ tinh Esri: nặng hơn ô bản đồ thường nhiều — cache vừa phải, không tải trước hàng loạt.
+        urlPattern: ({ url }) => url.hostname === 'server.arcgisonline.com' || url.hostname === 'ibasemaps-api.arcgis.com',
+        handler: 'StaleWhileRevalidate',
+        options: {
+          cacheName: 'satellite',
+          expiration: { maxEntries: 1000, maxAgeSeconds: 7 * DAY, purgeOnQuotaError: true },
+          cacheableResponse: { statuses: [0, 200] },
+        },
+      },
+      {
         urlPattern: ({ url, sameOrigin }) => sameOrigin && /^\/api\/(route|maps-link|geocode|revgeocode|drive)$/.test(url.pathname),
         handler: 'NetworkFirst',
         options: {

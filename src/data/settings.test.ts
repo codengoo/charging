@@ -32,8 +32,10 @@ describe('parseSettings', () => {
       driveStyle: 'eco',
       carId: 2,
       garage: [],
+      mapLayer: 'satellite',
     })
     expect(s).toEqual({
+      mapLayer: 'satellite',
       batteryHealth: 90,
       driveStyle: 'eco',
       carId: 2,
@@ -180,5 +182,12 @@ describe('nhiều xe', () => {
   it('garage: id trùng với xe đang dùng thì đánh lại', () => {
     const g = parse({ carId: 1, garage: [{ id: 1, vehicleId: 'vf5' }, { id: 3, vehicleId: 'vf6' }] }).garage
     expect(g.map((c) => c.id)).toEqual([2, 3])
+  })
+})
+
+describe('mapLayer', () => {
+  it('lạ → mặc định', () => {
+    expect(parse({ mapLayer: 'hybrid' }).mapLayer).toBe('default')
+    expect(parse({ mapLayer: 'streets' }).mapLayer).toBe('streets')
   })
 })

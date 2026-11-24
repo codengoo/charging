@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckIcon, CopyIcon, DownloadIcon, Link2, MapPinned, Share2Icon } from 'lucide-react'
+import { CheckIcon, CopyIcon, DownloadIcon, ExternalLink, Link2, MapPinned, Share2Icon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Segmented } from '@/components/ui/segmented'
@@ -25,6 +25,8 @@ const L = pick({
     linkAria: 'Link chia sẻ',
     copied: 'Đã chép',
     copy: 'Sao chép',
+    open: 'Mở',
+    openAria: 'Mở trong Google Maps',
     downloadQr: 'Tải ảnh QR',
     copiedMessage: 'Đã chép lời nhắn',
     share: 'Chia sẻ…',
@@ -41,6 +43,8 @@ const L = pick({
     linkAria: 'Share link',
     copied: 'Copied',
     copy: 'Copy',
+    open: 'Open',
+    openAria: 'Open in Google Maps',
     downloadQr: 'Download QR image',
     copiedMessage: 'Message copied',
     share: 'Share…',
@@ -156,6 +160,16 @@ export function ShareSheet({ open, station, onClose }: Props) {
             {copied ? <CheckIcon /> : <CopyIcon />}
             {copied ? L.copied : L.copy}
           </Button>
+          {/* Link Google Maps: iOS / Android mở thẳng app Google Maps nếu đã cài (universal / app link),
+              chưa cài thì mở trên trình duyệt. Tab Link trạm là trang của chính app — không cần nút này. */}
+          {mode === 'maps' && (
+            <Button asChild variant="outline" className="shrink-0">
+              <a href={link} target="_blank" rel="noopener noreferrer" aria-label={L.openAria}>
+                <ExternalLink />
+                {L.open}
+              </a>
+            </Button>
+          )}
         </div>
 
         <div className="flex gap-2 pt-1 *:flex-1">

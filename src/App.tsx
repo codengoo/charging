@@ -44,6 +44,7 @@ import { useStationDetail } from './data/useStationDetail'
 import { DEFAULT_FILTERS, extraFilterCount, kwActive, kwLabel, passesFilters, tierOf, type Filters } from './data/stations'
 import { KM_PER_LAT, distanceKm } from './lib/geo'
 import { batteryRange } from './data/range'
+import { ROAD_DETOUR } from './data/battery'
 import { RangeCard, rangeLayerOf } from './ui/RangeCard'
 import { pctOf } from './ui/BatteryControl'
 import { allSaved } from './data/groups'
@@ -102,6 +103,8 @@ export function App() {
   const notes = useNotes()
   const places = usePlaces()
   const recent = useRecent()
+  /** Địa điểm Nhà đã lưu — "Về Nhà được không?" ở bảng trạm và thẻ tầm pin. */
+  const homePlace = places.places.find((p) => p.kind === 'home') ?? null
   const recentTrips = useRecentTrips()
   const { book } = groups
   const isMobile = useIsMobile()
@@ -287,6 +290,7 @@ export function App() {
   const plan = useTripPlan({
     trip,
     hits,
+    routeHits: tripCtl.routeHits,
     power,
     vehicle,
     battery: battery.reading,
@@ -377,6 +381,8 @@ export function App() {
         }
         onMapClick={editTarget ? pickOnMap : undefined}
         range={rangeLayer}
+        mapLayer={settings.mapLayer}
+        onMapLayer={(mapLayer) => updateSettings({ mapLayer })}
         overlay={settings.showLegend ? <PowerLegend /> : null}
       />
 
@@ -420,6 +426,11 @@ export function App() {
             reservePct={settings.reservePct}
             fromGps={userPos !== null}
             fastInRange={fastInRange}
+            homeKm={
+              homePlace && rangeCenter
+                ? distanceKm(rangeCenter.lat, rangeCenter.lng, homePlace.lat, homePlace.lng) * ROAD_DETOUR
+                : null
+            }
             reading={battery.reading}
             stale={battery.stale}
             onBattery={battery.set}
@@ -439,6 +450,7 @@ export function App() {
           onOpen={tripCtl.open}
           onRadius={tripCtl.setRadius}
           routeTotals={tripCtl.routeTotals}
+          routeSummaries={plan.routeSummaries}
           onSelectRoute={tripCtl.selectRoute}
           onAvoid={tripCtl.setAvoid}
           kwBands={filters.kw}
@@ -494,6 +506,8 @@ export function App() {
           vehicle={vehicle}
           climate={settings.climate}
           pricePerKwh={settings.pricePerKwh}
+          home={homePlace}
+          reservePct={settings.reservePct}
           battery={battery.reading}
           batteryStale={battery.stale}
           onBattery={battery.set}

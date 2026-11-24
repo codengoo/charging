@@ -27,11 +27,16 @@ export interface WeatherHour {
 
 export interface Weather {
   now: WeatherNow
-  /** Các giờ SAU giờ hiện tại (tối đa 6). */
+  /** Các giờ SAU giờ hiện tại (tối đa 6) — hộp thời tiết ở bảng trạm. */
   hours: WeatherHour[]
+  /** Mọi giờ dự báo (tới 24 giờ), khoá "YYYY-MM-DDTHH" giờ địa phương — tra theo giờ tới trạm. */
+  series: Map<string, WeatherHour>
+  /** Lệch múi giờ của trạm so với UTC (giây). */
+  utcOffsetSec: number
 }
 
 interface Body {
+  utc_offset_seconds?: number
   current?: { time?: string; temperature_2m?: number; apparent_temperature?: number; weather_code?: number; wind_speed_10m?: number; is_day?: number }
   hourly?: { time?: string[]; temperature_2m?: number[]; precipitation_probability?: (number | null)[]; weather_code?: number[] }
 }
@@ -53,18 +58,19 @@ export function parseWeather(b: Body): Weather | null {
   const h = b.hourly
   const nowKey = (c.time ?? '').slice(0, 13) // "2026-11-24T16"
   const hours: WeatherHour[] = []
+  const series = new Map<string, WeatherHour>()
   for (let i = 0; i < (h?.time?.length ?? 0); i++) {
     const t = h!.time![i]
-    // Chỉ các giờ sau giờ hiện tại (giờ đang diễn ra đã có ở `now`).
-    if (!nowKey || t.slice(0, 13) <= nowKey) continue
     const temp = h!.temperature_2m?.[i]
     const code = h!.weather_code?.[i]
     if (!num(temp) || !num(code)) continue
     const rain = h!.precipitation_probability?.[i]
-    hours.push({ hour: hourOf(t), temp, code, rainPct: num(rain) ? rain : null })
-    if (hours.length === 6) break
+    const wh = { hour: hourOf(t), temp, code, rainPct: num(rain) ? rain : null }
+    series.set(t.slice(0, 13), wh)
+    // Hộp ở bảng trạm: chỉ các giờ sau giờ hiện tại (giờ đang diễn ra đã có ở `now`).
+    if (nowKey && t.slice(0, 13) > nowKey && hours.length < 6) hours.push(wh)
   }
-  return { now, hours }
+  return { now, hours, series, utcOffsetSec: num(b.utc_offset_seconds) ? b.utc_offset_seconds : 7 * 3600 }
 }
 
 const L = pick({
@@ -92,6 +98,12 @@ export function describe(code: number, isDay = true): { label: string; icon: Wea
   return { label: L.cloudy, icon: 'cloud' }
 }
 
+/** Dự báo của giờ chứa thời điểm `ms` (theo giờ địa phương của trạm); ngoài 24 giờ dự báo → null. */
+export function weatherAt(w: Weather, ms: number): WeatherHour | null {
+  const key = new Date(ms + w.utcOffsetSec * 1000).toISOString().slice(0, 13)
+  return w.series.get(key) ?? null
+}
+
 /** Giờ đầu tiên trong 3 giờ tới có khả năng mưa ≥ ngưỡng — nhắc mang ô khi ra trạm. */
 export const RAIN_ALERT_PCT = 50
 export function rainSoon(w: Weather): WeatherHour | null {
@@ -104,6 +116,47 @@ const cache = new Map<string, { at: number; v: Weather | null }>()
 const keyOf = (lat: number, lng: number) => `${(Math.round(lat / 0.05) * 0.05).toFixed(2)},${(Math.round(lng / 0.05) * 0.05).toFixed(2)}`
 
 export type WeatherState = { kind: 'loading' } | { kind: 'ok'; weather: Weather } | { kind: 'error' }
+
+/** Tải (hoặc lấy cache) thời tiết một ô lưới. Lỗi → null, thử lại sau 1 phút. */
+async function load(key: string, signal: AbortSignal): Promise<void> {
+  const hit = cache.get(key)
+  if (hit && Date.now() - hit.at < TTL_MS) return
+  try {
+    const b = await fetchJson<Body>(`/api/weather?at=${key}`, { signal })
+    cache.set(key, { at: Date.now(), v: parseWeather(b) })
+  } catch {
+    if (!signal.aborted) cache.set(key, { at: Date.now() - TTL_MS + 60_000, v: null })
+  }
+}
+
+/**
+ * Thời tiết tại nhiều điểm (điểm dừng của kế hoạch sạc) — tối đa `max` ô lưới, tuần tự để không dồn
+ * giới hạn `/api`. Trả map toạ độ "lat,lng" của điểm → Weather (thiếu = chưa có / lỗi).
+ */
+export function useWeatherMany(points: { lat: number; lng: number }[], enabled: boolean, max = 5): Map<string, Weather> {
+  const keys = [...new Set(points.slice(0, max).map((p) => keyOf(p.lat, p.lng)))]
+  const sig = keys.join(';')
+  const [, bump] = useState(0)
+  useEffect(() => {
+    if (!enabled || !sig) return
+    const ctrl = new AbortController()
+    void (async () => {
+      for (const k of sig.split(';')) {
+        if (ctrl.signal.aborted) return
+        const before = cache.get(k)
+        await load(k, ctrl.signal)
+        if (!ctrl.signal.aborted && cache.get(k) !== before) bump((n) => n + 1)
+      }
+    })()
+    return () => ctrl.abort()
+  }, [sig, enabled])
+  const out = new Map<string, Weather>()
+  for (const p of points.slice(0, max)) {
+    const v = cache.get(keyOf(p.lat, p.lng))?.v
+    if (v) out.set(`${p.lat},${p.lng}`, v)
+  }
+  return out
+}
 
 export function useWeather(at: { lat: number; lng: number } | null, enabled: boolean): WeatherState | null {
   const key = at ? keyOf(at.lat, at.lng) : null

@@ -36,6 +36,9 @@ const L = pick({
     unsave: (name: string) => `Bỏ ${name} khỏi mọi nhóm`,
     free: (f: number, t: number) => `${f}/${t} trống`,
     full: 'Hết cổng trống',
+    sortBy: 'Sắp xếp:',
+    sortNear: 'Gần nhất',
+    sortFree: 'Còn cổng trống',
   },
   en: {
     title: 'Saved charging stations',
@@ -48,6 +51,9 @@ const L = pick({
     unsave: (name: string) => `Remove ${name} from all groups`,
     free: (f: number, t: number) => `${f}/${t} free`,
     full: 'No free ports',
+    sortBy: 'Sort:',
+    sortNear: 'Nearest',
+    sortFree: 'Free ports',
   },
 })
 
@@ -104,6 +110,14 @@ export function SavedSheet({ open, index, book, notes, now, userPos, onPick, onU
     shown.map(({ st }) => st.storeId).filter(Boolean),
     open,
   )
+  // Sắp theo cổng trống: trạm còn cổng trống lên trước (nhiều trước), trạm chưa có số liệu giữ thứ tự gần nhất.
+  const [byFree, setByFree] = useState(false)
+  const freeOf = (storeId: string) => {
+    const lv = live.get(storeId)
+    return lv ? (freeSummary(lv)?.free ?? -1) : -1
+  }
+  const hasLive = shown.some(({ st }) => freeOf(st.storeId) >= 0)
+  const ordered = byFree && hasLive ? [...shown].sort((a, b) => freeOf(b.st.storeId) - freeOf(a.st.storeId)) : shown
 
   return (
     <AppSheet
@@ -153,8 +167,20 @@ export function SavedSheet({ open, index, book, notes, now, userPos, onPick, onU
         </div>
       )}
 
+      {hasLive && (
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+          {L.sortBy}
+          <Chip size="sm" selected={!byFree} onClick={() => setByFree(false)}>
+            {L.sortNear}
+          </Chip>
+          <Chip size="sm" selected={byFree} onClick={() => setByFree(true)}>
+            {L.sortFree}
+          </Chip>
+        </div>
+      )}
+
       <ul className="mt-2 flex flex-col">
-        {shown.map(({ st, km }) => {
+        {ordered.map(({ st, km }) => {
           const gids = groupsOf(book, st.entityId)
           const pin = group(book, pinGroupOf(book, st.entityId) ?? '')
           const exp = soonestExpiry(book, st.entityId)

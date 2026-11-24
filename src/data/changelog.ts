@@ -11,6 +11,28 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.20.0',
+    date: '2026-11-24',
+    title: 'Vệ tinh, thời tiết dọc đường & về Nhà',
+    changes: [
+      "Lớp bản đồ: Mặc định, Đường phố, Vệ tinh — nút ngay trên nút định vị.",
+      "Kế hoạch sạc hiện thời tiết lúc tới từng điểm dừng.",
+      "Thẻ chọn tuyến so sánh số lần sạc và thời gian sạc của từng tuyến.",
+      "Bảng trạm và thẻ tầm pin cho biết về Nhà được không, cần sạc lên bao nhiêu.",
+      "Sắp xếp trạm đã lưu theo số cổng trống.",
+      "Chia sẻ trạm: nút Mở để mở thẳng app Google Maps.",
+    ],
+    titleEn: 'Satellite, weather on the way & getting home',
+    changesEn: [
+      "Map layers: Default, Streets, Satellite — button right above the locate button.",
+      "The charging plan shows the weather when you reach each stop.",
+      "Route cards compare the number of charging stops and charging time.",
+      "Station sheet and range card tell you whether you can get Home and how much to charge.",
+      "Sort saved stations by free ports.",
+      "Share a station: an Open button jumps straight into the Google Maps app.",
+    ],
+  },
+  {
     version: '0.19.0',
     date: '2026-11-24',
     title: 'Thời tiết tại trạm',

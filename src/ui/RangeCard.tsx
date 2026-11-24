@@ -1,4 +1,4 @@
-import { X, Zap } from 'lucide-react'
+import { House, X, Zap } from 'lucide-react'
 import type { BatteryReading } from '../data/battery'
 import type { BatteryRange } from '../data/range'
 import type { Vehicle } from '../data/vehicles'
@@ -16,6 +16,8 @@ const L = pick({
     ringLabel: (km: number) => `~${km} km`,
     roundLabel: (km: number) => `đi về ~${km} km`,
     fast: (n: number) => (n ? `${n.toLocaleString('vi-VN')} trạm sạc nhanh DC trong tầm` : 'Không có trạm sạc nhanh DC nào trong tầm'),
+    home: (km: number, k: 'round' | 'one' | 'out') =>
+      `Nhà ~${km} km: ${k === 'round' ? 'đi rồi về được' : k === 'one' ? 'tới được, không đủ quay lại' : 'ngoài tầm — cần sạc'}`,
     note: (car: string, r: number, gps: boolean) =>
       `${car}, ước tính bi quan, chừa ${r}% dự phòng. Vòng tròn là đường chim bay quanh ${gps ? 'vị trí của bạn' : 'tâm bản đồ'} — đường thật vòng hơn.`,
   },
@@ -28,6 +30,8 @@ const L = pick({
     ringLabel: (km: number) => `~${km} km`,
     roundLabel: (km: number) => `round trip ~${km} km`,
     fast: (n: number) => (n ? `${n.toLocaleString('en-US')} DC fast ${n === 1 ? 'charger' : 'chargers'} in range` : 'No DC fast chargers in range'),
+    home: (km: number, k: 'round' | 'one' | 'out') =>
+      `Home ~${km} km: ${k === 'round' ? 'there and back' : k === 'one' ? 'reachable, not back' : 'out of range — charge first'}`,
     note: (car: string, r: number, gps: boolean) =>
       `${car}, pessimistic estimate keeping a ${r}% reserve. Circles are straight-line around ${gps ? 'your location' : 'the map centre'} — real roads wind more.`,
   },
@@ -54,6 +58,7 @@ export function RangeCard({
   reservePct,
   fromGps,
   fastInRange,
+  homeKm,
   reading,
   stale,
   onBattery,
@@ -65,6 +70,8 @@ export function RangeCard({
   fromGps: boolean
   /** Trạm DC (theo bộ lọc) trong vòng "đi tới được"; null = chưa tính được. */
   fastInRange: number | null
+  /** Quãng LÁI ước tính tới Nhà (chim bay × 1,3); null = chưa đặt Nhà. */
+  homeKm: number | null
   reading: BatteryReading | null
   stale: boolean
   onBattery: (pct: number) => void
@@ -103,6 +110,12 @@ export function RangeCard({
         <p className={`flex items-center gap-1 pl-6 text-sm ${fastInRange ? 'text-foreground' : 'text-warn'}`}>
           <Zap className="-ml-0.5 size-3.5 shrink-0 text-brand" aria-hidden />
           {L.fast(fastInRange)}
+        </p>
+      )}
+      {homeKm !== null && homeKm >= 1 && (
+        <p className={`flex items-center gap-1 pl-6 text-sm ${homeKm > range.roadKm ? 'text-warn' : 'text-foreground'}`}>
+          <House className="-ml-0.5 size-3.5 shrink-0 text-brand" aria-hidden />
+          {L.home(roundKm(homeKm), homeKm <= range.roadKm / 2 ? 'round' : homeKm <= range.roadKm ? 'one' : 'out')}
         </p>
       )}
       <p className="pl-6 text-[11px] text-muted-foreground">{L.note(vehicle.name, reservePct, fromGps)}</p>

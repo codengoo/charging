@@ -2,6 +2,15 @@
 
 Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app).
 
+## [0.20.0] — 2026-11-24 — Vệ tinh, thời tiết dọc đường & về Nhà
+
+- Lớp bản đồ: Mặc định, Đường phố, Vệ tinh — nút ngay trên nút định vị.
+- Kế hoạch sạc hiện thời tiết lúc tới từng điểm dừng.
+- Thẻ chọn tuyến so sánh số lần sạc và thời gian sạc của từng tuyến.
+- Bảng trạm và thẻ tầm pin cho biết về Nhà được không, cần sạc lên bao nhiêu.
+- Sắp xếp trạm đã lưu theo số cổng trống.
+- Chia sẻ trạm: nút Mở để mở thẳng app Google Maps.
+
 ## [0.19.0] — 2026-11-24 — Thời tiết tại trạm
 
 - Mở trạm để xem thời tiết hiện tại và 6 giờ tới, kèm nhắc mang ô khi sắp mưa.

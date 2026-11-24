@@ -72,14 +72,15 @@ export function useTrip(
     () => (index && trip.route ? alongRoute(index, trip.route, trip.radiusKm, keep) : EMPTY_HITS),
     [index, trip.route, trip.radiusKm, keep],
   )
-  // Số trạm của từng tuyến cho thẻ chọn tuyến. Chỉ tính khi có hơn một tuyến.
-  const routeTotals = useMemo(
+  // Trạm dọc từng tuyến cho thẻ chọn tuyến (số trạm + so sánh kế hoạch sạc). Chỉ tính khi có hơn một tuyến.
+  const routeHits = useMemo(
     () =>
       index && trip.routes.length > 1
-        ? trip.routes.map((r, i) => (i === trip.routeIdx ? hits.total : alongRoute(index, r, trip.radiusKm, keep).total))
+        ? trip.routes.map((r, i) => (i === trip.routeIdx ? hits : alongRoute(index, r, trip.radiusKm, keep)))
         : [],
-    [index, trip.routes, trip.routeIdx, trip.radiusKm, keep, hits.total],
+    [index, trip.routes, trip.routeIdx, trip.radiusKm, keep, hits],
   )
+  const routeTotals = useMemo(() => routeHits.map((h) => h.total), [routeHits])
 
   /** Lượt mới huỷ lượt cũ: chỉ kết quả của lượt mới nhất được ghi vào state. */
   const startJob = useCallback(() => {
@@ -157,5 +158,5 @@ export function useTrip(
 
   useEffect(() => () => job.current?.abort(), [])
 
-  return { trip, hits, routeTotals, show, open, setAvoid, selectRoute, setRadius, close }
+  return { trip, hits, routeHits, routeTotals, show, open, setAvoid, selectRoute, setRadius, close }
 }

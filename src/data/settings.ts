@@ -10,6 +10,7 @@ import {
   PRICE_MAX,
 } from './cost'
 import { TRIP_RADII, type TripRadius } from './tripTypes'
+import { MAP_LAYERS, type MapLayerId } from '../map/basemaps'
 import { THEME_PREFS, type ThemePref } from '../lib/theme'
 import { DRIVE_STYLES, HEALTH_MIN, VEHICLE_IDS, type DriveStyle } from './vehicles'
 import { RESERVE_MAX, RESERVE_MIN, RESERVE_PCT, type BatteryReading } from './battery'
@@ -54,6 +55,8 @@ export interface Settings {
   batteryHealth: number
   /** Kiểu lái — nhân mức tiêu thụ ước tính (không áp khi có usageOverride). */
   driveStyle: DriveStyle
+  /** Lớp nền bản đồ (mặc định / đường phố / vệ tinh). */
+  mapLayer: MapLayerId
   /** Số hiệu xe đang dùng ("Xe 1", "Xe 2"…). Các trường xe phía trên là của xe này. */
   carId: number
   /** Các xe khác của gia đình, cất lại — đổi xe là tráo với các trường đang dùng. */
@@ -98,6 +101,7 @@ export const DEFAULT_SETTINGS: Settings = {
   driveStyle: 'normal',
   carId: 1,
   garage: [],
+  mapLayer: 'default',
 }
 
 const KEY = 'tramsac.settings'
@@ -148,6 +152,7 @@ export function parseSettings(raw: string | null): Settings {
     batteryHealth: readHealth(o.batteryHealth) ?? d.batteryHealth,
     driveStyle: DRIVE_STYLES.includes(o.driveStyle as DriveStyle) ? (o.driveStyle as DriveStyle) : d.driveStyle,
     ...readGarage(o),
+    mapLayer: MAP_LAYERS.includes(o.mapLayer as MapLayerId) ? (o.mapLayer as MapLayerId) : d.mapLayer,
   }
 }
 

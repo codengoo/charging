@@ -89,6 +89,9 @@ interface Props {
   climate: boolean
   /** Giá sạc đ/kWh — ước tính tiền sạc lên 80%. */
   pricePerKwh: number
+  /** Địa điểm Nhà (đã lưu) + pin dự phòng — dòng "Về Nhà". */
+  home: { lat: number; lng: number } | null
+  reservePct: number
   battery: BatteryReading | null
   batteryStale: boolean
   onBattery: (pct: number) => void
@@ -114,7 +117,7 @@ const STATUS_BG = {
   planned: 'bg-[#64748B]',
 } as const
 
-export function StationSheet({ open, station, book, power, powerLoading, detail, detailLoading, drive, live, vehicle, climate, pricePerKwh, battery, batteryStale, onBattery, onPickCar, note, onNote, reviews, theme, onOpenGroups, onShare, onClose, children }: Props) {
+export function StationSheet({ open, station, book, power, powerLoading, detail, detailLoading, drive, live, vehicle, climate, pricePerKwh, home, reservePct, battery, batteryStale, onBattery, onPickCar, note, onNote, reviews, theme, onOpenGroups, onShare, onClose, children }: Props) {
   const gmapsDir = `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}`
   // Thời tiết tại trạm — chỉ tải khi bảng mở.
   const weather = useWeather(station, open)
@@ -208,6 +211,9 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
           live={live?.live?.ports ?? null}
           onPickCar={onPickCar}
           pricePerKwh={pricePerKwh}
+          home={home}
+          reservePct={reservePct}
+          station={station}
         />
 
         {/* key theo trạm: lựa chọn khoảng giờ / mức kW không mang sang trạm khác. */}

@@ -8,9 +8,19 @@ import type { TripState } from '../data/useTrip'
 import type { Vehicle } from '../data/vehicles'
 import type { TripLayer } from '../map/MapView'
 
+/** Kế hoạch sạc tóm tắt của một tuyến (thẻ chọn tuyến). */
+export interface RouteSummary {
+  ok: boolean
+  /** Số lần dừng sạc (kẹt: số lần dừng tới chỗ kẹt). */
+  stops: number
+  chargeMin: number
+}
+
 interface Args {
   trip: TripState
   hits: RouteHits
+  /** Trạm dọc TỪNG tuyến (rỗng khi chỉ có một tuyến) — so sánh kế hoạch sạc trên thẻ chọn tuyến. */
+  routeHits: RouteHits[]
   power: Map<string, StationPower> | null
   vehicle: Vehicle | null
   battery: BatteryReading | null
@@ -23,7 +33,7 @@ interface Args {
  * Kế hoạch dừng sạc + lớp tuyến vẽ lên bản đồ cho hành trình đang mở. Kế hoạch chỉ tính khi bật,
  * có xe và tuyến đã sẵn sàng; đóng hành trình thì tự tắt.
  */
-export function useTripPlan({ trip, hits, power, vehicle, battery, climate, reservePct, isMobile }: Args) {
+export function useTripPlan({ trip, hits, routeHits, power, vehicle, battery, climate, reservePct, isMobile }: Args) {
   const [planOn, setPlanOn] = useState(false)
   useEffect(() => {
     if (trip.status === 'closed') setPlanOn(false)
@@ -62,7 +72,21 @@ export function useTripPlan({ trip, hits, power, vehicle, battery, climate, rese
     }
   }, [trip.route, trip.routes, trip.routeIdx, hits, plan, isMobile])
 
+  // So sánh tuyến: kế hoạch sạc tóm tắt cho mỗi tuyến (có độ dốc riêng của tuyến đó). ≤ 3 tuyến × ~20 ms.
+  const routeSummaries = useMemo<(RouteSummary | null)[]>(() => {
+    if (!vehicle || trip.status !== 'ready' || routeHits.length < 2) return []
+    const mass = vehicle.massKg + LOAD_KG
+    return trip.routes.map((r, i) => {
+      const h = routeHits[i]
+      if (!h) return null
+      const prof = elevationProfile(r.points, r.elev)
+      const climbOf = prof ? (a: number, b: number) => climbKwh(prof, a, b, mass) : undefined
+      const p = planCharging(h.items, power, r, battery?.pct ?? DEFAULT_PCT, vehicle, climate, reservePct, climbOf)
+      return p.ok ? { ok: true, stops: p.stops.length, chargeMin: p.chargeMin } : { ok: false, stops: p.stops.length, chargeMin: 0 }
+    })
+  }, [vehicle, trip.status, trip.routes, routeHits, power, battery, climate, reservePct])
+
   /** Tổng mét leo / xuống cả tuyến (null = HERE không trả độ cao). */
   const elevation = profile ? { up: profile.totalUp, down: profile.totalDown } : null
-  return { planOn, togglePlan: () => setPlanOn((v) => !v), plan, layer, climb, elevation }
+  return { planOn, togglePlan: () => setPlanOn((v) => !v), plan, layer, climb, elevation, routeSummaries }
 }
