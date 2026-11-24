@@ -1,6 +1,6 @@
 import { CheckIcon, ChevronDownIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
-import { DrawerContent, DrawerHeader, DrawerNestedRoot, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger } from '@/components/ui/drawer'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useIsMobile } from '@/hooks/use-media-query'
 import { cn } from '@/lib/utils'
@@ -52,7 +52,9 @@ export function ResponsiveSelect({
   }
 
   return (
-    <DrawerNestedRoot open={open} onOpenChange={setOpen}>
+    // Drawer RIÊNG, không NestedRoot: NestedRoot thu nhỏ + đẩy drawer cha khi mở, và trên iOS có lúc không
+    // trả lại sau khi chọn xong — drawer cha (vd. Xe của bạn) bị co hai bên, không dính đáy.
+    <Drawer open={open} onOpenChange={setOpen}>
       <DrawerTrigger asChild disabled={disabled}>
         <button
           id={id}
@@ -92,6 +94,6 @@ export function ResponsiveSelect({
           })}
         </div>
       </DrawerContent>
-    </DrawerNestedRoot>
+    </Drawer>
   )
 }

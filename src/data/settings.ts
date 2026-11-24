@@ -54,14 +54,19 @@ export interface Settings {
   batteryHealth: number
   /** Kiểu lái — nhân mức tiêu thụ ước tính (không áp khi có usageOverride). */
   driveStyle: DriveStyle
-  /** Xe đang dùng là Xe 1 hay Xe 2; xe kia cất trong `otherCar`. */
-  carSlot: 0 | 1
-  /** Hồ sơ xe còn lại (gia đình có 2 xe) — đổi xe là tráo với các trường đang dùng. null = chưa có. */
-  otherCar: CarProfile | null
+  /** Số hiệu xe đang dùng ("Xe 1", "Xe 2"…). Các trường xe phía trên là của xe này. */
+  carId: number
+  /** Các xe khác của gia đình, cất lại — đổi xe là tráo với các trường đang dùng. */
+  garage: CarProfile[]
 }
 
-/** Phần cài đặt riêng của MỘT chiếc xe — tráo qua lại khi đổi Xe 1 / Xe 2. */
+/** Tối đa chừng này xe. */
+export const MAX_CARS = 6
+
+/** Phần cài đặt riêng của MỘT chiếc xe — tráo vào / ra khi đổi xe. */
 export interface CarProfile {
+  /** Số hiệu ổn định, ≥ 1 — nhãn "Xe N", không đổi khi xoá xe khác. */
+  id: number
   vehicleId: string | null
   customKwh: number
   customKwhPer100: number
@@ -91,8 +96,8 @@ export const DEFAULT_SETTINGS: Settings = {
   fuelPrice: DEFAULT_FUEL_PRICE,
   batteryHealth: 100,
   driveStyle: 'normal',
-  carSlot: 0,
-  otherCar: null,
+  carId: 1,
+  garage: [],
 }
 
 const KEY = 'tramsac.settings'
@@ -142,9 +147,33 @@ export function parseSettings(raw: string | null): Settings {
     fuelPrice: inRange(o.fuelPrice, 0, FUEL_PRICE_MAX) ? o.fuelPrice : d.fuelPrice,
     batteryHealth: readHealth(o.batteryHealth) ?? d.batteryHealth,
     driveStyle: DRIVE_STYLES.includes(o.driveStyle as DriveStyle) ? (o.driveStyle as DriveStyle) : d.driveStyle,
-    carSlot: o.carSlot === 1 ? 1 : 0,
-    otherCar: parseCar(o.otherCar),
+    ...readGarage(o),
   }
+}
+
+/**
+ * Xe đang dùng + các xe cất. Bản 0.18.0 lưu `carSlot` (0 | 1) + `otherCar` → chuyển sang id 1 / 2.
+ * Id trùng / sai thì đánh lại, bỏ phần quá MAX_CARS.
+ */
+function readGarage(o: Record<string, unknown>): Pick<Settings, 'carId' | 'garage'> {
+  if (!Array.isArray(o.garage)) {
+    const other = parseCar(o.otherCar)
+    if (!other) return { carId: 1, garage: [] }
+    const mine = o.carSlot === 1 ? 2 : 1
+    return { carId: mine, garage: [{ ...other, id: mine === 1 ? 2 : 1 }] }
+  }
+  const carId = Number.isInteger(o.carId) && (o.carId as number) >= 1 ? (o.carId as number) : 1
+  const used = new Set([carId])
+  const garage: CarProfile[] = []
+  for (const raw of o.garage) {
+    const c = parseCar(raw)
+    if (!c || garage.length >= MAX_CARS - 1) continue
+    let id = c.id
+    while (used.has(id)) id++
+    used.add(id)
+    garage.push({ ...c, id })
+  }
+  return { carId, garage }
 }
 
 const readHealth = (v: unknown): number | null =>
@@ -157,6 +186,7 @@ export function parseCar(v: unknown): CarProfile | null {
   const d = DEFAULT_SETTINGS
   const b = o.battery as Partial<BatteryReading> | null | undefined
   return {
+    id: Number.isInteger(o.id) && (o.id as number) >= 1 ? (o.id as number) : 1,
     vehicleId: typeof o.vehicleId === 'string' && VEHICLE_IDS.includes(o.vehicleId) ? o.vehicleId : null,
     customKwh: inRange(o.customKwh, 5, 250) ? o.customKwh : d.customKwh,
     customKwhPer100: inRange(o.customKwhPer100, 5, 60) ? o.customKwhPer100 : d.customKwhPer100,
@@ -168,21 +198,55 @@ export function parseCar(v: unknown): CarProfile | null {
 
 /** Các trường của xe đang dùng, gói thành hồ sơ (kèm % pin hiện tại) — để cất khi đổi xe. */
 export function currentCar(s: Settings, battery: BatteryReading | null): CarProfile {
-  const { vehicleId, customKwh, customKwhPer100, usageOverride, batteryHealth } = s
-  return { vehicleId, customKwh, customKwhPer100, usageOverride, batteryHealth, battery }
+  const { carId: id, vehicleId, customKwh, customKwhPer100, usageOverride, batteryHealth } = s
+  return { id, vehicleId, customKwh, customKwhPer100, usageOverride, batteryHealth, battery }
+}
+
+/** Mọi xe (đang dùng + cất), theo số hiệu — danh sách chọn xe. */
+export function allCars(s: Settings): CarProfile[] {
+  return [currentCar(s, null), ...s.garage].sort((a, b) => a.id - b.id)
+}
+
+/** Kết quả một thao tác xe: patch Settings + % pin của xe đang dùng sau thao tác. */
+export interface CarChange {
+  patch: Partial<Settings>
+  battery: BatteryReading | null
+}
+
+/** Đưa xe `c` (đang cất) lên dùng, cất xe hiện tại (kèm % pin) vào garage. */
+function activate(c: CarProfile, garage: CarProfile[]): CarChange {
+  const { id, battery: nextBattery, ...fields } = c
+  return { patch: { ...fields, carId: id, garage }, battery: nextBattery }
+}
+
+/** Chuyển sang xe số `id`; không có / đang dùng rồi → null. */
+export function switchCar(s: Settings, battery: BatteryReading | null, id: number): CarChange | null {
+  const target = s.garage.find((c) => c.id === id)
+  if (!target) return null
+  return activate(target, [...s.garage.filter((c) => c.id !== id), currentCar(s, battery)])
+}
+
+/** Thêm một xe trống (chưa chọn mẫu) và chuyển sang nó; đã đủ MAX_CARS → null. */
+export function addCar(s: Settings, battery: BatteryReading | null): CarChange | null {
+  if (s.garage.length + 1 >= MAX_CARS) return null
+  const id = Math.max(s.carId, ...s.garage.map((c) => c.id)) + 1
+  const blank = { ...currentCar(DEFAULT_SETTINGS, null), id }
+  return activate(blank, [...s.garage, currentCar(s, battery)])
 }
 
 /**
- * Đổi sang xe kia: trả patch Settings + % pin của xe mới. Chưa có xe kia → xe mới trống (chưa
- * chọn mẫu), giữ xe hiện tại làm `otherCar`.
+ * Xoá xe số `id`. Xoá xe đang dùng thì chuyển sang xe số nhỏ nhất còn lại; chỉ còn một xe thì xe
+ * đó về trống (giữ số hiệu).
  */
-export function swapCar(s: Settings, battery: BatteryReading | null): { patch: Partial<Settings>; battery: BatteryReading | null } {
-  const next = s.otherCar ?? { ...currentCar(DEFAULT_SETTINGS, null) }
-  const { battery: nextBattery, ...fields } = next
-  return {
-    patch: { ...fields, otherCar: currentCar(s, battery), carSlot: s.carSlot === 0 ? 1 : 0 },
-    battery: nextBattery,
+export function removeCar(s: Settings, battery: BatteryReading | null, id: number): CarChange {
+  if (id !== s.carId) return { patch: { garage: s.garage.filter((c) => c.id !== id) }, battery }
+  if (s.garage.length === 0) {
+    const d = DEFAULT_SETTINGS
+    const blank = { vehicleId: d.vehicleId, customKwh: d.customKwh, customKwhPer100: d.customKwhPer100, usageOverride: d.usageOverride, batteryHealth: d.batteryHealth }
+    return { patch: blank, battery: null }
   }
+  const [first, ...rest] = [...s.garage].sort((a, b) => a.id - b.id)
+  return activate(first, rest)
 }
 
 /** Chế độ riêng tư chặn localStorage → mặc định. */

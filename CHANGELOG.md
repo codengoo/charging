@@ -2,6 +2,25 @@
 
 Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app).
 
+## [0.19.0] — 2026-11-24 — Thời tiết tại trạm
+
+- Mở trạm để xem thời tiết hiện tại và 6 giờ tới, kèm nhắc mang ô khi sắp mưa.
+
+## [0.18.3] — 2026-11-24 — Sửa ô nhập trên iPhone
+
+- Bấm vào ô nhập không còn đẩy tay cầm, tiêu đề của bảng ra khỏi màn hình.
+
+## [0.18.2] — 2026-11-24 — Sửa bảng trên iPhone
+
+- Bảng Xe của bạn luôn dính đáy và đủ bề rộng sau khi chọn trong danh sách.
+- Chạm ra ngoài ô nhập để đóng bàn phím.
+
+## [0.18.1] — 2026-11-24 — Nhiều xe
+
+- Lưu được tối đa 6 xe, chọn xe đang dùng trong danh sách; thêm, xoá xe ngay trong Xe của bạn.
+- Sửa lỗi đổi xe trên iPhone làm bảng Xe của bạn trôi khuất dưới màn hình.
+- Sửa lỗi bàn phím iPhone che ô đang nhập trong Xe của bạn.
+
 ## [0.18.0] — 2026-11-24 — Giờ tới nơi, hai xe & cổng trống trạm đã lưu
 
 - Kế hoạch sạc ghi giờ theo đồng hồ: chọn giờ đi, xem giờ tới từng trạm dừng và giờ tới nơi.

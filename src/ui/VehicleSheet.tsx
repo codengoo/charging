@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { Plus, Trash2 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { SwitchRow } from '@/components/ui/switch'
 import { Segmented } from '@/components/ui/segmented'
 import { Input } from '@/components/ui/input'
 import { ResponsiveSelect } from '@/components/ui/responsive-select'
-import type { Settings } from '../data/settings'
+import { MAX_CARS, allCars, type Settings } from '../data/settings'
 import { CUSTOM_ID, DRIVE_STYLES, HEALTH_OPTIONS, VEHICLES, vehicleOf, type DriveStyle } from '../data/vehicles'
 import { ChargeCurveChart } from './ChargeCurveChart'
 import { RESERVE_MAX, RESERVE_MIN, RESERVE_OPTIONS } from '../data/battery'
@@ -31,10 +33,12 @@ const L = pick({
     real: 'Tiêu thụ thực tế (kWh/100 km)',
     realHint: (v: string) => `Đọc mức tiêu thụ trung bình trên màn hình xe. Để trống = ước tính ${v} kWh/100 km.`,
     climate: 'Điều hoà',
-    slot: 'Xe của gia đình',
+    slot: 'Xe đang dùng',
     slotName: (n: number) => `Xe ${n}`,
-    slotHint: (other: string) => `Xe còn lại: ${other}. Mỗi xe nhớ riêng mẫu xe, tiêu thụ, pin còn lại và % pin.`,
-    slotEmpty: 'Thêm xe thứ hai: bấm Xe 2 rồi chọn mẫu.',
+    slotHint: 'Mỗi xe nhớ riêng mẫu xe, tiêu thụ, pin còn lại và % pin. Điều hoà, dự phòng, giá và kiểu lái dùng chung.',
+    addCar: 'Thêm xe',
+    removeCar: 'Xoá xe này',
+    confirmRemove: (name: string) => `Xoá ${name} khỏi danh sách xe?`,
     notSet: 'chưa chọn mẫu',
     style: 'Kiểu lái',
     styles: { eco: 'Tiết kiệm', normal: 'Bình thường', fast: 'Nhanh' } as Record<DriveStyle, string>,
@@ -65,10 +69,12 @@ const L = pick({
     real: 'Real consumption (kWh/100 km)',
     realHint: (v: string) => `Read the average consumption on your car's display. Leave empty to use the ${v} kWh/100 km estimate.`,
     climate: 'Air conditioning',
-    slot: 'Family cars',
+    slot: 'Car in use',
     slotName: (n: number) => `Car ${n}`,
-    slotHint: (other: string) => `Other car: ${other}. Each car keeps its own model, consumption, battery health and charge level.`,
-    slotEmpty: 'Add a second car: tap Car 2 and pick a model.',
+    slotHint: 'Each car keeps its own model, consumption, battery health and charge level. A/C, reserve, prices and driving style are shared.',
+    addCar: 'Add a car',
+    removeCar: 'Remove this car',
+    confirmRemove: (name: string) => `Remove ${name} from your cars?`,
     notSet: 'no model set',
     style: 'Driving style',
     styles: { eco: 'Eco', normal: 'Normal', fast: 'Fast' } as Record<DriveStyle, string>,
@@ -110,7 +116,7 @@ const MODEL_OPTIONS = [
 ]
 
 /** "VF 6 · 59,6 kWh" / "Tuỳ chỉnh · 60 kWh" / null khi chưa chọn — dòng tóm tắt trong Cài đặt. */
-export function vehicleSummary(s: Settings): string | null {
+export function vehicleSummary(s: Pick<Settings, 'vehicleId' | 'customKwh'>): string | null {
   if (!s.vehicleId) return null
   if (s.vehicleId === CUSTOM_ID) return `${L.custom.replace('…', '')} · ${fmtNum(s.customKwh)} kWh`
   const v = VEHICLES.find((x) => x.id === s.vehicleId)
@@ -124,39 +130,70 @@ interface Props {
   onClose: () => void
   /** Mở chồng lên một drawer khác (Cài đặt) — drawer dưới lùi lại phía sau. */
   nested?: boolean
-  /** Đổi sang xe kia (Xe 1 ↔ Xe 2) — App tráo cài đặt xe và % pin. */
-  onSwapCar: () => void
+  /** Chọn / thêm / xoá xe — App tráo cài đặt xe và % pin. */
+  onCar: (a: CarAction) => void
 }
 
+export type CarAction = { type: 'select'; id: number } | { type: 'add' } | { type: 'remove'; id: number }
+
+/** Mục "+ Thêm xe" trong danh sách chọn xe. */
+const ADD = 'add'
+
 /** Drawer riêng chọn xe + điều hoà; đổi là lưu ngay như Cài đặt. */
-export function VehicleSheet({ open, settings, onChange, onClose, nested = false, onSwapCar }: Props) {
+export function VehicleSheet({ open, settings, onChange, onClose, nested = false, onCar }: Props) {
   const model = VEHICLES.find((v) => v.id === settings.vehicleId)
   const car = vehicleOf(settings.vehicleId, settings.customKwh, settings.customKwhPer100, settings.usageOverride, {
     health: settings.batteryHealth,
     style: settings.driveStyle,
   })
-  const other = settings.otherCar
-  const otherName = other?.vehicleId ? vehicleSummary({ ...settings, ...other }) : null
+  const cars = allCars(settings)
+  const carName = (c: { id: number } & Pick<Settings, 'vehicleId' | 'customKwh'>) =>
+    `${L.slotName(c.id)} · ${vehicleSummary(c) ?? L.notSet}`
+  const carOptions = [
+    ...cars.map((c) => ({ value: String(c.id), label: carName(c) })),
+    ...(cars.length < MAX_CARS
+      ? [{ value: ADD, label: <span className="flex items-center gap-1.5 text-brand"><Plus className="size-4" />{L.addCar}</span> }]
+      : []),
+  ]
+  // Ô nhập dùng defaultValue: gắn key theo xe để đổi xe là đọc lại giá trị của xe mới — KHÔNG dựng lại
+  // cả nội dung bảng (đổi chiều cao đột ngột làm drawer vaul trên Safari iOS lệch chỗ).
+  const k = (name: string) => `${settings.carId}-${name}`
   return (
     <AppSheet
       nested={nested}
       open={open}
       onClose={onClose}
       autoFocus={false}
+      // Nhiều ô nhập (tiêu thụ, giá…): không dùng hai mốc snap để bàn phím iOS không che ô đang nhập.
+      snap={false}
       title={L.title}
       description={L.hint}
     >
-      {/* key theo xe: đổi Xe 1 / Xe 2 thì các ô nhập (defaultValue) đọc lại giá trị của xe mới. */}
-      <div key={settings.carSlot} className="mt-3 flex flex-col gap-4 pb-2 sm:mt-0">
+      <div className="mt-3 flex flex-col gap-4 pb-2 sm:mt-0">
         <section className="flex flex-col gap-1.5">
           <h3 className="text-sm font-semibold">{L.slot}</h3>
-          <Segmented
-            label={L.slot}
-            value={String(settings.carSlot)}
-            onChange={(v) => Number(v) !== settings.carSlot && onSwapCar()}
-            options={[0, 1].map((n) => ({ value: String(n), label: L.slotName(n + 1) }))}
+          <ResponsiveSelect
+            title={L.slot}
+            value={String(settings.carId)}
+            onChange={(v) => (v === ADD ? onCar({ type: 'add' }) : onCar({ type: 'select', id: Number(v) }))}
+            options={carOptions}
           />
-          <p className="text-xs text-muted-foreground">{other ? L.slotHint(otherName ?? L.notSet) : L.slotEmpty}</p>
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-xs text-muted-foreground">{L.slotHint}</p>
+            {cars.length > 1 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="-mt-1 shrink-0 text-destructive hover:text-destructive"
+                onClick={() => {
+                  if (window.confirm(L.confirmRemove(carName({ ...settings, id: settings.carId })))) onCar({ type: 'remove', id: settings.carId })
+                }}
+              >
+                <Trash2 />
+                {L.removeCar}
+              </Button>
+            )}
+          </div>
         </section>
 
         <section className="flex flex-col gap-1.5">
@@ -171,6 +208,7 @@ export function VehicleSheet({ open, settings, onChange, onClose, nested = false
           {settings.vehicleId === CUSTOM_ID && (
             <div className="flex gap-2">
               <NumberField
+                key={k('kwh')}
                 label={L.capacity}
                 value={settings.customKwh}
                 min={5}
@@ -178,6 +216,7 @@ export function VehicleSheet({ open, settings, onChange, onClose, nested = false
                 onCommit={(customKwh) => onChange({ customKwh })}
               />
               <NumberField
+                key={k('per100')}
                 label={L.usage}
                 value={settings.customKwhPer100}
                 min={5}
@@ -191,7 +230,7 @@ export function VehicleSheet({ open, settings, onChange, onClose, nested = false
               {L.real}
               <Input
                 // key theo mẫu: đổi mẫu thì ô trống lại (defaultValue chỉ đọc lúc gắn).
-                key={model.id}
+                key={k(model.id)}
                 type="number"
                 inputMode="decimal"
                 min={5}

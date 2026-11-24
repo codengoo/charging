@@ -16,7 +16,8 @@ import { SettingsSheet } from './ui/SettingsSheet'
 import { VehicleSheet } from './ui/VehicleSheet'
 import { useDriveDistance, useStableOrigin } from './data/drive'
 import { useLiveStatus } from './data/live'
-import { filtersFrom, swapCar, useSettings, type Settings } from './data/settings'
+import { addCar, filtersFrom, removeCar, switchCar, useSettings, type CarChange, type Settings } from './data/settings'
+import type { CarAction } from './ui/VehicleSheet'
 import { useBattery } from './data/useBattery'
 import { vehicleOf } from './data/vehicles'
 import { useResolvedTheme } from './lib/theme'
@@ -218,11 +219,15 @@ export function App() {
     if (patch.tripRadiusKm !== undefined) tripCtl.setRadius(patch.tripRadiusKm)
   }
 
-  /** Đổi Xe 1 ↔ Xe 2: tráo cài đặt xe và % pin (mỗi xe nhớ riêng). */
-  function swapCarProfile() {
-    const { patch, battery: next } = swapCar(settings, battery.reading)
-    updateSettings(patch)
-    battery.replace(next)
+  /** Chọn / thêm / xoá xe: tráo cài đặt xe và % pin (mỗi xe nhớ riêng). */
+  function carAction(a: CarAction) {
+    let change: CarChange | null
+    if (a.type === 'select') change = switchCar(settings, battery.reading, a.id)
+    else if (a.type === 'add') change = addCar(settings, battery.reading)
+    else change = removeCar(settings, battery.reading, a.id)
+    if (!change) return
+    updateSettings(change.patch)
+    if (change.battery !== battery.reading) battery.replace(change.battery)
   }
 
   function toggleRange() {
@@ -506,7 +511,7 @@ export function App() {
         >
           <VehicleSheet
             nested
-            onSwapCar={swapCarProfile}
+            onCar={carAction}
             open={sheets.is('car')}
             settings={settings}
             onChange={changeSettings}
@@ -615,7 +620,7 @@ export function App() {
         onClose={() => sheets.close('settings')}
         placesSummary={places.places.length ? places.places.map(placeName).join(' · ') : null}
         onOpenPlaces={() => sheets.open('settingsPlaces')}
-        onSwapCar={swapCarProfile}
+        onCar={carAction}
       >
         <PlacesSheet
           nested

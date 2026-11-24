@@ -10,7 +10,7 @@ import { cn } from 'cn'
 import { LANG, pick, type Lang } from '@/i18n'
 import { switchLang } from '@/lib/langSwitch'
 import { THEME_PREFS, type ThemePref } from '@/lib/theme'
-import { VehicleSheet, vehicleSummary } from './VehicleSheet'
+import { VehicleSheet, vehicleSummary, type CarAction } from './VehicleSheet'
 import { AppSheet } from './AppSheet'
 
 const L = pick({
@@ -87,18 +87,18 @@ interface Props {
   /** "Nhà · Công ty · Quê" — null khi chưa đặt địa điểm nào. */
   placesSummary: string | null
   onOpenPlaces: () => void
-  /** Đổi Xe 1 ↔ Xe 2 (trong Xe của bạn). */
-  onSwapCar: () => void
+  /** Chọn / thêm / xoá xe (trong Xe của bạn). */
+  onCar: (a: CarAction) => void
   /** Bảng con mở chồng (vd. Địa điểm của tôi). */
   children?: ReactNode
 }
 
 /** Cấu hình hiển thị: đổi là lưu và áp dụng ngay, không có nút "Lưu". */
-export function SettingsSheet({ open, settings, onChange, onClose, placesSummary, onOpenPlaces, onSwapCar, children }: Props) {
+export function SettingsSheet({ open, settings, onChange, onClose, placesSummary, onOpenPlaces, onCar, children }: Props) {
   const [vehicleOpen, setVehicleOpen] = useState(false)
   // Có 2 xe thì ghi rõ đang dùng xe nào.
   const summary = vehicleSummary(settings)
-  const car = summary && settings.otherCar ? `${L.slot(settings.carSlot + 1)} · ${summary}` : summary
+  const car = summary && settings.garage.length > 0 ? `${L.slot(settings.carId)} · ${summary}` : summary
   return (
     <AppSheet
       open={open}
@@ -215,7 +215,7 @@ export function SettingsSheet({ open, settings, onChange, onClose, placesSummary
           {L.reset}
         </Button>
       </div>
-      <VehicleSheet nested open={vehicleOpen} settings={settings} onChange={onChange} onClose={() => setVehicleOpen(false)} onSwapCar={onSwapCar} />
+      <VehicleSheet nested open={vehicleOpen} settings={settings} onChange={onChange} onClose={() => setVehicleOpen(false)} onCar={onCar} />
       {children}
     </AppSheet>
   )
@@ -223,7 +223,7 @@ export function SettingsSheet({ open, settings, onChange, onClose, placesSummary
 
 /** "Khôi phục mặc định" là cấu hình HIỂN THỊ — xe của người dùng không phải sở thích hiển thị, giữ lại. */
 function resetKeepingCar(s: Settings): Settings {
-  const { vehicleId, customKwh, customKwhPer100, usageOverride, climate, pricePerKwh, fuelPer100, fuelPrice, batteryHealth, driveStyle, carSlot, otherCar } = s
+  const { vehicleId, customKwh, customKwhPer100, usageOverride, climate, pricePerKwh, fuelPer100, fuelPrice, batteryHealth, driveStyle, carId, garage } = s
   return {
     ...DEFAULT_SETTINGS,
     vehicleId,
@@ -236,8 +236,8 @@ function resetKeepingCar(s: Settings): Settings {
     fuelPrice,
     batteryHealth,
     driveStyle,
-    carSlot,
-    otherCar,
+    carId,
+    garage,
   }
 }
 

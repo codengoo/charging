@@ -18,6 +18,8 @@ interface Props {
   className?: string
   /** false = không tự focus ô đầu tiên khi mở (tránh bật bàn phím điện thoại). */
   autoFocus?: boolean
+  /** false = drawer điện thoại không dùng hai mốc snap (bảng nhiều ô nhập — xem ResponsiveDialog). */
+  snap?: boolean
   children?: ReactNode
 }
 
@@ -25,9 +27,9 @@ interface Props {
  * Bảng chuẩn của app: hộp thoại giữa màn trên desktop, ngăn kéo từ dưới trên điện thoại, MỘT kiểu
  * tiêu đề + mô tả. `pr-6` chừa chỗ nút đóng góc phải.
  */
-export function AppSheet({ open, onClose, nested, title, description, className = 'sm:max-w-md', autoFocus = true, children }: Props) {
+export function AppSheet({ open, onClose, nested, title, description, className = 'sm:max-w-md', autoFocus = true, snap, children }: Props) {
   return (
-    <ResponsiveDialog nested={nested} open={open} onOpenChange={(o) => !o && onClose()}>
+    <ResponsiveDialog nested={nested} snap={snap} open={open} onOpenChange={(o) => !o && onClose()}>
       <ResponsiveDialogContent className={className} onOpenAutoFocus={autoFocus ? undefined : (e) => e.preventDefault()}>
         <ResponsiveDialogHeader className="gap-1 pr-6 text-left">
           <ResponsiveDialogTitle className="text-lg">{title}</ResponsiveDialogTitle>

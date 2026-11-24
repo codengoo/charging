@@ -11,6 +11,52 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.19.0',
+    date: '2026-11-24',
+    title: 'Thời tiết tại trạm',
+    changes: ["Mở trạm để xem thời tiết hiện tại và 6 giờ tới, kèm nhắc mang ô khi sắp mưa."],
+    titleEn: 'Weather at stations',
+    changesEn: ["Open a station to see the current weather and the next 6 hours, with an umbrella reminder when rain is coming."],
+  },
+  {
+    version: '0.18.3',
+    date: '2026-11-24',
+    title: 'Sửa ô nhập trên iPhone',
+    changes: ["Bấm vào ô nhập không còn đẩy tay cầm, tiêu đề của bảng ra khỏi màn hình."],
+    titleEn: 'iPhone field fix',
+    changesEn: ["Tapping a field no longer pushes the sheet handle and title off screen."],
+  },
+  {
+    version: '0.18.2',
+    date: '2026-11-24',
+    title: 'Sửa bảng trên iPhone',
+    changes: [
+      "Bảng Xe của bạn luôn dính đáy và đủ bề rộng sau khi chọn trong danh sách.",
+      "Chạm ra ngoài ô nhập để đóng bàn phím.",
+    ],
+    titleEn: 'iPhone sheet fixes',
+    changesEn: [
+      "The Your car sheet stays pinned to the bottom at full width after picking from a list.",
+      "Tap outside a field to close the keyboard.",
+    ],
+  },
+  {
+    version: '0.18.1',
+    date: '2026-11-24',
+    title: 'Nhiều xe',
+    changes: [
+      "Lưu được tối đa 6 xe, chọn xe đang dùng trong danh sách; thêm, xoá xe ngay trong Xe của bạn.",
+      "Sửa lỗi đổi xe trên iPhone làm bảng Xe của bạn trôi khuất dưới màn hình.",
+      "Sửa lỗi bàn phím iPhone che ô đang nhập trong Xe của bạn.",
+    ],
+    titleEn: 'Multiple cars',
+    changesEn: [
+      "Save up to 6 cars and pick the one in use from a list; add or remove cars right in Your car.",
+      "Fixed switching cars on iPhone pushing the Your car sheet off the bottom of the screen.",
+      "Fixed the iPhone keyboard covering the field you are typing in under Your car.",
+    ],
+  },
+  {
     version: '0.18.0',
     date: '2026-11-24',
     title: 'Giờ tới nơi, hai xe & cổng trống trạm đã lưu',

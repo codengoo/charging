@@ -36,7 +36,10 @@ function DrawerNestedRoot({
   const { isInsideDrawer } = React.useContext(DrawerContext)
   if (isInsideDrawer) {
     return (
-      <DrawerPrimitive.NestedRoot data-slot="drawer-nested-root" {...props}>
+      // repositionInputs tắt như Drawer thường: để iOS tự lo bàn phím. Bật (mặc định của vaul) thì vaul
+      // chỉnh height / bottom của drawer theo bàn phím và trên iOS không trả lại sau khi phím đóng —
+      // drawer lơ lửng, không dính đáy.
+      <DrawerPrimitive.NestedRoot data-slot="drawer-nested-root" repositionInputs={repositionInputs} {...props}>
         {children}
       </DrawerPrimitive.NestedRoot>
     )

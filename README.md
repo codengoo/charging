@@ -86,8 +86,18 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   của mẫu, chỉ thay kWh/100 km. Đổi mẫu thì xoá.
 - **Pin còn lại / kiểu lái** (`vehicleOf(..., { health, style })`): `Settings.batteryHealth` 60–100% nhân dung lượng;
   `driveStyle` eco ×0,92 / normal / fast ×1,12 nhân tiêu thụ ước tính (không nhân khi đã có `usageOverride`).
-- **Hai xe** (`Settings.carSlot`, `otherCar`, `swapCar`): đổi Xe 1 ↔ Xe 2 tráo mẫu xe, tuỳ chỉnh, tiêu thụ thực tế,
-  pin còn lại và % pin (`useBattery().replace`). Điều hoà, dự phòng, giá, kiểu lái dùng chung.
+- **Nhiều xe** (`Settings.carId`, `garage`; `switchCar` / `addCar` / `removeCar` trong `src/data/settings.ts`): tối đa
+  6 xe, số hiệu "Xe N" ổn định. Các trường xe ở gốc Settings là của xe đang dùng; đổi xe tráo mẫu xe, tuỳ chỉnh, tiêu
+  thụ thực tế, pin còn lại và % pin (`useBattery().replace`) với bản cất trong `garage`. Điều hoà, dự phòng, giá, kiểu
+  lái dùng chung. Bản 0.18.0 lưu `carSlot` + `otherCar` → tự chuyển sang id 1 / 2 khi đọc.
+- **Drawer điện thoại** (`src/components/ui/responsive-dialog.tsx`): khi đang mở chỉ BẬT chế độ snap (nội dung dài),
+  không tắt — nội dung ngắn lại mà bỏ `snapPoints` thì vaul trên Safari iOS giữ độ dịch của mốc 60%, drawer trôi khuất.
+  Bảng nhiều ô nhập (Xe của bạn) dùng `AppSheet snap={false}`: không bao giờ snap, nội dung luôn cuộn — ở mốc 60% khung
+  nội dung khoá cuộn nên bàn phím iOS che ô đang nhập, và đổi mốc khi focus không đáng tin. Focus một ô nhập trong drawer:
+  thêm khoảng trống cuối nội dung rồi `scrollIntoView` đưa ô lên cách đầu khung 80 px.
+  Chạm (không kéo, < 10 px) ra ngoài ô nhập → focus chuyển sang khung nội dung (`tabIndex=-1`, không `blur()` ra body —
+  Radix Dialog sẽ trả focus về ô) để iOS đóng bàn phím. `ResponsiveSelect` mở bằng Drawer riêng, không `NestedRoot`
+  (NestedRoot co + đẩy drawer cha và trên iOS có lúc không trả lại); `DrawerNestedRoot` tắt `repositionInputs` như Drawer.
 - **Giờ theo đồng hồ** (`src/data/eta.ts`): kế hoạch sạc có ô "Đi lúc" (mặc định bây giờ, làm tròn lên 5 phút),
   giờ tới / rời từng điểm dừng và giờ tới nơi — cùng tốc độ trung bình tuyến và `totalSeconds` của kế hoạch.
 - **Hành trình gần đây** (`src/data/recentTrips.ts`, localStorage `tramsac.trips`): 5 link Dọc đường đã tính xong,
@@ -114,6 +124,10 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   đồ chỉ vẽ ghim các điểm dừng.
 - **Lối tắt PWA** (`shortcuts` trong `public/manifest.webmanifest`): nhấn giữ icon app → Gần tôi (`/?open=nearby`,
   tự xin vị trí), Dọc đường (`/trip`), Quét QR (`/?open=scan`). `?open=` đọc và xoá ở `src/app/useUrlSync.ts`.
+- **Thời tiết tại trạm** (`worker/weather.ts`, `src/data/weather.ts`, `src/ui/WeatherBox.tsx`): `/api/weather?at=lat,lng` → Open-Meteo
+  (miễn phí, không key, CC BY 4.0 — ghi công trong Credits; dùng thương mại cần gói trả phí). Toạ độ làm tròn 0,05° (~5 km),
+  cache edge 15 phút, client nhớ 10 phút. Bảng trạm hiện nhiệt độ, trạng thái (mã WMO), gió, 6 giờ tới kèm % mưa; nhắc mang ô
+  khi 3 giờ tới có giờ mưa ≥ 50%. Chỉ tải khi mở trạm, không cache offline.
 - **Ghi chú cá nhân** (`src/data/notes.ts`, `src/ui/NoteBox.tsx`): localStorage `tramsac.notes`, ≤ 1.000 ký tự;
   sao lưu mang trường `notes` (gộp giữ bản sửa sau).
 - **Đánh giá & bình luận công khai** (`worker/reviews.ts`, `src/ui/ReviewsSection.tsx`): xem mục bên dưới.

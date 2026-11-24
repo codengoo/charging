@@ -4,6 +4,7 @@
 // (/api/station/* là proxy chi tiết VinFast, ở worker/locator.ts, không đi qua đây.)
 
 import { serveLive } from './evcs'
+import { serveWeather } from './weather'
 import { fail, json, jsonText, NO_STORE } from './http'
 
 export interface ApiEnv {
@@ -42,6 +43,8 @@ export async function serveApi(req: Request, url: URL, env: ApiEnv, ctx: Executi
         return await revgeocode(url, env)
       case '/api/maps-link':
         return await mapsLink(url)
+      case '/api/weather':
+        return await serveWeather(url, ctx)
       default:
         return fail(404, 'Not found')
     }

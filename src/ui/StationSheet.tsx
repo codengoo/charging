@@ -20,6 +20,8 @@ import type { DriveState } from '../data/drive'
 import type { LiveState } from '../data/live'
 import { HistoryBox, PortsBox } from './LiveSection'
 import { BatteryBox } from './BatteryControl'
+import { WeatherBox } from './WeatherBox'
+import { useWeather } from '../data/weather'
 import { NoteBox } from './NoteBox'
 import { ReviewsSection } from './ReviewsSection'
 import type { Note } from '../data/notes'
@@ -114,6 +116,8 @@ const STATUS_BG = {
 
 export function StationSheet({ open, station, book, power, powerLoading, detail, detailLoading, drive, live, vehicle, climate, pricePerKwh, battery, batteryStale, onBattery, onPickCar, note, onNote, reviews, theme, onOpenGroups, onShare, onClose, children }: Props) {
   const gmapsDir = `https://www.google.com/maps/dir/?api=1&destination=${station.lat},${station.lng}`
+  // Thời tiết tại trạm — chỉ tải khi bảng mở.
+  const weather = useWeather(station, open)
   const groups = groupsOf(book, station.entityId)
     .map((id) => group(book, id))
     .filter((g) => g !== undefined)
@@ -190,6 +194,8 @@ export function StationSheet({ open, station, book, power, powerLoading, detail,
         <NoteBox key={`note-${station.entityId}`} note={note} onSave={onNote} />
 
         <PortsBox power={ports} powerLoading={powerLoading || (!ports && detailLoading)} standards={detail?.standards} live={live} />
+
+        <WeatherBox state={weather} />
 
         <BatteryBox
           vehicle={vehicle}
