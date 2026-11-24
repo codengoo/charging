@@ -7,6 +7,7 @@ Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app
 - Số phiên bản chuyển sang góc dưới phải, ghi công bản đồ sang góc trái và tự thu gọn.
 - Thông tin & ghi công chuyển vào Lịch sử cập nhật.
 - Lịch sử cập nhật hiện 3 bản mới nhất, bấm để xem các bản cũ hơn.
+- Ô giá sạc hiện dấu phân tách hàng nghìn (3.858).
 
 ## [0.16.0] — 2026-11-24 — Tiền sạc, tầm pin & lọc thêm
 

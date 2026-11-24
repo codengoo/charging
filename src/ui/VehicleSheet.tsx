@@ -171,21 +171,7 @@ export function VehicleSheet({ open, settings, onChange, onClose, nested = false
         {settings.vehicleId && (
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-semibold">{L.price}</span>
-            <Input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={PRICE_MAX}
-              step="1"
-              placeholder={String(DEFAULT_PRICE)}
-              defaultValue={settings.pricePerKwh}
-              onChange={(e) => {
-                // Để trống = về giá mặc định; ngoài khoảng thì chưa lưu (đang gõ dở).
-                const v = Number(e.target.value)
-                if (!e.target.value) onChange({ pricePerKwh: DEFAULT_PRICE })
-                else if (Number.isFinite(v) && v >= 0 && v <= PRICE_MAX) onChange({ pricePerKwh: v })
-              }}
-            />
+            <MoneyInput value={settings.pricePerKwh} onCommit={(pricePerKwh) => onChange({ pricePerKwh })} />
             <span className="text-xs text-muted-foreground">{L.priceHint(DEFAULT_PRICE.toLocaleString(LOCALE))}</span>
           </label>
         )}
@@ -232,6 +218,47 @@ function ReservePicker({ value, onChange }: { value: number; onChange: (v: numbe
         </label>
       )}
     </>
+  )
+}
+
+const fmtMoney = (n: number) => n.toLocaleString(LOCALE, { maximumFractionDigits: 0 })
+
+/**
+ * Ô tiền có dấu phân tách hàng nghìn ("3.858"). type="number" không hiện được dấu phân tách nên
+ * dùng ô chữ + bàn phím số: mỗi lần gõ lấy lại các chữ số, định dạng lại và đặt con trỏ đúng sau
+ * chữ số vừa gõ. Để trống = giá mặc định (placeholder); quá PRICE_MAX thì kẹp lại.
+ */
+function MoneyInput({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+  const [text, setText] = useState(() => fmtMoney(value))
+  return (
+    <Input
+      type="text"
+      inputMode="numeric"
+      autoComplete="off"
+      placeholder={fmtMoney(DEFAULT_PRICE)}
+      value={text}
+      onChange={(e) => {
+        const el = e.target
+        const caret = el.selectionStart ?? el.value.length
+        const digitsBefore = el.value.slice(0, caret).replace(/\D/g, '').length
+        const digits = el.value.replace(/\D/g, '')
+        if (!digits) {
+          setText('')
+          onCommit(DEFAULT_PRICE)
+          return
+        }
+        const n = Math.min(Number(digits), PRICE_MAX)
+        const next = fmtMoney(n)
+        setText(next)
+        onCommit(n)
+        // Định dạng lại làm con trỏ nhảy về cuối — đặt lại ngay sau chữ số thứ `digitsBefore`.
+        requestAnimationFrame(() => {
+          let pos = 0
+          for (let seen = 0; pos < next.length && seen < digitsBefore; pos++) if (/\d/.test(next[pos])) seen++
+          el.setSelectionRange(pos, pos)
+        })
+      }}
+    />
   )
 }
 

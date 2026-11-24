@@ -18,12 +18,14 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Số phiên bản chuyển sang góc dưới phải, ghi công bản đồ sang góc trái và tự thu gọn.",
       "Thông tin & ghi công chuyển vào Lịch sử cập nhật.",
       "Lịch sử cập nhật hiện 3 bản mới nhất, bấm để xem các bản cũ hơn.",
+      "Ô giá sạc hiện dấu phân tách hàng nghìn (3.858).",
     ],
     titleEn: 'Tidier',
     changesEn: [
       "Version number moved to the bottom right; map credits moved to the left and collapse on their own.",
       "About & credits moved into the Changelog.",
       "The Changelog shows the 3 latest versions — tap to see older ones.",
+      "The charging price field shows thousands separators (3,858).",
     ],
   },
   {
