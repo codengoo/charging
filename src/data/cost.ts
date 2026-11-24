@@ -27,6 +27,31 @@ export function chargeCost(fromPct: number, toPct: number, v: Pick<Vehicle, 'kwh
   return billedKwh(fromPct, toPct, v) * pricePerKwh
 }
 
+/**
+ * So với xe xăng (Settings.fuelPer100 / fuelPrice). Mặc định: xe xăng cỡ B/C đi hỗn hợp ~7 L/100 km;
+ * giá xăng RON 95 tham khảo — người dùng sửa trong Xe của bạn.
+ */
+export const DEFAULT_FUEL_PER100 = 7
+export const FUEL_PER100_MIN = 2
+export const FUEL_PER100_MAX = 30
+export const DEFAULT_FUEL_PRICE = 21000
+export const FUEL_PRICE_MAX = 100000
+
+/**
+ * Chi phí năng lượng CẢ CHUYẾN (gồm phần pin có sẵn lúc xuất phát — không chỉ tiền sạc dọc đường)
+ * so với xe xăng cùng quãng. `kwh` = điện năng xe dùng (giữa khoảng ước tính, đã gồm độ dốc).
+ * Giá ≤ 0 → null (miễn phí / không so).
+ */
+export function tripCosts(
+  kwh: number,
+  km: number,
+  o: { pricePerKwh: number; fuelPer100: number; fuelPrice: number },
+): { ev: number | null; fuel: number | null } {
+  const ev = o.pricePerKwh > 0 ? (Math.max(0, kwh) / CHARGE_EFFICIENCY) * o.pricePerKwh : null
+  const fuel = o.fuelPrice > 0 && o.fuelPer100 > 0 ? ((km * o.fuelPer100) / 100) * o.fuelPrice : null
+  return { ev, fuel }
+}
+
 /** "~85.000 đ" / "~85,000 VND" — làm tròn tới 1.000 đ (dưới 1.000 thì tới 100 đ). */
 export function fmtVnd(vnd: number): string {
   const step = vnd < 1000 ? 100 : 1000

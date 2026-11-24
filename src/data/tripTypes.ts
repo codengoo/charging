@@ -14,6 +14,8 @@ export const TRIP_RADII: TripRadius[] = [2, 5, 10]
 export interface RoutePath {
   points: GeoPoint[]
   limited: boolean[]
+  /** Độ cao (m) từng điểm, dài bằng `points`; thiếu khi HERE không trả (`return=elevation`). */
+  elev?: number[]
   meters: number
   seconds: number
 }

@@ -47,10 +47,26 @@ export function speedFactor(avgKmh: number): number {
   return 1.25
 }
 
-export function arrivalPct(startPct: number, km: number, avgKmh: number, v: Vehicle, climate: boolean): ArrivalEstimate {
+/** kWh xe dùng cho `km` (giữa khoảng ước tính, chưa gồm độ dốc) — chi phí cả chuyến. */
+export function driveKwh(km: number, avgKmh: number, v: Vehicle, climate: boolean): number {
+  return ((km * v.kwhPer100) / 100) * speedFactor(avgKmh) * (climate ? CLIMATE : 1)
+}
+
+/**
+ * `extraKwh`: năng lượng thêm do độ dốc (elevation.ts `climbKwh`; âm = đổ dốc lấy lại được). Không
+ * nhân khoảng ±SPREAD — phần đó đã ước tính riêng. Tổng tiêu thụ không âm (không "sạc" thêm pin).
+ */
+export function arrivalPct(
+  startPct: number,
+  km: number,
+  avgKmh: number,
+  v: Vehicle,
+  climate: boolean,
+  extraKwh = 0,
+): ArrivalEstimate {
   const kwh = ((km * v.kwhPer100) / 100) * speedFactor(avgKmh) * (climate ? CLIMATE : 1)
-  const used = (kwh / v.kwh) * 100
-  return { low: startPct - used * (1 + SPREAD), high: startPct - used * (1 - SPREAD) }
+  const used = (k: number) => (Math.max(0, k + extraKwh) / v.kwh) * 100
+  return { low: startPct - used(kwh * (1 + SPREAD)), high: startPct - used(kwh * (1 - SPREAD)) }
 }
 
 /** Tốc độ trung bình giả định khi không có thời gian lái (đường hỗn hợp). */

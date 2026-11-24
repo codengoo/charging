@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Drawer as DrawerPrimitive } from 'vaul'
-import { ChevronDown, ChevronUp, ClipboardPaste, Loader2, Route, X, Zap } from 'lucide-react'
+import { ChevronDown, ChevronUp, ClipboardPaste, ExternalLink, Loader2, Route, X, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { Input } from '@/components/ui/input'
@@ -12,11 +12,15 @@ import type { Station, StationPower } from '../data/types'
 import { KW_BANDS, KW_BAND_LABEL, kwActive, tierOf, type KwBand } from '../data/stations'
 import { TIER_COLORS } from '../map/pins'
 import { pick } from '../i18n'
-import { arrivalPct, avgKmh, type ArrivalEstimate, type BatteryReading } from '../data/battery'
+import { arrivalPct, avgKmh, driveKwh, type ArrivalEstimate, type BatteryReading } from '../data/battery'
 import type { Vehicle } from '../data/vehicles'
 import { BatteryControl, DANGER_PCT, fmtRange, pctOf, pctTone } from './BatteryControl'
 import { PLAN_MIN_DC_KW, passByKm, type ChargePlan } from '../data/chargePlan'
-import { chargeCost, fmtVnd } from '../data/cost'
+import { chargeCost, fmtVnd, tripCosts } from '../data/cost'
+import { planMapsLink } from '../data/planLink'
+import type { RoutePath } from '../data/tripTypes'
+import type { TripPoint } from '../data/trip'
+import { LOCALE } from '../i18n'
 import type { Avoid } from '../lib/mapsLink'
 import { useIsMobile } from '@/hooks/use-media-query'
 import type { Place } from '../data/places'
@@ -75,6 +79,10 @@ const L = pick({
     avoidSum: (s: string) => `tránh ${s.toLowerCase()}`,
     planOn: 'kế hoạch sạc',
     planCost: (c: string) => `Tiền sạc dọc đường ${c}`,
+    tripCost: (ev: string | null, fuel: string) => `Cả chuyến: điện ${ev ?? "miễn phí"} · xe xăng ${fuel}`,
+    tripCostNote: "Điện tính cả phần pin có sẵn lúc xuất phát.",
+    elev: (up: string, down: string) => `Đã tính độ dốc: leo ~${up} m, đổ dốc ~${down} m.`,
+    openMaps: "Mở trong Google Maps",
   },
   en: {
     title: 'Along route',
@@ -127,6 +135,10 @@ const L = pick({
     avoidSum: (s: string) => `avoid ${s.toLowerCase()}`,
     planOn: 'charging plan',
     planCost: (c: string) => `Charging cost on the way ${c}`,
+    tripCost: (ev: string | null, fuel: string) => `Whole trip: electricity ${ev ?? "free"} · petrol car ${fuel}`,
+    tripCostNote: "Electricity includes the battery you start with.",
+    elev: (up: string, down: string) => `Includes elevation: ~${up} m up, ~${down} m down.`,
+    openMaps: "Open in Google Maps",
   },
 })
 
@@ -160,6 +172,13 @@ interface Props {
   reservePct: number
   /** Giá sạc đ/kWh — tiền sạc từng điểm dừng + tổng; 0 = miễn phí, ẩn. */
   pricePerKwh: number
+  /** So với xe xăng (Settings). */
+  fuelPer100: number
+  fuelPrice: number
+  /** kWh thêm do độ dốc giữa hai km trên tuyến; thiếu = HERE không trả độ cao. */
+  climb?: (fromKm: number, toKm: number) => number
+  /** Tổng mét leo / xuống cả tuyến. */
+  elevation: { up: number; down: number } | null
   battery: BatteryReading | null
   batteryStale: boolean
   onBattery: (pct: number) => void
@@ -174,7 +193,7 @@ interface Props {
  * tuyến, và bảng chi tiết trạm mở đè lên được. Điện thoại: dải dưới đáy, bấm tay cầm để thu/mở.
  * Màn rộng: thẻ nổi góc trái.
  */
-export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, stationOpen, onOpen, onRadius, routeTotals, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, places, onRouteTo, onManagePlaces, onClose, vehicle, climate, reservePct, pricePerKwh, battery, batteryStale, onBattery, planOn, plan, onTogglePlan }: Props) {
+export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, stationOpen, onOpen, onRadius, routeTotals, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, places, onRouteTo, onManagePlaces, onClose, vehicle, climate, reservePct, pricePerKwh, fuelPer100, fuelPrice, climb, elevation, battery, batteryStale, onBattery, planOn, plan, onTogglePlan }: Props) {
   // Đóng xong App xoá hành trình ngay; giữ bản lúc còn mở để bảng không chớp sang trạng thái trống
   // trong lúc trượt xuống.
   const last = useRef({ trip: tripNow, hits: hitsNow })
@@ -222,7 +241,7 @@ export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, statio
   const estimates: ArrivalEstimate[] | null =
     vehicle && route && trip.status === 'ready'
       ? hits.items.map((h) =>
-          arrivalPct(startPct, passByKm(h), avgKmh(route.meters, route.seconds), vehicle, climate),
+          arrivalPct(startPct, passByKm(h), avgKmh(route.meters, route.seconds), vehicle, climate, climb?.(0, h.atKm) ?? 0),
         )
       : null
   let lastOk = -1
@@ -398,7 +417,20 @@ export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, statio
             )}
           </div>
 
-          {planOn && plan && <PlanView plan={plan} reservePct={reservePct} vehicle={vehicle} pricePerKwh={pricePerKwh} onPick={onPick} />}
+          {planOn && plan && (
+            <PlanView
+              plan={plan}
+              reservePct={reservePct}
+              vehicle={vehicle}
+              climate={climate}
+              prices={{ pricePerKwh, fuelPer100, fuelPrice }}
+              stops={trip.stops}
+              route={trip.route}
+              climb={climb}
+              elevation={elevation}
+              onPick={onPick}
+            />
+          )}
 
           {!(planOn && plan) && hits.items.length > 0 && (
             <ul className="-mx-4 px-4" aria-label={L.listAria}>
@@ -566,20 +598,46 @@ function PlanView({
   plan,
   reservePct,
   vehicle,
-  pricePerKwh,
+  climate,
+  prices,
+  stops,
+  route,
+  climb,
+  elevation,
   onPick,
 }: {
   plan: ChargePlan
   reservePct: number
   vehicle: Vehicle | null
-  pricePerKwh: number
+  climate: boolean
+  prices: { pricePerKwh: number; fuelPer100: number; fuelPrice: number }
+  stops: TripPoint[]
+  route: RoutePath | null
+  climb?: (fromKm: number, toKm: number) => number
+  elevation: { up: number; down: number } | null
   onPick: (st: Station) => void
 }) {
+  const { pricePerKwh } = prices
   // Tiền sạc mỗi điểm dừng: từ % khi tới (giữa khoảng ước tính) lên mức sạc tới.
   const costs = plan.stops.map((s) =>
     vehicle && s.chargeMin !== null ? chargeCost((s.arrive.low + s.arrive.high) / 2, s.toPct, vehicle, pricePerKwh) : null,
   )
   const total = costs.reduce<number | null>((sum, c) => (c === null ? sum : (sum ?? 0) + c), null)
+  // Cả chuyến so với xe xăng: điện năng xe dùng (giữa khoảng ước tính + độ dốc) cho quãng tuyến.
+  const km = route ? route.meters / 1000 : 0
+  const whole =
+    plan.ok && vehicle && route
+      ? tripCosts(driveKwh(km, avgKmh(route.meters, route.seconds), vehicle, climate) + (climb?.(0, km) ?? 0), km, prices)
+      : null
+  const mapsUrl =
+    plan.ok && route && plan.stops.length > 0
+      ? planMapsLink(
+          stops,
+          route.points,
+          plan.stops.map((s) => ({ lat: s.item.station.lat, lng: s.item.station.lng, atKm: s.item.atKm })),
+        )
+      : null
+  const meters = (m: number) => (Math.round(m / 10) * 10).toLocaleString(LOCALE)
   const head = !plan.ok
     ? L.planFail(Math.round(plan.stuckAtKm))
     : plan.stops.length === 0
@@ -590,8 +648,25 @@ function PlanView({
       <p className={`rounded-xl px-3 py-2 text-sm ${plan.ok ? 'bg-brand/10 text-foreground' : 'bg-destructive/10 text-destructive'}`}>
         {head}
         {plan.ok && total !== null && <span className="block font-semibold">{L.planCost(fmtVnd(total))}</span>}
-        <span className="mt-0.5 block text-[11px] text-muted-foreground">{L.planNote(reservePct)}</span>
+        {whole?.fuel != null && (
+          <span className="mt-0.5 block">
+            {L.tripCost(whole.ev === null ? null : fmtVnd(whole.ev), fmtVnd(whole.fuel))}
+            <span className="block text-[11px] text-muted-foreground">{L.tripCostNote}</span>
+          </span>
+        )}
+        <span className="mt-0.5 block text-[11px] text-muted-foreground">
+          {elevation && `${L.elev(meters(elevation.up), meters(elevation.down))} `}
+          {L.planNote(reservePct)}
+        </span>
       </p>
+      {mapsUrl && (
+        <Button asChild variant="secondary" size="sm" className="self-start rounded-full">
+          <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+            <ExternalLink />
+            {L.openMaps}
+          </a>
+        </Button>
+      )}
       {plan.stops.length > 0 && (
         <ol className="-mx-4 px-4" aria-label={L.planAria}>
           {plan.stops.map((s, i) => (

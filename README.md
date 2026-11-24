@@ -17,7 +17,12 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   ẩn (control vẫn chạy để vẽ chấm vị trí), thay bằng **nút định vị riêng** góc dưới phải
   (`MapView.tsx` `locate()`): bấm khi đang bám theo thì bay lại về vị trí chứ không tắt theo dõi như
   nút gốc; trạng thái chờ / bám theo / lỗi quyền suy từ `_watchState` (trường nội bộ maplibre 4.x).
-- Tìm trạm theo tên/địa chỉ (không phân biệt dấu).
+- Tìm trạm theo tên/địa chỉ (không phân biệt dấu). Gõ ≥ 3 ký tự thì thêm mục **Địa điểm** (HERE qua
+  `/api/geocode`, chờ ngừng gõ 400 ms, ưu tiên gần GPS / tâm bản đồ): chọn → ghim tạm, bay tới, mở "Trạm gần
+  <địa điểm>". Ô còn trống thì hiện **Vừa xem** — 10 trạm mở gần nhất (`src/data/recent.ts`, localStorage
+  `tramsac.recent`, không đi kèm sao lưu). Nút **micro** (`src/lib/speech.ts`, Web Speech API `SpeechRecognition`,
+  vi-VN / en-US theo trang): chữ hiện dần vào ô trong lúc nói; trình duyệt không có API (Firefox) thì ẩn nút.
+  Nhận dạng do trình duyệt làm (Chrome gửi âm thanh lên Google), app không gửi gì thêm.
 - Lọc (kết hợp phép VÀ, `passesFilters` trong `src/data/stations.ts`): đã lưu, **sạc nhanh DC** /
   **≥ 120 kW** (theo cổng DC mạnh nhất; trạm chưa có dữ liệu power bị ẩn khi lọc), **đang hoạt động**.
   **Lọc thêm** trong Cài đặt (`Settings.publicOnly / freeParking / minPorts`): chỉ trạm công cộng, miễn phí
@@ -57,15 +62,23 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   chim bay × 1,3 khi lỗi) và thời gian sạc lên 80% ở cổng mạnh nhất còn trống; Dọc đường hiện % tại từng trạm
   (`atKm + 2 × offsetKm`) và vạch "Trạm cuối còn kịp" (ước tính bi quan ≥ mức dự phòng, mặc định 10%). Tính hoàn toàn ở client, không
   gọi thêm HERE/EVCS. Mô hình: tiêu thụ thực tế ước tính của xe × hệ số tốc độ trung bình (< 40 km/h 0,95 … ≥ 90
-  km/h 1,25), hiện khoảng ±8%, chưa tính độ dốc. Thông số xe tra 2026-11-17, `kwhPer100` là ước tính (≈ dung
+  km/h 1,25), hiện khoảng ±8%. Thông số xe tra 2026-11-17, `kwhPer100` là ước tính (≈ dung
   lượng ÷ NEDC × 0,8), không phải số hãng công bố.
+- **Độ dốc** (`src/data/elevation.ts`): `/api/route` xin `return=elevation` → polyline 3D, `here.ts` giữ độ cao vào
+  `RoutePath.elev`. Leo / xuống tích luỹ theo km (lọc trễ 5 m bỏ nhiễu địa hình); kWh thêm = m·g·(leo ÷ 0,85 − xuống
+  × 0,6), m = `Vehicle.massKg` (gần đúng) + 150 kg tải. Áp cho % pin từng trạm Dọc đường và kế hoạch sạc
+  (`planCharging(..., climb)`), không áp cho bảng trạm (`/api/drive` chỉ có summary — vẫn ghi "chưa tính độ dốc").
 - **Tiền sạc** (`src/data/cost.ts`): giá đ/kWh trong Xe của bạn (`Settings.pricePerKwh`, mặc định 3.858 đ —
   giá trạm VinFast tham khảo; 0 = miễn phí, ẩn tiền). kWh tính tiền = kWh vào pin ÷ 0,92 (hao hụt sạc). Hiện ở
-  bảng trạm (sạc lên 80%) và kế hoạch sạc (từng điểm dừng + tổng).
+  bảng trạm (sạc lên 80%) và kế hoạch sạc (từng điểm dừng + tổng). Kế hoạch còn **so với xe xăng**: điện cả
+  chuyến (gồm pin lúc xuất phát, có độ dốc) với xăng cùng quãng (`Settings.fuelPer100` mặc định 7 L/100 km,
+  `fuelPrice` 21.000 đ/L; giá 0 = không so), và nút **Mở trong Google Maps** (`src/data/planLink.ts`: `dir/?api=1`,
+  điểm ghé = chặng giữa của người dùng + trạm dừng theo km, tối đa 9).
 - **Tầm pin** (`src/data/range.ts`, `src/ui/RangeCard.tsx`, lớp `battery-range` trong `src/map/layers.ts`): chip
   "Tầm pin" vẽ vòng liền "đi tới được" và vòng đứt "đi rồi về" quanh vị trí GPS (chưa có thì tâm bản đồ lúc bật),
   kèm thẻ có thanh kéo % pin. Ước tính bi quan (tiêu thụ +8%, chừa `reservePct`), tốc độ hỗn hợp; bán kính chim
-  bay = quãng lái ÷ 1,3, nhãn ghi quãng lái.
+  bay = quãng lái ÷ 1,3, nhãn ghi quãng lái. Ghim / cụm ngoài vòng "đi tới được" vẽ mờ (biểu thức `within`, không
+  dựng lại dữ liệu); thẻ đếm trạm DC đang hoạt động theo bộ lọc trong tầm.
 - **Ghi đè tiêu thụ:** VehicleSheet có ô "Tiêu thụ thực tế" (`Settings.usageOverride`) — giữ pin / công suất sạc
   của mẫu, chỉ thay kWh/100 km. Đổi mẫu thì xoá.
 - **Kế hoạch dừng sạc** (`src/data/chargePlan.ts`): chip "Lên kế hoạch sạc" trong Dọc đường. Thứ tự ưu tiên:

@@ -1,4 +1,4 @@
-import { X } from 'lucide-react'
+import { X, Zap } from 'lucide-react'
 import type { BatteryReading } from '../data/battery'
 import type { BatteryRange } from '../data/range'
 import type { Vehicle } from '../data/vehicles'
@@ -15,6 +15,7 @@ const L = pick({
     km: (km: number) => `~${km} km đường`,
     ringLabel: (km: number) => `~${km} km`,
     roundLabel: (km: number) => `đi về ~${km} km`,
+    fast: (n: number) => (n ? `${n.toLocaleString('vi-VN')} trạm sạc nhanh DC trong tầm` : 'Không có trạm sạc nhanh DC nào trong tầm'),
     note: (car: string, r: number, gps: boolean) =>
       `${car}, ước tính bi quan, chừa ${r}% dự phòng. Vòng tròn là đường chim bay quanh ${gps ? 'vị trí của bạn' : 'tâm bản đồ'} — đường thật vòng hơn.`,
   },
@@ -26,6 +27,7 @@ const L = pick({
     km: (km: number) => `~${km} km by road`,
     ringLabel: (km: number) => `~${km} km`,
     roundLabel: (km: number) => `round trip ~${km} km`,
+    fast: (n: number) => (n ? `${n.toLocaleString('en-US')} DC fast ${n === 1 ? 'charger' : 'chargers'} in range` : 'No DC fast chargers in range'),
     note: (car: string, r: number, gps: boolean) =>
       `${car}, pessimistic estimate keeping a ${r}% reserve. Circles are straight-line around ${gps ? 'your location' : 'the map centre'} — real roads wind more.`,
   },
@@ -51,6 +53,7 @@ export function RangeCard({
   vehicle,
   reservePct,
   fromGps,
+  fastInRange,
   reading,
   stale,
   onBattery,
@@ -60,6 +63,8 @@ export function RangeCard({
   vehicle: Vehicle
   reservePct: number
   fromGps: boolean
+  /** Trạm DC (theo bộ lọc) trong vòng "đi tới được"; null = chưa tính được. */
+  fastInRange: number | null
   reading: BatteryReading | null
   stale: boolean
   onBattery: (pct: number) => void
@@ -94,6 +99,12 @@ export function RangeCard({
           <span className="ml-auto font-semibold tabular-nums">{L.km(roundKm(range.roadKm / 2))}</span>
         </span>
       </div>
+      {fastInRange !== null && (
+        <p className={`flex items-center gap-1 pl-6 text-sm ${fastInRange ? 'text-foreground' : 'text-warn'}`}>
+          <Zap className="-ml-0.5 size-3.5 shrink-0 text-brand" aria-hidden />
+          {L.fast(fastInRange)}
+        </p>
+      )}
       <p className="pl-6 text-[11px] text-muted-foreground">{L.note(vehicle.name, reservePct, fromGps)}</p>
     </section>
   )

@@ -9,7 +9,7 @@ import type { Vehicle } from '@/data/vehicles'
  * không điều hoà → mỗi km tốn 0,2%; ước tính bi quan ×1,08 = 0,216%/km.
  * Từ 80% đi được tới ~324 km mà vẫn còn ≥ 10% (bi quan).
  */
-const V: Vehicle = { id: 'test', name: 'Test', kwh: 100, kwhPer100: 20, dcKw: 150, acKw: 11 }
+const V: Vehicle = { id: 'test', name: 'Test', kwh: 100, kwhPer100: 20, dcKw: 150, acKw: 11, massKg: 2000 }
 const RESERVE = 10
 const route = (km: number) => ({ meters: km * 1000, seconds: km * 60 }) // 60 km/h
 
@@ -29,6 +29,18 @@ const every100 = (maxKm: number) => {
 }
 
 describe('planCharging', () => {
+  it('độ dốc: leo làm tới nơi ít pin hơn, đủ dốc thì phải dừng sạc', () => {
+    const { items, power } = every100(300)
+    const flat = planCharging(items, power, route(300), 80, V, false, RESERVE)
+    // Đường bằng: tới nơi còn 80 − 0,216 × 300 ≈ 15% (bi quan). Leo thêm 0,05 kWh/km = 15 kWh
+    // (15% pin với xe 100 kWh) cả tuyến → dưới mức dự phòng 10%, phải dừng sạc.
+    const uphill = (a: number, b: number) => (b - a) * 0.05
+    const hilly = planCharging(items, power, route(300), 80, V, false, RESERVE, uphill)
+    expect(flat.ok && hilly.ok).toBe(true)
+    if (!flat.ok || !hilly.ok) return
+    expect(flat.stops).toEqual([])
+    expect(hilly.stops.length).toBeGreaterThan(0)
+  })
   it('tới đích không cần dừng', () => {
     const { items, power } = every100(300)
     const p = planCharging(items, power, route(300), 80, V, false, RESERVE)

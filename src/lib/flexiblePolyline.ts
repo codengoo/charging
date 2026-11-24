@@ -28,7 +28,7 @@ const TABLE = [
 ]
 
 /** Trả về rỗng khi chuỗi hỏng hoặc đúng phiên bản khác — nơi gọi tự lo liệu. */
-export function decodeFlexiblePolyline(encoded: string): GeoPoint[] {
+export function decodeFlexiblePolyline(encoded: string): PolylinePoint[] {
   let i = 0
   /** Đọc một số varint; null khi hết chuỗi hoặc gặp ký tự lạ. */
   const next = (): number | null => {
@@ -52,11 +52,16 @@ export function decodeFlexiblePolyline(encoded: string): GeoPoint[] {
   if (header === null) return []
   const precision = header & 15
   const thirdDim = (header >> 4) & 7
+  const thirdPrecision = (header >> 7) & 15
   const scale = 10 ** precision
+  const zScale = 10 ** thirdPrecision
+  // 2 = ALTITUDE, 3 = ELEVATION (mét): giữ lại thành `z`. Các loại khác (level, tuỳ ý) đọc rồi bỏ.
+  const keepZ = thirdDim === 2 || thirdDim === 3
 
-  const out: GeoPoint[] = []
+  const out: PolylinePoint[] = []
   let lat = 0
   let lng = 0
+  let z = 0
   for (;;) {
     const dLat = next()
     if (dLat === null) break
@@ -64,10 +69,16 @@ export function decodeFlexiblePolyline(encoded: string): GeoPoint[] {
     if (dLng === null) break
     lat += unzigzag(dLat)
     lng += unzigzag(dLng)
-    // Chiều thứ ba (độ cao…) phải đọc cho hết dù không dùng tới, không thì lệch nhịp và mọi
-    // điểm sau đều sai.
-    if (thirdDim !== 0 && next() === null) break
-    out.push({ lat: lat / scale, lng: lng / scale })
+    // Chiều thứ ba phải đọc cho hết dù không dùng tới, không thì lệch nhịp và mọi điểm sau đều sai.
+    if (thirdDim !== 0) {
+      const dz = next()
+      if (dz === null) break
+      z += unzigzag(dz)
+    }
+    out.push(keepZ ? { lat: lat / scale, lng: lng / scale, z: z / zScale } : { lat: lat / scale, lng: lng / scale })
   }
   return out
 }
+
+/** Điểm giải mã; `z` = độ cao (m) khi chuỗi mang chiều thứ ba là độ cao (`return=elevation`). */
+export type PolylinePoint = GeoPoint & { z?: number }

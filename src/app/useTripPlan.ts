@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { DEFAULT_PCT, type BatteryReading } from '../data/battery'
 import { planCharging } from '../data/chargePlan'
+import { LOAD_KG, climbKwh, elevationProfile } from '../data/elevation'
 import { routeBounds, type RouteHits } from '../data/routeCorridor'
 import type { StationPower } from '../data/types'
 import type { TripState } from '../data/useTrip'
@@ -28,12 +29,20 @@ export function useTripPlan({ trip, hits, power, vehicle, battery, climate, rese
     if (trip.status === 'closed') setPlanOn(false)
   }, [trip.status])
 
+  // Độ dốc: hồ sơ độ cao của tuyến (một lần mỗi tuyến) → kWh thêm giữa hai km, theo khối lượng xe.
+  const profile = useMemo(() => (trip.route ? elevationProfile(trip.route.points, trip.route.elev) : null), [trip.route])
+  const climb = useMemo(() => {
+    if (!profile || !vehicle) return undefined
+    const mass = vehicle.massKg + LOAD_KG
+    return (fromKm: number, toKm: number) => climbKwh(profile, fromKm, toKm, mass)
+  }, [profile, vehicle])
+
   const plan = useMemo(
     () =>
       planOn && vehicle && trip.route && trip.status === 'ready'
-        ? planCharging(hits.items, power, trip.route, battery?.pct ?? DEFAULT_PCT, vehicle, climate, reservePct)
+        ? planCharging(hits.items, power, trip.route, battery?.pct ?? DEFAULT_PCT, vehicle, climate, reservePct, climb)
         : null,
-    [planOn, vehicle, trip.route, trip.status, hits, power, battery, climate, reservePct],
+    [planOn, vehicle, trip.route, trip.status, hits, power, battery, climate, reservePct, climb],
   )
 
   // Chừa chỗ cho bảng hành trình: điện thoại là dải dưới (~55% màn), màn rộng là thẻ trái — khớp
@@ -53,5 +62,7 @@ export function useTripPlan({ trip, hits, power, vehicle, battery, climate, rese
     }
   }, [trip.route, trip.routes, trip.routeIdx, hits, plan, isMobile])
 
-  return { planOn, togglePlan: () => setPlanOn((v) => !v), plan, layer }
+  /** Tổng mét leo / xuống cả tuyến (null = HERE không trả độ cao). */
+  const elevation = profile ? { up: profile.totalUp, down: profile.totalDown } : null
+  return { planOn, togglePlan: () => setPlanOn((v) => !v), plan, layer, climb, elevation }
 }

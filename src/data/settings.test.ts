@@ -26,8 +26,12 @@ describe('parseSettings', () => {
       freeParking: true,
       minPorts: 4,
       pricePerKwh: 0,
+      fuelPer100: 8.5,
+      fuelPrice: 24000,
     })
     expect(s).toEqual({
+      fuelPer100: 8.5,
+      fuelPrice: 24000,
       publicOnly: true,
       freeParking: true,
       minPorts: 4,

@@ -57,7 +57,8 @@ interface Props {
   /** Số cổng + kW (tải sau base). null = chưa có — ghim tạm một màu, lọc công suất ẩn hết. */
   power: Map<string, StationPower> | null
   selected: Station | null
-  flyTo: { lng: number; lat: number; zoom?: number } | null
+  /** `liftPx`: đẩy điểm lên trên tâm chừng này px — chừa chỗ cho bảng mở từ dưới lên. */
+  flyTo: { lng: number; lat: number; zoom?: number; liftPx?: number } | null
   onSelect: (st: Station) => void
   onLocate?: (pos: { lat: number; lng: number }) => void
   /** Tâm bản đồ sau mỗi lần kéo/zoom — "Gần tôi" dùng khi chưa có GPS. */
@@ -356,7 +357,7 @@ export function MapView({ index, filters, book, power, selected, flyTo, onSelect
   useEffect(() => {
     const map = mapRef.current
     if (!map || !flyTo) return
-    map.flyTo({ center: [flyTo.lng, flyTo.lat], zoom: flyTo.zoom ?? 15 })
+    map.flyTo({ center: [flyTo.lng, flyTo.lat], zoom: flyTo.zoom ?? 15, offset: [0, -(flyTo.liftPx ?? 0)] })
   }, [flyTo])
 
   // Nút định vị. Không gọi thẳng geo.trigger() như nút gốc: ở ACTIVE_LOCK / WAITING_ACTIVE nút gốc

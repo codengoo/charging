@@ -2,6 +2,16 @@
 
 Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app).
 
+## [0.17.0] — 2026-11-24 — Tìm địa chỉ, độ dốc & so với xe xăng
+
+- Gõ địa chỉ vào ô tìm kiếm để xem trạm sạc quanh đó.
+- Tìm bằng giọng nói: bấm micro trong ô tìm kiếm rồi nói tên trạm hoặc địa chỉ.
+- Bấm vào ô tìm kiếm để mở lại các trạm vừa xem.
+- Kế hoạch sạc tính cả độ dốc: leo đèo tốn pin hơn, đổ đèo lấy lại một phần.
+- Mở kế hoạch sạc trong Google Maps để dẫn đường qua các trạm dừng.
+- So chi phí cả chuyến với xe xăng — đặt mức tiêu thụ và giá xăng trong Xe của bạn.
+- Tầm pin: trạm ngoài tầm vẽ mờ, kèm số trạm sạc nhanh trong tầm.
+
 ## [0.16.1] — 2026-11-24 — Gọn hơn
 
 - Số phiên bản chuyển sang góc dưới phải, ghi công bản đồ sang góc trái và tự thu gọn.

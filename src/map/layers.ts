@@ -265,9 +265,31 @@ export function rangeBounds(r: RangeLayer): [[number, number], [number, number]]
   return [[w, s], [e, n]]
 }
 
-/** Đặt dữ liệu vòng tầm pin (null = ẩn). */
+const CLUSTER_OPACITY = 0.85
+/** Ghim / cụm ngoài vòng "đi tới được" vẽ mờ tới mức này. */
+const OUT_OF_RANGE_OPACITY = 0.25
+
+/**
+ * Đặt dữ liệu vòng tầm pin (null = ẩn) và làm mờ ghim / cụm NGOÀI vòng "đi tới được" bằng biểu thức
+ * `within` — tính trên GPU theo từng điểm, không phải dựng lại 25k feature khi kéo % pin.
+ */
 export function setRange(map: maplibregl.Map, r: RangeLayer | null) {
   ;(map.getSource(SRC_RANGE) as maplibregl.GeoJSONSource | undefined)?.setData(rangeGeoJSON(r))
+  const ring = r?.rings.find((x) => x.kind === 'one-way' && x.km > 0)
+  const inside: maplibregl.ExpressionSpecification | null = r && ring
+    ? ['within', { type: 'Polygon', coordinates: [circleRing(r.center, ring.km)] }]
+    : null
+  // Trạm đang chọn (lớp riêng) luôn rõ.
+  const pointBase = POINT_PAINT!['icon-opacity'] as maplibregl.ExpressionSpecification
+  if (map.getLayer('point')) {
+    map.setPaintProperty('point', 'icon-opacity', inside ? ['case', inside, pointBase, OUT_OF_RANGE_OPACITY] : pointBase)
+  }
+  if (map.getLayer('clusters')) {
+    map.setPaintProperty('clusters', 'circle-opacity', inside ? ['case', inside, CLUSTER_OPACITY, OUT_OF_RANGE_OPACITY] : CLUSTER_OPACITY)
+  }
+  if (map.getLayer('cluster-count')) {
+    map.setPaintProperty('cluster-count', 'text-opacity', inside ? ['case', inside, 1, 0.5] : 1)
+  }
 }
 
 /** Thêm mọi nguồn + lớp của app vào style vừa nạp. Thứ tự thêm = thứ tự vẽ (sau đè trước). */
@@ -378,7 +400,7 @@ export function addAppLayers(map: maplibregl.Map, stations: GeoJSON.FeatureColle
     filter: ['has', 'point_count'],
     paint: {
       'circle-color': '#0b7a47',
-      'circle-opacity': 0.85,
+      'circle-opacity': CLUSTER_OPACITY,
       'circle-radius': ['step', ['get', 'point_count'], 16, 50, 22, 500, 30],
     },
   })

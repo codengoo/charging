@@ -7,7 +7,15 @@ import type { Settings } from '../data/settings'
 import { CUSTOM_ID, VEHICLES, vehicleOf } from '../data/vehicles'
 import { ChargeCurveChart } from './ChargeCurveChart'
 import { RESERVE_MAX, RESERVE_MIN, RESERVE_OPTIONS } from '../data/battery'
-import { DEFAULT_PRICE, PRICE_MAX } from '../data/cost'
+import {
+  DEFAULT_FUEL_PER100,
+  DEFAULT_FUEL_PRICE,
+  DEFAULT_PRICE,
+  FUEL_PER100_MAX,
+  FUEL_PER100_MIN,
+  FUEL_PRICE_MAX,
+  PRICE_MAX,
+} from '../data/cost'
 import { LOCALE, pick } from '@/i18n'
 import { AppSheet } from './AppSheet'
 
@@ -30,6 +38,10 @@ const L = pick({
     reserveHint: 'Kế hoạch sạc và vạch "Trạm cuối còn kịp" luôn chừa lại ít nhất mức này (theo ước tính bi quan).',
     price: 'Giá sạc (đ/kWh)',
     priceHint: (d: string) => `Để ước tính tiền sạc. Mặc định ${d} đ/kWh (giá trạm VinFast tham khảo). Nhập 0 nếu bạn được sạc miễn phí.`,
+    fuel: "So với xe xăng",
+    fuelUse: "Xe xăng (L/100 km)",
+    fuelPrice: "Giá xăng (đ/L)",
+    fuelHint: "Kế hoạch sạc dọc đường so chi phí cả chuyến với xe xăng cùng quãng. Giá xăng 0 = không so.",
   },
   en: {
     title: 'Your car',
@@ -49,6 +61,10 @@ const L = pick({
     reserveHint: 'The charging plan and the "last station you can reach" line always keep at least this much (pessimistic estimate).',
     price: 'Charging price (VND/kWh)',
     priceHint: (d: string) => `Used to estimate charging cost. Default ${d} VND/kWh (VinFast station list price, for reference). Enter 0 if you charge for free.`,
+    fuel: "Compared with a petrol car",
+    fuelUse: "Petrol car (L/100 km)",
+    fuelPrice: "Petrol price (VND/L)",
+    fuelHint: "The charging plan compares the whole trip cost with a petrol car over the same distance. Price 0 = no comparison.",
   },
 })
 
@@ -171,9 +187,30 @@ export function VehicleSheet({ open, settings, onChange, onClose, nested = false
         {settings.vehicleId && (
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-semibold">{L.price}</span>
-            <MoneyInput value={settings.pricePerKwh} onCommit={(pricePerKwh) => onChange({ pricePerKwh })} />
+            <MoneyInput value={settings.pricePerKwh} fallback={DEFAULT_PRICE} max={PRICE_MAX} onCommit={(pricePerKwh) => onChange({ pricePerKwh })} />
             <span className="text-xs text-muted-foreground">{L.priceHint(DEFAULT_PRICE.toLocaleString(LOCALE))}</span>
           </label>
+        )}
+
+        {settings.vehicleId && (
+          <section className="flex flex-col gap-1.5">
+            <h3 className="text-sm font-semibold">{L.fuel}</h3>
+            <div className="flex gap-2">
+              <NumberField
+                label={L.fuelUse}
+                value={settings.fuelPer100}
+                min={FUEL_PER100_MIN}
+                max={FUEL_PER100_MAX}
+                placeholder={fmtNum(DEFAULT_FUEL_PER100)}
+                onCommit={(fuelPer100) => onChange({ fuelPer100 })}
+              />
+              <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted-foreground">
+                {L.fuelPrice}
+                <MoneyInput value={settings.fuelPrice} fallback={DEFAULT_FUEL_PRICE} max={FUEL_PRICE_MAX} onCommit={(fuelPrice) => onChange({ fuelPrice })} />
+              </label>
+            </div>
+            <p className="text-xs text-muted-foreground">{L.fuelHint}</p>
+          </section>
         )}
       </div>
     </AppSheet>
@@ -226,16 +263,27 @@ const fmtMoney = (n: number) => n.toLocaleString(LOCALE, { maximumFractionDigits
 /**
  * Ô tiền có dấu phân tách hàng nghìn ("3.858"). type="number" không hiện được dấu phân tách nên
  * dùng ô chữ + bàn phím số: mỗi lần gõ lấy lại các chữ số, định dạng lại và đặt con trỏ đúng sau
- * chữ số vừa gõ. Để trống = giá mặc định (placeholder); quá PRICE_MAX thì kẹp lại.
+ * chữ số vừa gõ. Để trống = `fallback` (placeholder); quá `max` thì kẹp lại.
  */
-function MoneyInput({ value, onCommit }: { value: number; onCommit: (v: number) => void }) {
+function MoneyInput({
+  value,
+  fallback,
+  max,
+  onCommit,
+}: {
+  value: number
+  /** Để trống ô = giá trị này (hiện làm placeholder). */
+  fallback: number
+  max: number
+  onCommit: (v: number) => void
+}) {
   const [text, setText] = useState(() => fmtMoney(value))
   return (
     <Input
       type="text"
       inputMode="numeric"
       autoComplete="off"
-      placeholder={fmtMoney(DEFAULT_PRICE)}
+      placeholder={fmtMoney(fallback)}
       value={text}
       onChange={(e) => {
         const el = e.target
@@ -244,10 +292,10 @@ function MoneyInput({ value, onCommit }: { value: number; onCommit: (v: number) 
         const digits = el.value.replace(/\D/g, '')
         if (!digits) {
           setText('')
-          onCommit(DEFAULT_PRICE)
+          onCommit(fallback)
           return
         }
-        const n = Math.min(Number(digits), PRICE_MAX)
+        const n = Math.min(Number(digits), max)
         const next = fmtMoney(n)
         setText(next)
         onCommit(n)
@@ -269,12 +317,14 @@ function NumberField({
   min,
   max,
   onCommit,
+  placeholder,
 }: {
   label: string
   value: number
   min: number
   max: number
   onCommit: (v: number) => void
+  placeholder?: string
 }) {
   return (
     <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted-foreground">
@@ -286,6 +336,7 @@ function NumberField({
         max={max}
         step="0.1"
         defaultValue={value}
+        placeholder={placeholder}
         onChange={(e) => {
           const v = Number(e.target.value)
           if (e.target.value && Number.isFinite(v) && v >= min && v <= max) onCommit(v)

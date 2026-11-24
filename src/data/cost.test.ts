@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CHARGE_EFFICIENCY, billedKwh, chargeCost, fmtVnd } from '@/data/cost'
+import { CHARGE_EFFICIENCY, billedKwh, chargeCost, fmtVnd, tripCosts } from '@/data/cost'
 
 const car = { kwh: 60 }
 
@@ -20,6 +20,19 @@ describe('chargeCost', () => {
   })
   it('giá 0 (miễn phí) → null', () => {
     expect(chargeCost(20, 80, car, 0)).toBeNull()
+  })
+})
+
+describe('tripCosts', () => {
+  const o = { pricePerKwh: 4000, fuelPer100: 7, fuelPrice: 20000 }
+  it('điện: kWh ÷ hiệu suất × giá; xăng: km × L/100 × giá', () => {
+    const r = tripCosts(30, 200, o)
+    expect(r.ev).toBeCloseTo((30 / CHARGE_EFFICIENCY) * 4000, 3)
+    expect(r.fuel).toBeCloseTo(14 * 20000, 6)
+  })
+  it('giá 0 → null', () => {
+    expect(tripCosts(30, 200, { ...o, pricePerKwh: 0 }).ev).toBeNull()
+    expect(tripCosts(30, 200, { ...o, fuelPrice: 0 }).fuel).toBeNull()
   })
 })
 

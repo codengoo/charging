@@ -109,6 +109,8 @@ export function planCharging(
   climate: boolean,
   /** Pin dự phòng tối thiểu (%) — Settings.reservePct. */
   reservePct: number,
+  /** kWh thêm do độ dốc giữa hai km trên tuyến (elevation.ts); thiếu = đường bằng. */
+  climb: (fromKm: number, toKm: number) => number = () => 0,
 ): ChargePlan {
   const totalKm = route.meters / 1000
   const speed = avgKmh(route.meters, route.seconds)
@@ -116,9 +118,10 @@ export function planCharging(
     .map((item) => ({ item, kw: dcMaxKw(power?.get(item.station.entityId)), access: accessKm(item) }))
     .filter((c) => c.kw >= PLAN_MIN_DC_KW)
 
-  const arrive = (from: number, km: number) => arrivalPct(from, km, speed, v, climate)
-  /** % pin cần lúc rời đi để đi `km` mà còn ≥ reservePct theo ước tính bi quan. */
-  const need = (km: number) => reservePct + (100 - arrive(100, km).low)
+  /** Đi `km` (gồm quãng rẽ vào / ra) trên đoạn tuyến `a`→`b` (km), xuất phát với `from`%. */
+  const arrive = (from: number, km: number, a: number, b: number) => arrivalPct(from, km, speed, v, climate, climb(a, b))
+  /** % pin cần lúc rời đi để đi `km` trên đoạn `a`→`b` mà còn ≥ reservePct theo ước tính bi quan. */
+  const need = (km: number, a: number, b: number) => reservePct + (100 - arrive(100, km, a, b).low)
   const done = (stops: PlanStop[], arriveDest: ArrivalEstimate, chargeMin: number): ChargePlan => {
     const detourSeconds = stops.reduce((t, s) => (s.item.viaExit ? t + (s.detourKm / speed) * 3600 : t), 0)
     return { ok: true, stops, arriveDest, chargeMin, totalSeconds: route.seconds + detourSeconds + chargeMin * 60 }
@@ -138,7 +141,7 @@ export function planCharging(
   }
 
   // Không cần dừng.
-  const direct = arrive(startPct, totalKm)
+  const direct = arrive(startPct, totalKm, 0, totalKm)
   if (direct.low >= reservePct) return done([], direct, 0)
 
   const seen = new Set<number>()
@@ -157,8 +160,8 @@ export function planCharging(
       const c = cands[j]
       if (c.item.atKm < pos + MIN_HOP_KM) continue
       // Xa hơn nữa trên tuyến cũng không tới được — dừng quét.
-      if (arrive(leave, rejoin + c.item.atKm - pos).low < reservePct) break
-      const a = arrive(leave, rejoin + c.item.atKm - pos + c.access)
+      if (arrive(leave, rejoin + c.item.atKm - pos, pos, c.item.atKm).low < reservePct) break
+      const a = arrive(leave, rejoin + c.item.atKm - pos + c.access, pos, c.item.atKm)
       if (a.low < reservePct) continue
       const mid = (a.low + a.high) / 2
       const key = keyOf(j, mid)
@@ -184,11 +187,11 @@ export function planCharging(
       if (!farthest || c.item.atKm > cands[farthest.i].item.atKm) farthest = l
       const toDest = c.access + Math.max(0, totalKm - c.item.atKm)
       // Làm tròn lên: tới đích còn ≥ mức dự phòng một chút, không sát đúng.
-      const leave = Math.max(l.mid, Math.ceil(need(toDest)))
+      const leave = Math.max(l.mid, Math.ceil(need(toDest, c.item.atKm, totalKm)))
       if (leave > TARGET_PCT + EPS) continue
       const stop = stopAt(l, leave)
       const cost: Cost = { chargeMin: l.chargeMin + (stop.chargeMin ?? 0), detourKm: l.detourKm + stop.detourKm }
-      if (!best || better(cost, best.cost)) best = { stops: [...l.stops, stop], arriveDest: arrive(leave, toDest), cost }
+      if (!best || better(cost, best.cost)) best = { stops: [...l.stops, stop], arriveDest: arrive(leave, toDest, c.item.atKm, totalKm), cost }
     }
     if (best) return done(best.stops, best.arriveDest, best.cost.chargeMin)
 
@@ -200,7 +203,7 @@ export function planCharging(
       for (let j = l.i + 1; j < cands.length; j++) {
         const n = cands[j]
         if (n.item.atKm < c.item.atKm + MIN_HOP_KM) continue
-        const lv = Math.ceil(need(c.access + n.item.atKm - c.item.atKm + n.access))
+        const lv = Math.ceil(need(c.access + n.item.atKm - c.item.atKm + n.access, c.item.atKm, n.item.atKm))
         if (lv > TARGET_PCT) break
         if (lv > l.mid + 0.5) levels.add(lv)
       }

@@ -48,19 +48,24 @@ export function parseHereRoutes(body: HereRoute): RoutePath[] {
 function pathOf(sections: HereSection[]): RoutePath | null {
   const points: GeoPoint[] = []
   const limited: boolean[] = []
+  const elev: number[] = []
+  let hasElev = true
   for (const sec of sections) {
     const pts = decodeFlexiblePolyline(sec.polyline ?? '')
     const flags = limitedFlags(sec.spans, pts.length)
     pts.forEach((pt, k) => {
-      // Điểm nối giữa hai section bị lặp; bỏ điểm trùng thì phải bỏ cả cờ đi kèm, không thì hai
-      // mảng lệch nhau từ đó trở đi (và đoạn dài 0 làm phép chiếu chia cho 0).
+      // Điểm nối giữa hai section bị lặp; bỏ điểm trùng thì phải bỏ cả cờ / độ cao đi kèm, không
+      // thì các mảng lệch nhau từ đó trở đi (và đoạn dài 0 làm phép chiếu chia cho 0).
       const last = points[points.length - 1]
       if (last && last.lat === pt.lat && last.lng === pt.lng) return
-      points.push(pt)
+      points.push({ lat: pt.lat, lng: pt.lng })
       limited.push(flags[k])
+      if (pt.z === undefined) hasElev = false
+      else elev.push(pt.z)
     })
   }
-  return points.length >= 2 ? { points, limited, ...sumSummary(sections) } : null
+  if (points.length < 2) return null
+  return { points, limited, ...(hasElev ? { elev } : {}), ...sumSummary(sections) }
 }
 
 /** Cộng quãng đường (m) + thời gian (s) của mọi section. */

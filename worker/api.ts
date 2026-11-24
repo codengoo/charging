@@ -94,7 +94,8 @@ async function route(url: URL, env: ApiEnv): Promise<Response> {
   target.searchParams.set('destination', destination.at)
   if (alt > 0) target.searchParams.set('alternatives', String(alt))
   if (avoid.length) target.searchParams.set('avoid[features]', avoid.join(','))
-  target.searchParams.set('return', 'polyline,summary')
+  // elevation: polyline mang độ cao từng điểm (chiều thứ ba) — client tính năng lượng leo dốc.
+  target.searchParams.set('return', 'polyline,summary,elevation')
   target.searchParams.set('spans', 'length,functionalClass')
   target.searchParams.set('apiKey', key)
   return passHere(target, 300)

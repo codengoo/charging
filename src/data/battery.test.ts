@@ -3,7 +3,7 @@ import { arrivalPct, avgKmh, chargeMinutes, chargePort, dcCurveKw, speedFactor }
 import type { StationPower } from '@/data/types'
 import { CUSTOM_ID, VEHICLES, vehicleOf, type Vehicle } from '@/data/vehicles'
 
-const V: Vehicle = { id: 'test', name: 'Test', kwh: 100, kwhPer100: 20, dcKw: 150, acKw: 11 }
+const V: Vehicle = { id: 'test', name: 'Test', kwh: 100, kwhPer100: 20, dcKw: 150, acKw: 11, massKg: 2000 }
 
 describe('speedFactor / avgKmh', () => {
   it('ngưỡng 40 / 70 / 90 km/h', () => {
@@ -32,6 +32,16 @@ describe('arrivalPct', () => {
   })
   it('có thể âm (không tới được)', () => {
     expect(arrivalPct(10, 500, 60, V, false).high).toBeLessThan(0)
+  })
+  it('extraKwh (độ dốc) cộng thẳng, không nhân khoảng ±8%', () => {
+    const r = arrivalPct(80, 100, 60, V, false, 5)
+    expect(r.low).toBeCloseTo(80 - 20 * 1.08 - 5, 9)
+    expect(r.high).toBeCloseTo(80 - 20 * 0.92 - 5, 9)
+  })
+  it('đổ dốc dài: tiêu thụ không âm, pin không tăng', () => {
+    const r = arrivalPct(50, 10, 60, V, false, -30)
+    expect(r.low).toBe(50)
+    expect(r.high).toBe(50)
   })
 })
 

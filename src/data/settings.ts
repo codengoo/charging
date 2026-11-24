@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_FILTERS, KW_BANDS, MIN_PORT_OPTIONS, type Filters, type KwBand } from './stations'
-import { DEFAULT_PRICE, PRICE_MAX } from './cost'
+import {
+  DEFAULT_FUEL_PER100,
+  DEFAULT_FUEL_PRICE,
+  DEFAULT_PRICE,
+  FUEL_PER100_MAX,
+  FUEL_PER100_MIN,
+  FUEL_PRICE_MAX,
+  PRICE_MAX,
+} from './cost'
 import { TRIP_RADII, type TripRadius } from './tripTypes'
 import { THEME_PREFS, type ThemePref } from '../lib/theme'
 import { VEHICLE_IDS } from './vehicles'
@@ -39,6 +47,9 @@ export interface Settings {
   reservePct: number
   /** Giá sạc (đ/kWh) để ước tính tiền sạc; 0 = được sạc miễn phí, ẩn chi phí. */
   pricePerKwh: number
+  /** So với xe xăng: tiêu thụ (L/100 km) và giá xăng (đ/L); giá 0 = không so. */
+  fuelPer100: number
+  fuelPrice: number
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -57,6 +68,8 @@ export const DEFAULT_SETTINGS: Settings = {
   climate: true,
   reservePct: RESERVE_PCT,
   pricePerKwh: DEFAULT_PRICE,
+  fuelPer100: DEFAULT_FUEL_PER100,
+  fuelPrice: DEFAULT_FUEL_PRICE,
 }
 
 const KEY = 'tramsac.settings'
@@ -102,6 +115,8 @@ export function parseSettings(raw: string | null): Settings {
     reservePct:
       inRange(o.reservePct, RESERVE_MIN, RESERVE_MAX) && Number.isInteger(o.reservePct) ? o.reservePct : d.reservePct,
     pricePerKwh: inRange(o.pricePerKwh, 0, PRICE_MAX) ? o.pricePerKwh : d.pricePerKwh,
+    fuelPer100: inRange(o.fuelPer100, FUEL_PER100_MIN, FUEL_PER100_MAX) ? o.fuelPer100 : d.fuelPer100,
+    fuelPrice: inRange(o.fuelPrice, 0, FUEL_PRICE_MAX) ? o.fuelPrice : d.fuelPrice,
   }
 }
 

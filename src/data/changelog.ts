@@ -11,6 +11,30 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.17.0',
+    date: '2026-11-24',
+    title: 'Tìm địa chỉ, độ dốc & so với xe xăng',
+    changes: [
+      "Gõ địa chỉ vào ô tìm kiếm để xem trạm sạc quanh đó.",
+      "Tìm bằng giọng nói: bấm micro trong ô tìm kiếm rồi nói tên trạm hoặc địa chỉ.",
+      "Bấm vào ô tìm kiếm để mở lại các trạm vừa xem.",
+      "Kế hoạch sạc tính cả độ dốc: leo đèo tốn pin hơn, đổ đèo lấy lại một phần.",
+      "Mở kế hoạch sạc trong Google Maps để dẫn đường qua các trạm dừng.",
+      "So chi phí cả chuyến với xe xăng — đặt mức tiêu thụ và giá xăng trong Xe của bạn.",
+      "Tầm pin: trạm ngoài tầm vẽ mờ, kèm số trạm sạc nhanh trong tầm.",
+    ],
+    titleEn: 'Address search, elevation & petrol comparison',
+    changesEn: [
+      "Type an address in the search box to see charging stations around it.",
+      "Voice search: tap the microphone in the search box and say a station or an address.",
+      "Tap the search box to reopen stations you viewed recently.",
+      "The charging plan accounts for elevation: climbs use more battery, descents win some back.",
+      "Open the charging plan in Google Maps to navigate via the charging stops.",
+      "Compare the whole trip cost with a petrol car — set its consumption and fuel price in Your car.",
+      "Range: stations out of range are faded, with a count of fast chargers in range.",
+    ],
+  },
+  {
     version: '0.16.1',
     date: '2026-11-24',
     title: 'Gọn hơn',

@@ -22,6 +22,7 @@ import { vehicleOf } from './data/vehicles'
 import { useResolvedTheme } from './lib/theme'
 import { ImportDialog, pendingImport, type PendingImport } from './ui/ImportDialog'
 import { useNotes } from './data/notes'
+import { useRecent } from './data/recent'
 import { newPlaceId, placeName, usePlaces } from './data/places'
 import { PlacesSheet } from './ui/PlacesSheet'
 import { PlaceEditorPanel, type PlaceEditTarget } from './ui/PlaceEditorPanel'
@@ -36,7 +37,8 @@ import { useIsMobile } from '@/hooks/use-media-query'
 import { Button } from '@/components/ui/button'
 import { useStationData } from './data/useStationData'
 import { useStationDetail } from './data/useStationDetail'
-import { DEFAULT_FILTERS, extraFilterCount, kwActive, kwLabel, passesFilters, type Filters } from './data/stations'
+import { DEFAULT_FILTERS, extraFilterCount, kwActive, kwLabel, passesFilters, tierOf, type Filters } from './data/stations'
+import { KM_PER_LAT, distanceKm } from './lib/geo'
 import { batteryRange } from './data/range'
 import { RangeCard, rangeLayerOf } from './ui/RangeCard'
 import { pctOf } from './ui/BatteryControl'
@@ -83,7 +85,7 @@ export function App() {
   const reviews = useReviews(sheetStation?.entityId ?? null, selected !== null)
   const live = useLiveStatus(sheetStation?.storeId ?? null, selected !== null)
   const sheets = useSheets()
-  const [flyTo, setFlyTo] = useState<{ lng: number; lat: number; zoom?: number } | null>(null)
+  const [flyTo, setFlyTo] = useState<{ lng: number; lat: number; zoom?: number; liftPx?: number } | null>(null)
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null)
   // Tâm bản đồ hiện tại (ref: đổi liên tục khi kéo, không cần render lại). Mặc định = tâm mặc định của map.
   const mapCenter = useRef({ lat: 16.05, lng: 108.2 })
@@ -95,6 +97,7 @@ export function App() {
   const groups = useGroupBook()
   const notes = useNotes()
   const places = usePlaces()
+  const recent = useRecent()
   const { book } = groups
   const isMobile = useIsMobile()
   const { settings, update: updateSettings } = useSettings()
@@ -125,6 +128,20 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- theo toạ độ, không theo object
     [rangeInfo, rangeCenter?.lat, rangeCenter?.lng],
   )
+  // Số trạm sạc nhanh DC đang hoạt động (theo bộ lọc bản đồ) trong vòng "đi tới được".
+  const fastInRange = useMemo(() => {
+    if (!rangeInfo || !rangeCenter || !index) return null
+    const r = rangeInfo.oneWayKm
+    const dLat = r / KM_PER_LAT
+    let n = 0
+    for (const st of index.all) {
+      if (st.status !== 0 || Math.abs(st.lat - rangeCenter.lat) > dLat) continue
+      if (tierOf(power?.get(st.entityId)) === 0 || !passesFilters(st, filters, power)) continue
+      if (distanceKm(rangeCenter.lat, rangeCenter.lng, st.lat, st.lng) <= r) n++
+    }
+    return n
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- theo toạ độ, không theo object
+  }, [rangeInfo, rangeCenter?.lat, rangeCenter?.lng, index, power, filters])
   const tripCtl = useTrip(index, userPos, settings.tripRadiusKm, tripKeep)
   const { trip, hits } = tripCtl
   // Giữ lần nhập cuối để hộp xác nhận còn nội dung lúc trôi xuống.
@@ -203,7 +220,20 @@ export function App() {
 
   /** "Gần tôi": GPS có rồi thì theo GPS, chưa thì tâm bản đồ (bảng có nút xin vị trí). */
   function openNearby() {
+    setSearchPin(null)
     setNearby(userPos ? { origin: userPos, fromGps: true } : { origin: mapCenter.current, fromGps: false })
+    sheets.open('nearby')
+  }
+
+  // Chọn một địa chỉ trong ô tìm kiếm: ghim tạm ở đó, bay tới, mở "Trạm gần <địa chỉ>".
+  const [searchPin, setSearchPin] = useState<{ lat: number; lng: number } | null>(null)
+  function pickPlace(hit: PlaceHit) {
+    const at = { lat: hit.lat, lng: hit.lng }
+    setSelected(null)
+    setSearchPin(at)
+    // Điện thoại: bảng Gần tôi che nửa dưới — đẩy ghim lên phần bản đồ còn thấy.
+    setFlyTo({ ...at, zoom: 15, liftPx: isMobile ? Math.round(window.innerHeight * 0.25) : 0 })
+    setNearby({ origin: at, fromGps: false, label: hit.label })
     sheets.open('nearby')
   }
 
@@ -237,6 +267,16 @@ export function App() {
     reservePct: settings.reservePct,
     isMobile,
   })
+
+  // Trạm vừa xem: mỗi lần mở một trạm (chọn trên bản đồ, tìm kiếm, link…).
+  const pushRecent = recent.push
+  useEffect(() => {
+    if (selected) pushRecent(selected.entityId)
+  }, [selected, pushRecent])
+  const recentStations = useMemo(
+    () => (index ? recent.ids.map((id) => index.byId.get(id)).filter((s): s is Station => s !== undefined) : []),
+    [index, recent.ids],
+  )
 
   // Generation mới (dữ liệu làm mới hằng ngày): trạm đang mở trỏ sang bản ghi mới cùng id.
   useEffect(() => {
@@ -299,7 +339,15 @@ export function App() {
           if (pl) openPoint({ lat: pl.lat, lng: pl.lng }, id)
         }}
         onLongPress={(pt) => (editTarget ? pickOnMap(pt) : openPoint(pt, null))}
-        pinAt={editTarget ? editPin : sheets.is('point') && point && !point.placeId ? point.at : null}
+        pinAt={
+          editTarget
+            ? editPin
+            : sheets.is('point') && point && !point.placeId
+              ? point.at
+              : sheets.is('nearby') && searchPin
+                ? searchPin
+                : null
+        }
         onMapClick={editTarget ? pickOnMap : undefined}
         range={rangeLayer}
         overlay={settings.showLegend ? <PowerLegend /> : null}
@@ -311,7 +359,16 @@ export function App() {
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[5] flex flex-col gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         {/* relative z-10: danh sách kết quả tìm kiếm phải đè lên hàng chip phía dưới. */}
         <div className="pointer-events-auto relative z-10">
-          <SearchBar index={index} onPick={pick} onSettings={() => sheets.open('settings')} onScan={() => sheets.open('scan')} />
+          <SearchBar
+            index={index}
+            onPick={pick}
+            onPickPlace={pickPlace}
+            near={() => userPos ?? mapCenter.current}
+            recent={recentStations}
+            onClearRecent={recent.clear}
+            onSettings={() => sheets.open('settings')}
+            onScan={() => sheets.open('scan')}
+          />
         </div>
         <MapChips
           onNearby={openNearby}
@@ -335,6 +392,7 @@ export function App() {
             vehicle={vehicle}
             reservePct={settings.reservePct}
             fromGps={userPos !== null}
+            fastInRange={fastInRange}
             reading={battery.reading}
             stale={battery.stale}
             onBattery={battery.set}
@@ -367,6 +425,10 @@ export function App() {
           climate={settings.climate}
           reservePct={settings.reservePct}
           pricePerKwh={settings.pricePerKwh}
+          fuelPer100={settings.fuelPer100}
+          fuelPrice={settings.fuelPrice}
+          climb={plan.climb}
+          elevation={plan.elevation}
           battery={battery.reading}
           batteryStale={battery.stale}
           onBattery={battery.set}

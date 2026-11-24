@@ -22,8 +22,13 @@ describe('decodeFlexiblePolyline', () => {
   it('vector 2D chính thức của HERE (precision 5)', () => {
     near(decodeFlexiblePolyline('BFoz5xJ67i1B1B7PzIhaxL7Y'), HERE_2D)
   })
-  it('vector 3D chính thức (độ cao, precision 5/0): đọc bỏ chiều thứ ba, không lệch nhịp', () => {
-    near(decodeFlexiblePolyline('BlBoz5xJ67i1BU1B7PUzIhaUxL7YU'), HERE_2D)
+  it('vector 3D chính thức (độ cao, precision 5/0): không lệch nhịp, giữ độ cao thành z', () => {
+    const pts = decodeFlexiblePolyline('BlBoz5xJ67i1BU1B7PUzIhaUxL7YU')
+    near(pts, HERE_2D)
+    expect(pts.map((p) => p.z)).toEqual([10, 20, 30, 40])
+  })
+  it('chuỗi 2D không có z', () => {
+    expect(decodeFlexiblePolyline('BFoz5xJ67i1B1B7PzIhaxL7Y')[0].z).toBeUndefined()
   })
   it('chuỗi rỗng hoặc sai phiên bản → []', () => {
     expect(decodeFlexiblePolyline('')).toEqual([])
