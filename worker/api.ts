@@ -102,7 +102,7 @@ async function route(url: URL, env: ApiEnv): Promise<Response> {
 }
 
 /**
- * `from=lat,lng&to=lat,lng` → quãng đường lái xe thật (chỉ `summary`, vài trăm byte). Dùng khi
+ * `from=lat,lng&to=lat,lng` → quãng đường lái xe thật (`summary` + polyline có độ cao để tính độ dốc). Dùng khi
  * mở một trạm — giống HereRouting.route() bên Android. 1 lượt Routing Car mỗi cặp điểm.
  */
 async function drive(url: URL, env: ApiEnv): Promise<Response> {
@@ -115,7 +115,8 @@ async function drive(url: URL, env: ApiEnv): Promise<Response> {
   target.searchParams.set('transportMode', 'car')
   target.searchParams.set('origin', from)
   target.searchParams.set('destination', to)
-  target.searchParams.set('return', 'summary')
+  // polyline + elevation: client cộng mét leo / xuống để ước tính % pin có độ dốc.
+  target.searchParams.set('return', 'summary,polyline,elevation')
   target.searchParams.set('apiKey', key)
   return passHere(target, 600)
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_SETTINGS, filtersFrom, parseSettings } from '@/data/settings'
+import { DEFAULT_SETTINGS, filtersFrom, parseCar, parseSettings, swapCar } from '@/data/settings'
 
 const parse = (o: unknown) => parseSettings(JSON.stringify(o))
 
@@ -28,8 +28,16 @@ describe('parseSettings', () => {
       pricePerKwh: 0,
       fuelPer100: 8.5,
       fuelPrice: 24000,
+      batteryHealth: 90,
+      driveStyle: 'eco',
+      carSlot: 1,
+      otherCar: null,
     })
     expect(s).toEqual({
+      batteryHealth: 90,
+      driveStyle: 'eco',
+      carSlot: 1,
+      otherCar: null,
       fuelPer100: 8.5,
       fuelPrice: 24000,
       publicOnly: true,
@@ -99,5 +107,47 @@ describe('filtersFrom', () => {
       freeParking: true,
       minPorts: 2,
     })
+  })
+})
+
+describe('batteryHealth / driveStyle', () => {
+  it('ngoài khoảng / không nguyên / lạ → mặc định', () => {
+    expect(parse({ batteryHealth: 59 }).batteryHealth).toBe(100)
+    expect(parse({ batteryHealth: 92.5 }).batteryHealth).toBe(100)
+    expect(parse({ batteryHealth: 85 }).batteryHealth).toBe(85)
+    expect(parse({ driveStyle: 'sport' }).driveStyle).toBe('normal')
+  })
+})
+
+describe('hồ sơ 2 xe', () => {
+  it('parseCar: không phải object → null; trường sai → mặc định', () => {
+    expect(parseCar(null)).toBeNull()
+    expect(parseCar('x')).toBeNull()
+    expect(parseCar({ vehicleId: 'tesla', batteryHealth: 10, battery: { pct: 200, at: 1 } })).toEqual({
+      vehicleId: null,
+      customKwh: DEFAULT_SETTINGS.customKwh,
+      customKwhPer100: DEFAULT_SETTINGS.customKwhPer100,
+      usageOverride: null,
+      batteryHealth: 100,
+      battery: null,
+    })
+  })
+  it('swapCar: lần đầu → xe 2 trống, xe 1 cất kèm % pin; đổi lại thì về như cũ', () => {
+    const s1 = { ...DEFAULT_SETTINGS, vehicleId: 'vf8', batteryHealth: 90 }
+    const b1 = { pct: 55, at: 1000 }
+    const a = swapCar(s1, b1)
+    expect(a.patch.carSlot).toBe(1)
+    expect(a.patch.vehicleId).toBeNull()
+    expect(a.battery).toBeNull()
+    expect(a.patch.otherCar).toMatchObject({ vehicleId: 'vf8', batteryHealth: 90, battery: b1 })
+    const s2 = { ...s1, ...a.patch, vehicleId: 'vf3' }
+    const b = swapCar(s2, { pct: 30, at: 2000 })
+    expect(b.patch).toMatchObject({ carSlot: 0, vehicleId: 'vf8', batteryHealth: 90 })
+    expect(b.battery).toEqual(b1)
+    expect(b.patch.otherCar).toMatchObject({ vehicleId: 'vf3', battery: { pct: 30, at: 2000 } })
+  })
+  it('otherCar đi qua parseSettings', () => {
+    const s = parse({ otherCar: { vehicleId: 'vf5', customKwh: 60, customKwhPer100: 16, usageOverride: null, batteryHealth: 95, battery: null } })
+    expect(s.otherCar?.vehicleId).toBe('vf5')
   })
 })

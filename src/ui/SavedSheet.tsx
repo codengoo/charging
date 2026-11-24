@@ -21,6 +21,7 @@ import { TIER_COLORS, tintHex } from '../map/pins'
 import { fmtDistance } from '@/lib/format'
 import { LOCALE, pick } from '../i18n'
 import { AppSheet } from './AppSheet'
+import { freeSummary, useLiveMany } from '../data/live'
 import { StationRow } from './StationRow'
 
 const L = pick({
@@ -33,6 +34,8 @@ const L = pick({
     all: 'Tất cả',
     left: (t: string) => `còn ${t}`,
     unsave: (name: string) => `Bỏ ${name} khỏi mọi nhóm`,
+    free: (f: number, t: number) => `${f}/${t} trống`,
+    full: 'Hết cổng trống',
   },
   en: {
     title: 'Saved charging stations',
@@ -43,6 +46,8 @@ const L = pick({
     all: 'All',
     left: (t: string) => `${t} left`,
     unsave: (name: string) => `Remove ${name} from all groups`,
+    free: (f: number, t: number) => `${f}/${t} free`,
+    full: 'No free ports',
   },
 })
 
@@ -93,6 +98,12 @@ export function SavedSheet({ open, index, book, notes, now, userPos, onPick, onU
   const shown = active.size === 0
     ? items
     : items.filter(({ st }) => [...active].some((g) => idsIn(book, g).includes(st.entityId)))
+
+  // Cổng trống thời gian thực cho vài trạm đầu danh sách (gần nhất trước) — chỉ khi bảng mở.
+  const live = useLiveMany(
+    shown.map(({ st }) => st.storeId).filter(Boolean),
+    open,
+  )
 
   return (
     <AppSheet
@@ -165,6 +176,16 @@ export function SavedSheet({ open, index, book, notes, now, userPos, onPick, onU
               trailing={
                 <>
                   {!Number.isNaN(km) && <span className="text-sm font-semibold">{fmtDistance(km)}</span>}
+                  {(() => {
+                    const lv = live.get(st.storeId)
+                    const sum = lv ? freeSummary(lv) : null
+                    if (!sum) return null
+                    return sum.free > 0 ? (
+                      <span className="text-xs font-semibold text-brand tabular-nums">{L.free(sum.free, sum.total)}</span>
+                    ) : (
+                      <span className="text-xs text-warn">{L.full}</span>
+                    )
+                  })()}
                   <span className="flex gap-0.5">
                     {gids.slice(0, 3).map((gid) => {
                       const g = group(book, gid)

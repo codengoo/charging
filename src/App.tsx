@@ -16,13 +16,16 @@ import { SettingsSheet } from './ui/SettingsSheet'
 import { VehicleSheet } from './ui/VehicleSheet'
 import { useDriveDistance, useStableOrigin } from './data/drive'
 import { useLiveStatus } from './data/live'
-import { filtersFrom, useSettings, type Settings } from './data/settings'
+import { filtersFrom, swapCar, useSettings, type Settings } from './data/settings'
 import { useBattery } from './data/useBattery'
 import { vehicleOf } from './data/vehicles'
 import { useResolvedTheme } from './lib/theme'
 import { ImportDialog, pendingImport, type PendingImport } from './ui/ImportDialog'
 import { useNotes } from './data/notes'
 import { useRecent } from './data/recent'
+import { useRecentTrips } from './data/recentTrips'
+import { stopLabel } from './ui/PlaceChips'
+import { firstUrl } from './lib/mapsLink'
 import { newPlaceId, placeName, usePlaces } from './data/places'
 import { PlacesSheet } from './ui/PlacesSheet'
 import { PlaceEditorPanel, type PlaceEditTarget } from './ui/PlaceEditorPanel'
@@ -98,6 +101,7 @@ export function App() {
   const notes = useNotes()
   const places = usePlaces()
   const recent = useRecent()
+  const recentTrips = useRecentTrips()
   const { book } = groups
   const isMobile = useIsMobile()
   const { settings, update: updateSettings } = useSettings()
@@ -105,8 +109,12 @@ export function App() {
   // Ước tính % pin khi đến: xe trong Cài đặt + % pin người dùng kéo (dùng chung bảng trạm / Dọc đường).
   const battery = useBattery()
   const vehicle = useMemo(
-    () => vehicleOf(settings.vehicleId, settings.customKwh, settings.customKwhPer100, settings.usageOverride),
-    [settings.vehicleId, settings.customKwh, settings.customKwhPer100, settings.usageOverride],
+    () =>
+      vehicleOf(settings.vehicleId, settings.customKwh, settings.customKwhPer100, settings.usageOverride, {
+        health: settings.batteryHealth,
+        style: settings.driveStyle,
+      }),
+    [settings.vehicleId, settings.customKwh, settings.customKwhPer100, settings.usageOverride, settings.batteryHealth, settings.driveStyle],
   )
   // Mở app với bộ lọc theo cài đặt; chip đổi tạm trong phiên, không ghi ngược vào cài đặt.
   const [filters, setFilters] = useState<Filters>(() => filtersFrom(settings))
@@ -210,6 +218,13 @@ export function App() {
     if (patch.tripRadiusKm !== undefined) tripCtl.setRadius(patch.tripRadiusKm)
   }
 
+  /** Đổi Xe 1 ↔ Xe 2: tráo cài đặt xe và % pin (mỗi xe nhớ riêng). */
+  function swapCarProfile() {
+    const { patch, battery: next } = swapCar(settings, battery.reading)
+    updateSettings(patch)
+    battery.replace(next)
+  }
+
   function toggleRange() {
     if (rangeOn) return setRangeOn(false)
     // Chưa chọn xe thì không tính được — mở Cài đặt (mục Xe của bạn ở đầu).
@@ -251,6 +266,13 @@ export function App() {
     },
   })
   const tripOpen = trip.status !== 'closed'
+  // Hành trình tính xong → nhớ vào "Hành trình gần đây" (link gốc + tên các chặng).
+  const pushTrip = recentTrips.push
+  const tripLabel = trip.stops.map((st) => stopLabel(st, places.places)).join(' → ')
+  useEffect(() => {
+    if (trip.status !== 'ready' || !trip.link || !tripLabel) return
+    pushTrip({ link: firstUrl(trip.link) ?? trip.link, label: tripLabel, at: Date.now() })
+  }, [trip.status, trip.link, tripLabel, pushTrip])
   // Giữ bảng Dọc đường trong cây sau lần mở đầu: gỡ ngay khi đóng thì drawer mất luôn, không trượt xuống.
   const [tripMounted, setTripMounted] = useState(false)
   useEffect(() => {
@@ -435,6 +457,8 @@ export function App() {
           planOn={plan.planOn}
           plan={plan.plan}
           onTogglePlan={plan.togglePlan}
+          recentTrips={recentTrips.trips}
+          onRemoveTrip={recentTrips.remove}
         />
       )}
 
@@ -482,6 +506,7 @@ export function App() {
         >
           <VehicleSheet
             nested
+            onSwapCar={swapCarProfile}
             open={sheets.is('car')}
             settings={settings}
             onChange={changeSettings}
@@ -590,6 +615,7 @@ export function App() {
         onClose={() => sheets.close('settings')}
         placesSummary={places.places.length ? places.places.map(placeName).join(' · ') : null}
         onOpenPlaces={() => sheets.open('settingsPlaces')}
+        onSwapCar={swapCarProfile}
       >
         <PlacesSheet
           nested

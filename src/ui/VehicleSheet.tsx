@@ -4,7 +4,7 @@ import { Segmented } from '@/components/ui/segmented'
 import { Input } from '@/components/ui/input'
 import { ResponsiveSelect } from '@/components/ui/responsive-select'
 import type { Settings } from '../data/settings'
-import { CUSTOM_ID, VEHICLES, vehicleOf } from '../data/vehicles'
+import { CUSTOM_ID, DRIVE_STYLES, HEALTH_OPTIONS, VEHICLES, vehicleOf, type DriveStyle } from '../data/vehicles'
 import { ChargeCurveChart } from './ChargeCurveChart'
 import { RESERVE_MAX, RESERVE_MIN, RESERVE_OPTIONS } from '../data/battery'
 import {
@@ -31,6 +31,17 @@ const L = pick({
     real: 'Tiêu thụ thực tế (kWh/100 km)',
     realHint: (v: string) => `Đọc mức tiêu thụ trung bình trên màn hình xe. Để trống = ước tính ${v} kWh/100 km.`,
     climate: 'Điều hoà',
+    slot: 'Xe của gia đình',
+    slotName: (n: number) => `Xe ${n}`,
+    slotHint: (other: string) => `Xe còn lại: ${other}. Mỗi xe nhớ riêng mẫu xe, tiêu thụ, pin còn lại và % pin.`,
+    slotEmpty: 'Thêm xe thứ hai: bấm Xe 2 rồi chọn mẫu.',
+    notSet: 'chưa chọn mẫu',
+    style: 'Kiểu lái',
+    styles: { eco: 'Tiết kiệm', normal: 'Bình thường', fast: 'Nhanh' } as Record<DriveStyle, string>,
+    styleHint: 'Tiết kiệm −8%, nhanh +12% mức tiêu thụ ước tính.',
+    styleOff: 'Đang dùng tiêu thụ thực tế bạn nhập — kiểu lái không áp dụng.',
+    health: 'Pin còn lại',
+    healthHint: 'Pin dùng lâu năm giảm dung lượng. Xe đã đi nhiều thì chọn mức ước chừng để ước tính sát hơn.',
     climateHint: 'Bật thì tiêu thụ tăng khoảng 8%.',
     reserve: 'Pin dự phòng tối thiểu',
     other: 'Khác',
@@ -54,6 +65,17 @@ const L = pick({
     real: 'Real consumption (kWh/100 km)',
     realHint: (v: string) => `Read the average consumption on your car's display. Leave empty to use the ${v} kWh/100 km estimate.`,
     climate: 'Air conditioning',
+    slot: 'Family cars',
+    slotName: (n: number) => `Car ${n}`,
+    slotHint: (other: string) => `Other car: ${other}. Each car keeps its own model, consumption, battery health and charge level.`,
+    slotEmpty: 'Add a second car: tap Car 2 and pick a model.',
+    notSet: 'no model set',
+    style: 'Driving style',
+    styles: { eco: 'Eco', normal: 'Normal', fast: 'Fast' } as Record<DriveStyle, string>,
+    styleHint: 'Eco −8%, fast +12% on the estimated consumption.',
+    styleOff: 'Using the real consumption you entered — driving style does not apply.',
+    health: 'Battery health',
+    healthHint: 'Batteries lose capacity over the years. If your car has a lot of miles, pick a rough level for closer estimates.',
     climateHint: 'Adds about 8% to consumption when on.',
     reserve: 'Minimum battery reserve',
     other: 'Other',
@@ -102,12 +124,19 @@ interface Props {
   onClose: () => void
   /** Mở chồng lên một drawer khác (Cài đặt) — drawer dưới lùi lại phía sau. */
   nested?: boolean
+  /** Đổi sang xe kia (Xe 1 ↔ Xe 2) — App tráo cài đặt xe và % pin. */
+  onSwapCar: () => void
 }
 
 /** Drawer riêng chọn xe + điều hoà; đổi là lưu ngay như Cài đặt. */
-export function VehicleSheet({ open, settings, onChange, onClose, nested = false }: Props) {
+export function VehicleSheet({ open, settings, onChange, onClose, nested = false, onSwapCar }: Props) {
   const model = VEHICLES.find((v) => v.id === settings.vehicleId)
-  const car = vehicleOf(settings.vehicleId, settings.customKwh, settings.customKwhPer100, settings.usageOverride)
+  const car = vehicleOf(settings.vehicleId, settings.customKwh, settings.customKwhPer100, settings.usageOverride, {
+    health: settings.batteryHealth,
+    style: settings.driveStyle,
+  })
+  const other = settings.otherCar
+  const otherName = other?.vehicleId ? vehicleSummary({ ...settings, ...other }) : null
   return (
     <AppSheet
       nested={nested}
@@ -117,7 +146,19 @@ export function VehicleSheet({ open, settings, onChange, onClose, nested = false
       title={L.title}
       description={L.hint}
     >
-      <div className="mt-3 flex flex-col gap-4 pb-2 sm:mt-0">
+      {/* key theo xe: đổi Xe 1 / Xe 2 thì các ô nhập (defaultValue) đọc lại giá trị của xe mới. */}
+      <div key={settings.carSlot} className="mt-3 flex flex-col gap-4 pb-2 sm:mt-0">
+        <section className="flex flex-col gap-1.5">
+          <h3 className="text-sm font-semibold">{L.slot}</h3>
+          <Segmented
+            label={L.slot}
+            value={String(settings.carSlot)}
+            onChange={(v) => Number(v) !== settings.carSlot && onSwapCar()}
+            options={[0, 1].map((n) => ({ value: String(n), label: L.slotName(n + 1) }))}
+          />
+          <p className="text-xs text-muted-foreground">{other ? L.slotHint(otherName ?? L.notSet) : L.slotEmpty}</p>
+        </section>
+
         <section className="flex flex-col gap-1.5">
           <h3 className="text-sm font-semibold">{L.model}</h3>
           <ResponsiveSelect
@@ -169,6 +210,32 @@ export function VehicleSheet({ open, settings, onChange, onClose, nested = false
             </label>
           )}
         </section>
+
+        {settings.vehicleId && (
+          <section className="flex flex-col gap-1.5">
+            <h3 className="text-sm font-semibold">{L.style}</h3>
+            <Segmented
+              label={L.style}
+              value={settings.driveStyle}
+              onChange={(driveStyle) => onChange({ driveStyle })}
+              options={DRIVE_STYLES.map((st) => ({ value: st, label: L.styles[st] }))}
+            />
+            <p className="text-xs text-muted-foreground">{settings.usageOverride ? L.styleOff : L.styleHint}</p>
+          </section>
+        )}
+
+        {settings.vehicleId && (
+          <section className="flex flex-col gap-1.5">
+            <h3 className="text-sm font-semibold">{L.health}</h3>
+            <Segmented
+              label={L.health}
+              value={String(settings.batteryHealth)}
+              onChange={(v) => onChange({ batteryHealth: Number(v) })}
+              options={HEALTH_OPTIONS.map((h) => ({ value: String(h), label: `${h}%` }))}
+            />
+            <p className="text-xs text-muted-foreground">{L.healthHint}</p>
+          </section>
+        )}
 
         {car && <ChargeCurveChart vehicle={car} />}
 

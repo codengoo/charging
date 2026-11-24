@@ -11,6 +11,28 @@ export interface ChangelogEntry {
 /** Lịch sử phiên bản. Mục mới nhất để đầu mảng. Giữ đồng bộ với CHANGELOG.md. */
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.18.0',
+    date: '2026-11-24',
+    title: 'Giờ tới nơi, hai xe & cổng trống trạm đã lưu',
+    changes: [
+      "Kế hoạch sạc ghi giờ theo đồng hồ: chọn giờ đi, xem giờ tới từng trạm dừng và giờ tới nơi.",
+      "Xe của bạn: chọn mức pin còn lại (pin đã chai) và kiểu lái tiết kiệm / bình thường / nhanh.",
+      "Gia đình có hai xe: đổi Xe 1 / Xe 2, mỗi xe nhớ riêng mẫu xe, pin và % pin.",
+      "Dọc đường nhớ 5 hành trình gần đây — bấm là mở lại.",
+      "% pin khi tới trạm tính cả độ dốc trên đường đi.",
+      "Danh sách trạm đã lưu hiện số cổng trống của các trạm gần nhất.",
+    ],
+    titleEn: 'Arrival times, two cars & free ports for saved stations',
+    changesEn: [
+      "The charging plan shows clock times: pick when you leave, see when you reach each stop and arrive.",
+      "Your car: set battery health and an eco / normal / fast driving style.",
+      "Two cars in the family: switch Car 1 / Car 2, each keeps its own model, battery and charge level.",
+      "Along route remembers your last 5 trips — tap to reopen.",
+      "Battery on arrival at a station now includes elevation along the way.",
+      "The saved stations list shows free ports at the nearest stations.",
+    ],
+  },
+  {
     version: '0.17.0',
     date: '2026-11-24',
     title: 'Tìm địa chỉ, độ dốc & so với xe xăng',

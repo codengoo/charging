@@ -2,6 +2,15 @@
 
 Giữ đồng bộ với `src/data/changelog.ts` (nguồn hiển thị trong app).
 
+## [0.18.0] — 2026-11-24 — Giờ tới nơi, hai xe & cổng trống trạm đã lưu
+
+- Kế hoạch sạc ghi giờ theo đồng hồ: chọn giờ đi, xem giờ tới từng trạm dừng và giờ tới nơi.
+- Xe của bạn: chọn mức pin còn lại (pin đã chai) và kiểu lái tiết kiệm / bình thường / nhanh.
+- Gia đình có hai xe: đổi Xe 1 / Xe 2, mỗi xe nhớ riêng mẫu xe, pin và % pin.
+- Dọc đường nhớ 5 hành trình gần đây — bấm là mở lại.
+- % pin khi tới trạm tính cả độ dốc trên đường đi.
+- Danh sách trạm đã lưu hiện số cổng trống của các trạm gần nhất.
+
 ## [0.17.0] — 2026-11-24 — Tìm địa chỉ, độ dốc & so với xe xăng
 
 - Gõ địa chỉ vào ô tìm kiếm để xem trạm sạc quanh đó.

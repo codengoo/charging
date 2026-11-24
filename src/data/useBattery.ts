@@ -21,6 +21,12 @@ export function useBattery() {
     writeJson(KEY, next) // không lưu được thì vẫn dùng trong phiên
   }, [])
 
+  /** Thay nguyên bản ghi (đổi Xe 1 / Xe 2 — mỗi xe nhớ % pin riêng); null = như chưa nhập. */
+  const replace = useCallback((next: BatteryReading | null) => {
+    setReading(next)
+    writeJson(KEY, next)
+  }, [])
+
   const stale = reading !== null && Date.now() - reading.at > STALE_MS
-  return { reading, stale, set }
+  return { reading, stale, set, replace }
 }

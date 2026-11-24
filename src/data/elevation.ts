@@ -86,7 +86,10 @@ function at(p: ElevationProfile, arr: Float64Array, atKm: number): number {
 export function climbKwh(p: ElevationProfile, fromKm: number, toKm: number, massKg: number): number {
   const a = Math.min(fromKm, toKm)
   const b = Math.max(fromKm, toKm)
-  const upM = at(p, p.up, b) - at(p, p.up, a)
-  const downM = at(p, p.down, b) - at(p, p.down, a)
+  return climbKwhOf(at(p, p.up, b) - at(p, p.up, a), at(p, p.down, b) - at(p, p.down, a), massKg)
+}
+
+/** kWh thêm khi tổng leo `upM` và tổng xuống `downM` mét (quãng tới trạm — chỉ cần tổng). */
+export function climbKwhOf(upM: number, downM: number, massKg: number): number {
   return (massKg * G * (upM / CLIMB_EFFICIENCY - downM * DESCENT_RECOVERY)) / J_PER_KWH
 }

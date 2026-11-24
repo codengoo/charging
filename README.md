@@ -38,7 +38,9 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   từng mức kW (AC/DC)** — ~89% trạm có dữ liệu.
 - **Nhóm trạm đã lưu** (port từ app Android): 3 nhóm dựng sẵn + nhóm tự tạo (tên, biểu
   tượng, màu, thời hạn tự gỡ), danh sách đã lưu lọc theo nhóm. Lưu trong localStorage
-  khoá `tramsac.groups`; khoá cũ `tramsac.favorites` tự chuyển sang nhóm "Yêu thích".
+  khoá `tramsac.groups`; khoá cũ `tramsac.favorites` tự chuyển sang nhóm "Yêu thích". Danh sách hiện **cổng
+  trống** của 6 trạm đầu (gần nhất trước) khi bảng mở (`useLiveMany` trong `src/data/live.ts`: ≤ 3 lượt song
+  song, nhớ 2 phút — `/api/live` dùng chung giới hạn 30 lượt / phút / IP với tìm đường, tìm địa chỉ).
 - **Ghim trạm** vẽ từ SVG (`src/map/pins.ts`, port `ic_pin_*` / `ic_grp_*`): vỏ giọt nước
   trắng + đĩa màu nhạt + hình đậm, raster theo `devicePixelRatio` rồi `map.addImage`.
 - Nút **Chỉ đường** mở Google Maps.
@@ -67,7 +69,8 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
 - **Độ dốc** (`src/data/elevation.ts`): `/api/route` xin `return=elevation` → polyline 3D, `here.ts` giữ độ cao vào
   `RoutePath.elev`. Leo / xuống tích luỹ theo km (lọc trễ 5 m bỏ nhiễu địa hình); kWh thêm = m·g·(leo ÷ 0,85 − xuống
   × 0,6), m = `Vehicle.massKg` (gần đúng) + 150 kg tải. Áp cho % pin từng trạm Dọc đường và kế hoạch sạc
-  (`planCharging(..., climb)`), không áp cho bảng trạm (`/api/drive` chỉ có summary — vẫn ghi "chưa tính độ dốc").
+  (`planCharging(..., climb)`). Bảng trạm cũng vậy: `/api/drive` xin polyline + độ cao, `driveInfoOf` chỉ giữ tổng
+  mét leo / xuống (`DriveInfo.upM / downM`, `climbKwhOf`); thiếu độ cao thì vẫn ghi "chưa tính độ dốc".
 - **Tiền sạc** (`src/data/cost.ts`): giá đ/kWh trong Xe của bạn (`Settings.pricePerKwh`, mặc định 3.858 đ —
   giá trạm VinFast tham khảo; 0 = miễn phí, ẩn tiền). kWh tính tiền = kWh vào pin ÷ 0,92 (hao hụt sạc). Hiện ở
   bảng trạm (sạc lên 80%) và kế hoạch sạc (từng điểm dừng + tổng). Kế hoạch còn **so với xe xăng**: điện cả
@@ -81,6 +84,14 @@ Webapp bản đồ ~25.000 trạm sạc ô tô VinFast, dữ liệu làm mới h
   dựng lại dữ liệu); thẻ đếm trạm DC đang hoạt động theo bộ lọc trong tầm.
 - **Ghi đè tiêu thụ:** VehicleSheet có ô "Tiêu thụ thực tế" (`Settings.usageOverride`) — giữ pin / công suất sạc
   của mẫu, chỉ thay kWh/100 km. Đổi mẫu thì xoá.
+- **Pin còn lại / kiểu lái** (`vehicleOf(..., { health, style })`): `Settings.batteryHealth` 60–100% nhân dung lượng;
+  `driveStyle` eco ×0,92 / normal / fast ×1,12 nhân tiêu thụ ước tính (không nhân khi đã có `usageOverride`).
+- **Hai xe** (`Settings.carSlot`, `otherCar`, `swapCar`): đổi Xe 1 ↔ Xe 2 tráo mẫu xe, tuỳ chỉnh, tiêu thụ thực tế,
+  pin còn lại và % pin (`useBattery().replace`). Điều hoà, dự phòng, giá, kiểu lái dùng chung.
+- **Giờ theo đồng hồ** (`src/data/eta.ts`): kế hoạch sạc có ô "Đi lúc" (mặc định bây giờ, làm tròn lên 5 phút),
+  giờ tới / rời từng điểm dừng và giờ tới nơi — cùng tốc độ trung bình tuyến và `totalSeconds` của kế hoạch.
+- **Hành trình gần đây** (`src/data/recentTrips.ts`, localStorage `tramsac.trips`): 5 link Dọc đường đã tính xong,
+  hiện khi bảng Dọc đường chưa có tuyến; bấm là mở lại.
 - **Kế hoạch dừng sạc** (`src/data/chargePlan.ts`): chip "Lên kế hoạch sạc" trong Dọc đường. Thứ tự ưu tiên:
   (1) ít lần sạc nhất → (2) tổng phút sạc ngắn nhất (chênh < 1 phút coi như bằng) → (3) tổng km vòng khỏi tuyến ít nhất.
   Duyệt theo lớp số lần sạc trên trạng thái (trạm DC ≥ 50 kW, % pin khi tới làm tròn 1%); mỗi lần dừng thử "vừa đủ

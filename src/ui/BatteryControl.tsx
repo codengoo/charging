@@ -12,6 +12,7 @@ import {
   type BatteryReading,
 } from '../data/battery'
 import { chargeCost, fmtVnd } from '../data/cost'
+import { LOAD_KG, climbKwhOf } from '../data/elevation'
 import type { DriveState } from '../data/drive'
 import type { LivePorts } from '../data/live'
 import type { StationPower } from '../data/types'
@@ -35,6 +36,7 @@ const L = pick({
     needGps: 'Bật định vị để ước tính pin khi tới.',
     pickCar: 'Ước tính pin khi tới — chọn xe',
     note: (car: string) => `Ước tính cho ${car}, chưa tính độ dốc.`,
+    noteElev: (car: string, up: string) => `Ước tính cho ${car}, đã tính độ dốc (leo ~${up} m).`,
   },
   en: {
     battery: 'Current battery',
@@ -49,6 +51,7 @@ const L = pick({
     needGps: 'Turn on location to estimate battery on arrival.',
     pickCar: 'Estimate battery on arrival — pick your car',
     note: (car: string) => `Estimate for ${car}, terrain not included.`,
+    noteElev: (car: string, up: string) => `Estimate for ${car}, includes elevation (~${up} m of climbing).`,
   },
 })
 
@@ -159,7 +162,10 @@ export function BatteryBox({
 
   const pct = pctOf(reading)
   let est: ArrivalEstimate | null = null
-  if (drive?.kind === 'ok') est = arrivalPct(pct, drive.info.meters / 1000, avgKmh(drive.info.meters, drive.info.seconds), vehicle, climate)
+  // Độ dốc: HERE trả độ cao trên đường tới trạm → cộng năng lượng leo / trừ phần đổ dốc lấy lại.
+  const info = drive?.kind === 'ok' ? drive.info : null
+  const climb = info?.upM !== undefined ? climbKwhOf(info.upM, info.downM ?? 0, vehicle.massKg + LOAD_KG) : 0
+  if (info) est = arrivalPct(pct, info.meters / 1000, avgKmh(info.meters, info.seconds), vehicle, climate, climb)
   else if (drive?.kind === 'fallback') est = arrivalPct(pct, drive.straightKm * ROAD_DETOUR, FALLBACK_KMH, vehicle, climate)
 
   const port = chargePort(power, live)
@@ -193,7 +199,13 @@ export function BatteryBox({
           {cost !== null && ` · ${fmtVnd(cost)}`}
         </p>
       )}
-      {est && <p className="pl-6 text-[11px] text-muted-foreground">{L.note(vehicle.name)}</p>}
+      {est && (
+        <p className="pl-6 text-[11px] text-muted-foreground">
+          {info?.upM !== undefined
+            ? L.noteElev(vehicle.name, (Math.round(info.upM / 10) * 10).toLocaleString(LOCALE))
+            : L.note(vehicle.name)}
+        </p>
+      )}
     </section>
   )
 }

@@ -40,6 +40,7 @@ const L = pick({
     noPlaces: 'Nhà, Công ty… — chạm để đặt',
     noVehicle: 'Chưa chọn',
     climateOn: 'điều hoà bật',
+    slot: (n: number) => `Xe ${n}`,
   },
   en: {
     title: 'Display settings',
@@ -67,6 +68,7 @@ const L = pick({
     noPlaces: 'Home, Work… — tap to set',
     noVehicle: 'Not set',
     climateOn: 'A/C on',
+    slot: (n: number) => `Car ${n}`,
   },
 })
 
@@ -85,14 +87,18 @@ interface Props {
   /** "Nhà · Công ty · Quê" — null khi chưa đặt địa điểm nào. */
   placesSummary: string | null
   onOpenPlaces: () => void
+  /** Đổi Xe 1 ↔ Xe 2 (trong Xe của bạn). */
+  onSwapCar: () => void
   /** Bảng con mở chồng (vd. Địa điểm của tôi). */
   children?: ReactNode
 }
 
 /** Cấu hình hiển thị: đổi là lưu và áp dụng ngay, không có nút "Lưu". */
-export function SettingsSheet({ open, settings, onChange, onClose, placesSummary, onOpenPlaces, children }: Props) {
+export function SettingsSheet({ open, settings, onChange, onClose, placesSummary, onOpenPlaces, onSwapCar, children }: Props) {
   const [vehicleOpen, setVehicleOpen] = useState(false)
-  const car = vehicleSummary(settings)
+  // Có 2 xe thì ghi rõ đang dùng xe nào.
+  const summary = vehicleSummary(settings)
+  const car = summary && settings.otherCar ? `${L.slot(settings.carSlot + 1)} · ${summary}` : summary
   return (
     <AppSheet
       open={open}
@@ -209,7 +215,7 @@ export function SettingsSheet({ open, settings, onChange, onClose, placesSummary
           {L.reset}
         </Button>
       </div>
-      <VehicleSheet nested open={vehicleOpen} settings={settings} onChange={onChange} onClose={() => setVehicleOpen(false)} />
+      <VehicleSheet nested open={vehicleOpen} settings={settings} onChange={onChange} onClose={() => setVehicleOpen(false)} onSwapCar={onSwapCar} />
       {children}
     </AppSheet>
   )
@@ -217,8 +223,22 @@ export function SettingsSheet({ open, settings, onChange, onClose, placesSummary
 
 /** "Khôi phục mặc định" là cấu hình HIỂN THỊ — xe của người dùng không phải sở thích hiển thị, giữ lại. */
 function resetKeepingCar(s: Settings): Settings {
-  const { vehicleId, customKwh, customKwhPer100, usageOverride, climate, pricePerKwh, fuelPer100, fuelPrice } = s
-  return { ...DEFAULT_SETTINGS, vehicleId, customKwh, customKwhPer100, usageOverride, climate, pricePerKwh, fuelPer100, fuelPrice }
+  const { vehicleId, customKwh, customKwhPer100, usageOverride, climate, pricePerKwh, fuelPer100, fuelPrice, batteryHealth, driveStyle, carSlot, otherCar } = s
+  return {
+    ...DEFAULT_SETTINGS,
+    vehicleId,
+    customKwh,
+    customKwhPer100,
+    usageOverride,
+    climate,
+    pricePerKwh,
+    fuelPer100,
+    fuelPrice,
+    batteryHealth,
+    driveStyle,
+    carSlot,
+    otherCar,
+  }
 }
 
 function Field({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {

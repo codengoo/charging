@@ -9,11 +9,15 @@ import { useEffect, useRef, useState } from 'react'
 import { distanceKm, type GeoPoint } from '../lib/geo'
 import type { Station } from './types'
 import { fetchJson } from '../lib/http'
-import { sumSummary } from './here'
+import { parseHereRoutes, sumSummary, type HereRoute } from './here'
+import { elevationProfile } from './elevation'
 
 export interface DriveInfo {
   meters: number
   seconds: number
+  /** Tổng mét leo / xuống trên đường đi (HERE trả độ cao); thiếu = không biết. */
+  upM?: number
+  downM?: number
 }
 
 /** GPS dịch dưới mức này thì giữ điểm gốc cũ — trackUserLocation báo vị trí liên tục. */
@@ -33,13 +37,22 @@ export function cachedDrive(origin: GeoPoint | null, st: Station): DriveInfo | n
 
 async function fetchDrive(origin: GeoPoint, st: Station, signal: AbortSignal): Promise<DriveInfo | null> {
   // 429 / 503 / lỗi mạng: fetchJson ném → không cache để lần mở sau thử lại.
-  const body = await fetchJson<{
-    routes?: Array<{ sections?: Array<{ summary?: { length?: number; duration?: number } }> }>
-  }>(`/api/drive?from=${coord(origin)}&to=${st.lat},${st.lng}`, { signal })
+  const body = await fetchJson<HereRoute>(`/api/drive?from=${coord(origin)}&to=${st.lat},${st.lng}`, { signal })
+  return driveInfoOf(body)
+}
+
+/**
+ * Body HERE → quãng đường + tổng leo / xuống. Chỉ giữ hai con số độ cao, không giữ cả đường đi
+ * (cache theo từng trạm). Bản Worker cũ chỉ trả summary → không có độ cao, vẫn dùng được.
+ */
+export function driveInfoOf(body: HereRoute): DriveInfo | null {
   const sections = body.routes?.[0]?.sections
   if (!sections?.length) return null
   const sum = sumSummary(sections)
-  return sum.meters > 0 ? sum : null
+  if (!(sum.meters > 0)) return null
+  const path = parseHereRoutes(body)[0]
+  const prof = path ? elevationProfile(path.points, path.elev) : null
+  return prof ? { ...sum, upM: prof.totalUp, downM: prof.totalDown } : sum
 }
 
 /**

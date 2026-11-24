@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Drawer as DrawerPrimitive } from 'vaul'
-import { ChevronDown, ChevronUp, ClipboardPaste, ExternalLink, Loader2, Route, X, Zap } from 'lucide-react'
+import { ChevronDown, ChevronUp, ClipboardPaste, ExternalLink, History, Loader2, Route, X, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Chip } from '@/components/ui/chip'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,8 @@ import { BatteryControl, DANGER_PCT, fmtRange, pctOf, pctTone } from './BatteryC
 import { PLAN_MIN_DC_KW, passByKm, type ChargePlan } from '../data/chargePlan'
 import { chargeCost, fmtVnd, tripCosts } from '../data/cost'
 import { planMapsLink } from '../data/planLink'
+import { nextFiveMinutes, planTimeline } from '../data/eta'
+import type { RecentTrip } from '../data/recentTrips'
 import type { RoutePath } from '../data/tripTypes'
 import type { TripPoint } from '../data/trip'
 import { LOCALE } from '../i18n'
@@ -79,10 +81,15 @@ const L = pick({
     avoidSum: (s: string) => `tránh ${s.toLowerCase()}`,
     planOn: 'kế hoạch sạc',
     planCost: (c: string) => `Tiền sạc dọc đường ${c}`,
-    tripCost: (ev: string | null, fuel: string) => `Cả chuyến: điện ${ev ?? "miễn phí"} · xe xăng ${fuel}`,
-    tripCostNote: "Điện tính cả phần pin có sẵn lúc xuất phát.",
+    tripCost: (ev: string | null, fuel: string) => `Cả chuyến: điện ${ev ?? 'miễn phí'} · xe xăng ${fuel}`,
+    tripCostNote: 'Điện tính cả phần pin có sẵn lúc xuất phát.',
     elev: (up: string, down: string) => `Đã tính độ dốc: leo ~${up} m, đổ dốc ~${down} m.`,
-    openMaps: "Mở trong Google Maps",
+    openMaps: 'Mở trong Google Maps',
+    depart: 'Đi lúc',
+    recentTrips: 'Hành trình gần đây',
+    removeTrip: (t: string) => `Bỏ ${t} khỏi danh sách`,
+    arriveAt: (t: string) => `tới nơi ~${t}`,
+    nextDay: ' (hôm sau)',
   },
   en: {
     title: 'Along route',
@@ -135,10 +142,15 @@ const L = pick({
     avoidSum: (s: string) => `avoid ${s.toLowerCase()}`,
     planOn: 'charging plan',
     planCost: (c: string) => `Charging cost on the way ${c}`,
-    tripCost: (ev: string | null, fuel: string) => `Whole trip: electricity ${ev ?? "free"} · petrol car ${fuel}`,
-    tripCostNote: "Electricity includes the battery you start with.",
+    tripCost: (ev: string | null, fuel: string) => `Whole trip: electricity ${ev ?? 'free'} · petrol car ${fuel}`,
+    tripCostNote: 'Electricity includes the battery you start with.',
     elev: (up: string, down: string) => `Includes elevation: ~${up} m up, ~${down} m down.`,
-    openMaps: "Open in Google Maps",
+    openMaps: 'Open in Google Maps',
+    depart: 'Leave at',
+    recentTrips: 'Recent trips',
+    removeTrip: (t: string) => `Remove ${t} from the list`,
+    arriveAt: (t: string) => `arrive ~${t}`,
+    nextDay: ' (next day)',
   },
 })
 
@@ -186,6 +198,9 @@ interface Props {
   planOn: boolean
   plan: ChargePlan | null
   onTogglePlan: () => void
+  /** Hành trình mở gần đây — hiện khi chưa có tuyến, bấm là mở lại. */
+  recentTrips: RecentTrip[]
+  onRemoveTrip: (link: string) => void
 }
 
 /**
@@ -193,7 +208,7 @@ interface Props {
  * tuyến, và bảng chi tiết trạm mở đè lên được. Điện thoại: dải dưới đáy, bấm tay cầm để thu/mở.
  * Màn rộng: thẻ nổi góc trái.
  */
-export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, stationOpen, onOpen, onRadius, routeTotals, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, places, onRouteTo, onManagePlaces, onClose, vehicle, climate, reservePct, pricePerKwh, fuelPer100, fuelPrice, climb, elevation, battery, batteryStale, onBattery, planOn, plan, onTogglePlan }: Props) {
+export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, stationOpen, onOpen, onRadius, routeTotals, onSelectRoute, onAvoid, kwBands, onKwBands, onPick, places, onRouteTo, onManagePlaces, onClose, vehicle, climate, reservePct, pricePerKwh, fuelPer100, fuelPrice, climb, elevation, battery, batteryStale, onBattery, planOn, plan, onTogglePlan, recentTrips, onRemoveTrip }: Props) {
   // Đóng xong App xoá hành trình ngay; giữ bản lúc còn mở để bảng không chớp sang trạng thái trống
   // trong lúc trượt xuống.
   const last = useRef({ trip: tripNow, hits: hitsNow })
@@ -333,6 +348,32 @@ export function TripPanel({ visible, trip: tripNow, hits: hitsNow, power, statio
           {/* Chưa có tuyến: chọn nhanh Từ / Tới địa điểm đã lưu. */}
           {(trip.status === 'idle' || trip.status === 'error') && (
             <PlaceChips places={places} onRoute={onRouteTo} onManage={onManagePlaces} />
+          )}
+
+          {(trip.status === 'idle' || trip.status === 'error') && recentTrips.length > 0 && (
+            <section className="flex flex-col" aria-label={L.recentTrips}>
+              <h3 className="pt-1 pb-0.5 text-xs font-semibold text-muted-foreground">{L.recentTrips}</h3>
+              <ul className="-mx-2 flex flex-col">
+                {recentTrips.map((t) => (
+                  <li key={t.link} className="flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setText(t.link)
+                        onOpen(t.link)
+                      }}
+                      className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2 text-left text-sm hover:bg-muted"
+                    >
+                      <History className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                      <span className="truncate">{t.label}</span>
+                    </button>
+                    <Button variant="ghost" size="icon-sm" aria-label={L.removeTrip(t.label)} onClick={() => onRemoveTrip(t.link)}>
+                      <X />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
 
           {trip.routes.length > 1 && (
@@ -638,6 +679,17 @@ function PlanView({
         )
       : null
   const meters = (m: number) => (Math.round(m / 10) * 10).toLocaleString(LOCALE)
+  // Giờ theo đồng hồ: chọn giờ đi (mặc định bây giờ, làm tròn lên 5 phút), không lưu lại.
+  const [departMs, setDepartMs] = useState(nextFiveMinutes)
+  const times = route ? planTimeline(plan, route, departMs) : null
+  const dayOf = (ms: number) => new Date(ms).toDateString()
+  const clock = (ms: number) =>
+    new Date(ms).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }) +
+    (dayOf(ms) !== dayOf(departMs) ? L.nextDay : '')
+  const hhmm = (ms: number) => {
+    const d = new Date(ms)
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
   const head = !plan.ok
     ? L.planFail(Math.round(plan.stuckAtKm))
     : plan.stops.length === 0
@@ -647,6 +699,26 @@ function PlanView({
     <>
       <p className={`rounded-xl px-3 py-2 text-sm ${plan.ok ? 'bg-brand/10 text-foreground' : 'bg-destructive/10 text-destructive'}`}>
         {head}
+        {plan.ok && times?.arriveDest != null && (
+          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <label className="flex items-center gap-1.5">
+              {L.depart}
+              <input
+                type="time"
+                value={hhmm(departMs)}
+                onChange={(e) => {
+                  const [h, m] = e.target.value.split(':').map(Number)
+                  if (!Number.isFinite(h) || !Number.isFinite(m)) return
+                  const d = new Date()
+                  d.setHours(h, m, 0, 0)
+                  setDepartMs(d.getTime())
+                }}
+                className="h-7 rounded-md border border-border bg-card px-1.5 text-sm tabular-nums text-foreground"
+              />
+            </label>
+            <span className="font-semibold">→ {L.arriveAt(clock(times.arriveDest))}</span>
+          </span>
+        )}
         {plan.ok && total !== null && <span className="block font-semibold">{L.planCost(fmtVnd(total))}</span>}
         {whole?.fuel != null && (
           <span className="mt-0.5 block">
@@ -679,6 +751,12 @@ function PlanView({
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="line-clamp-2 text-[15px] leading-snug">{s.item.station.name}</span>
                   <span className={`text-xs ${pctTone(s.arrive.low)}`}>
+                    {times && (
+                      <span className="font-semibold text-foreground tabular-nums">
+                        {clock(times.stops[i].arrive)}
+                        {s.chargeMin !== null && `–${clock(times.stops[i].leave)}`} ·{' '}
+                      </span>
+                    )}
                     {L.stopLine(fmtRange(s.arrive), s.toPct, s.chargeMin === null ? null : fmtMinutes(s.chargeMin * 60), fmtKw(s.kw))}
                     {costs[i] !== null && <span className="text-muted-foreground"> · {fmtVnd(costs[i]!)}</span>}
                   </span>

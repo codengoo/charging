@@ -128,4 +128,16 @@ describe('vehicleOf', () => {
     expect(vehicleOf('xyz', 60, 16)).toBeNull()
     expect(vehicleOf(null, 60, 16)).toBeNull()
   })
+  it('pin chai thu nhỏ dung lượng; kiểu lái nhân tiêu thụ ước tính', () => {
+    const vf8 = VEHICLES.find((v) => v.id === 'vf8')!
+    expect(vehicleOf('vf8', 0, 0, null, { health: 90 })!.kwh).toBeCloseTo(vf8.kwh * 0.9, 9)
+    expect(vehicleOf('vf8', 0, 0, null, { style: 'fast' })!.kwhPer100).toBeCloseTo(vf8.kwhPer100 * 1.12, 9)
+    expect(vehicleOf('vf8', 0, 0, null, { style: 'eco' })!.kwhPer100).toBeCloseTo(vf8.kwhPer100 * 0.92, 9)
+    // Mặc định → nguyên object mẫu.
+    expect(vehicleOf('vf8', 0, 0, null, { health: 100, style: 'normal' })).toBe(vf8)
+  })
+  it('đã nhập tiêu thụ thực tế → kiểu lái không nhân thêm; health kẹp ≥ 60', () => {
+    expect(vehicleOf('vf8', 0, 0, 22, { style: 'fast' })!.kwhPer100).toBe(22)
+    expect(vehicleOf(CUSTOM_ID, 60, 16, null, { health: 10 })!.kwh).toBeCloseTo(36, 9)
+  })
 })

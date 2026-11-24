@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyseHistory, estimateFromHistory, parseLive, windowHistory, type HistoryPoint, type LiveHistory } from '@/data/live'
+import { analyseHistory, estimateFromHistory, freeSummary, parseLive, windowHistory, type HistoryPoint, type LiveHistory } from '@/data/live'
 
 const M = 60_000
 const H = 60 * M
@@ -154,5 +154,13 @@ describe('estimateFromHistory', () => {
     expect(estimateFromHistory(hist([{ at: now, cars: 1 }]), [], now)).toBeNull()
     expect(estimateFromHistory(hist([{ at: now - 3 * H - 1, cars: 1 }]), [{ kw: 60, count: 4 }], now)).toBeNull()
     expect(estimateFromHistory(hist([]), [{ kw: 60, count: 4 }], now)).toBeNull()
+  })
+})
+
+describe('freeSummary', () => {
+  it('cộng mọi mức kW; không có cổng → null', () => {
+    const s = parseLive({}, 1)
+    expect(freeSummary(s)).toBeNull()
+    expect(freeSummary({ ...s, ports: [{ kw: 150, free: 1, total: 4 }, { kw: 60, free: 2, total: 2 }] })).toEqual({ free: 3, total: 6 })
   })
 })

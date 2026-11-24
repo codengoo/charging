@@ -345,3 +345,65 @@ export function useLiveStatus(storeId: string | null, enabled: boolean): LiveSta
   const retry = useCallback(() => setNonce((n) => n + 1), [])
   return { live, liveLoading, liveError, history, historyLoading, historyError, retry }
 }
+
+/** Tổng cổng trống / tổng cổng cả trạm (mọi mức kW); không báo số cổng → null. */
+export function freeSummary(s: LiveStatus): { free: number; total: number } | null {
+  if (s.ports.length === 0) return null
+  let free = 0
+  let total = 0
+  for (const p of s.ports) {
+    free += p.free
+    total += p.total
+  }
+  return { free, total }
+}
+
+/** Số trạm tối đa hỏi cùng lúc cho danh sách — `/api/*` dùng chung giới hạn 30 lượt / phút / IP. */
+export const LIVE_MANY_MAX = 6
+const LIVE_MANY_CONCURRENCY = 3
+const LIVE_MANY_TTL = 2 * 60_000
+/** Kết quả gần đây theo storeId (null = trạm không có số liệu / lỗi) — mở lại danh sách không hỏi lại ngay. */
+const manyCache = new Map<string, { at: number; v: LiveStatus | null }>()
+
+/**
+ * Cổng trống của vài trạm (danh sách Đã lưu): chỉ LIVE_MANY_MAX id đầu, tối đa 3 lượt song song,
+ * nhớ 2 phút. `enabled=false` (bảng đóng) thì không gọi, giữ kết quả cũ.
+ */
+export function useLiveMany(storeIds: string[], enabled: boolean): Map<string, LiveStatus | null> {
+  const ids = storeIds.slice(0, LIVE_MANY_MAX)
+  const key = ids.join(',')
+  const [, bump] = useState(0)
+
+  useEffect(() => {
+    if (!enabled || !key) return
+    const now = Date.now()
+    const todo = key.split(',').filter((id) => {
+      const hit = manyCache.get(id)
+      return !hit || now - hit.at > LIVE_MANY_TTL
+    })
+    if (todo.length === 0) return
+    const ctrl = new AbortController()
+    let next = 0
+    const worker = async () => {
+      while (next < todo.length && !ctrl.signal.aborted) {
+        const id = todo[next++]
+        try {
+          manyCache.set(id, { at: Date.now(), v: await fetchLive(id, ctrl.signal) })
+        } catch {
+          if (ctrl.signal.aborted) return
+          manyCache.set(id, { at: Date.now(), v: null })
+        }
+        bump((n) => n + 1)
+      }
+    }
+    for (let i = 0; i < LIVE_MANY_CONCURRENCY; i++) void worker()
+    return () => ctrl.abort()
+  }, [key, enabled])
+
+  const out = new Map<string, LiveStatus | null>()
+  for (const id of ids) {
+    const hit = manyCache.get(id)
+    if (hit) out.set(id, hit.v)
+  }
+  return out
+}

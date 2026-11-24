@@ -58,19 +58,43 @@ const CUSTOM_NAME = pick({ vi: 'Tuỳ chỉnh', en: 'Custom' })
 /** Xe Tuỳ chỉnh: dạng NMC chung (như VF 8), đỉnh 120 kW. */
 const GENERIC_CURVE_150: Vehicle['dcCurve'] = [[0, 66], [10, 102], [20, 120], [40, 114], [50, 106], [60, 93], [70, 79], [80, 60], [90, 33], [100, 9]]
 
+/** Kiểu lái: hệ số nhân mức tiêu thụ ước tính (không áp khi đã nhập tiêu thụ thực tế). */
+export type DriveStyle = 'eco' | 'normal' | 'fast'
+export const DRIVE_STYLES: DriveStyle[] = ['eco', 'normal', 'fast']
+export const STYLE_FACTOR: Record<DriveStyle, number> = { eco: 0.92, normal: 1, fast: 1.12 }
+
+/** Dung lượng pin còn lại so với lúc mới (%) — pin chai sau vài năm. */
+export const HEALTH_MIN = 60
+export const HEALTH_OPTIONS = [100, 95, 90, 85, 80] as const
+
+export interface VehicleOpts {
+  /** % dung lượng còn lại (60–100); mặc định 100. */
+  health?: number
+  style?: DriveStyle
+}
+
 /**
  * Xe đang chọn; null = chưa chọn. Xe tuỳ chỉnh không giới hạn công suất sạc thêm. Mẫu có sẵn +
  * `usageOverride` (số người dùng đọc trên màn hình xe) → giữ pin / công suất sạc của mẫu, chỉ
- * thay mức tiêu thụ.
+ * thay mức tiêu thụ. `health` thu nhỏ dung lượng dùng được; `style` nhân mức tiêu thụ ƯỚC TÍNH —
+ * số tiêu thụ thực tế (override) đã phản ánh cách lái nên không nhân thêm.
  */
 export function vehicleOf(
   id: string | null,
   customKwh: number,
   customKwhPer100: number,
   usageOverride: number | null = null,
+  opts: VehicleOpts = {},
 ): Vehicle | null {
-  if (id === CUSTOM_ID) return { id, name: CUSTOM_NAME, kwh: customKwh, kwhPer100: customKwhPer100, dcKw: 150, acKw: 11, massKg: 1800, dcCurve: GENERIC_CURVE_150 }
-  const v = VEHICLES.find((x) => x.id === id)
-  if (!v) return null
-  return usageOverride ? { ...v, kwhPer100: usageOverride } : v
+  const base: Vehicle | undefined =
+    id === CUSTOM_ID
+      ? { id, name: CUSTOM_NAME, kwh: customKwh, kwhPer100: customKwhPer100, dcKw: 150, acKw: 11, massKg: 1800, dcCurve: GENERIC_CURVE_150 }
+      : VEHICLES.find((x) => x.id === id)
+  if (!base) return null
+  const health = Math.min(100, Math.max(HEALTH_MIN, opts.health ?? 100))
+  const style = usageOverride ? 1 : STYLE_FACTOR[opts.style ?? 'normal']
+  const per100 = (usageOverride || base.kwhPer100) * style
+  // Không đổi gì → trả nguyên object mẫu (so sánh tham chiếu ổn định cho useMemo).
+  if (health === 100 && per100 === base.kwhPer100) return base
+  return { ...base, kwh: (base.kwh * health) / 100, kwhPer100: per100 }
 }
